@@ -1,0 +1,40 @@
+1) Equity 2010–2026 (wöchentlich bewertet):
+   ohne SL/TP       Endkapital     21212  CAGR  4.57 %  Max DD  24.9 %
+   SL 6 / TP 5      Endkapital     22865  CAGR  5.03 %  Max DD  26.2 %
+   Kaufen & Halten  Endkapital     65844  CAGR 11.84 %  Max DD  32.7 %
+
+2) Walk-Forward (5 Jahre Training -> 1 Jahr Test, Ziel: Rendite/Drawdown):
+   Jahr  gewählt (SL/TP)   WF-Rendite  Basis   SL6/TP5
+   2012  SL 0.0 / TP 3.5      11.7 %    10.9 %    10.9 %
+   2013  SL 0.0 / TP 3.5       9.0 %     9.2 %     9.2 %
+   2014  SL 5.5 / TP 3.5      19.6 %    19.8 %    19.8 %
+   2015  SL 5.0 / TP 3.5       3.4 %     2.5 %     1.1 %
+   2016  SL 5.0 / TP 3.0      13.0 %    12.1 %    12.8 %
+   2017  SL 4.5 / TP 3.0      11.4 %    11.4 %    11.4 %
+   2018  SL 4.5 / TP 3.0     -11.3 %    -8.1 %    -8.2 %
+   2019  SL 0.0 / TP 3.0      15.4 %    16.0 %    16.0 %
+   2020  SL 0.0 / TP 3.0      -6.8 %   -11.4 %    -6.9 %
+   2021  SL 6.0 / TP 4.0       0.7 %     1.7 %     1.7 %
+   2022  SL 6.0 / TP 4.0     -15.1 %    -7.5 %   -11.8 %
+   2023  SL 7.5 / TP 5.0       5.9 %     5.9 %     5.9 %
+   2024  SL 7.5 / TP 4.0      11.5 %    13.3 %    12.5 %
+   2025  SL 7.5 / TP 0.0      24.9 %    24.9 %    26.1 %
+   2026  SL 7.5 / TP 0.0      -3.1 %    -3.1 %    -3.1 %
+   Gesamt WF      :  121.4 %  Max DD 29.4 %
+   Gesamt Basis   :  139.8 %  Max DD 23.2 %
+   Gesamt SL6/TP5 :  139.0 %  Max DD 26.2 %
+
+3) Monte-Carlo (10.000 Bootstrap-Reihenfolgen, 202 Trades):
+   ohne SL/TP   Endkapital P5   10498  Median   21404  P95   42309 | Max DD Median 23.8 %  P95 41.4 % | P(Verlust)  3.9 %
+   SL 6 / TP 5  Endkapital P5   11816  Median   23026  P95   43804 | Max DD Median 21.6 %  P95 36.8 % | P(Verlust)  2.0 %
+
+4) Regression (SL 6 / TP 5):
+   Trend des Kapitals: 5.01 %/Jahr, R² = 0.822 (1 = perfekt gleichmäßig)
+   Gegen S&P 500: Beta 0.39, Alpha 0.55 %/Jahr, R² 0.40, Zeit im Markt 50 %
+
+5) Zufalls-Timing-Test (ohne SL/TP, 10.000 Läufe mit gleichen Haltedauern, zufälligen Startwochen):
+   Strategie 114.2 %, Zufall Median 178.4 %, p-Wert 0.716
+
+6) Parameter-Landkarte (Einstiegstag 6–16 x Ausstiegstag 20–28, ohne SL/TP):
+   11/27: 114.2 % | alle Varianten: Median 71.5 %, positiv 100 %, Min 1.6 %, Max 204.8 %
+   Nachbarn (Einstieg 9–13, Ausstieg 25–28): Median 120.7 %, Min 86.1 %
