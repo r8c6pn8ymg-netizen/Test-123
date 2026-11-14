@@ -1,7 +1,8 @@
 //@version=6
 // Regime Kalman – Grün = Long-Regime, Rot = Short-Regime, Gelb = Übergang (Regime wird schwächer / wechselt).
-// Kern: Kalman-Filter auf den Schlusskurs; KalF% = logistische Wahrscheinlichkeit, dass der Kurs
-// über dem Kalman-Trend liegt (Abstand in ATR normiert). Kalibriert an 6N1! 1W.
+// Kern: Trend = Schlusskurs vs. SMA(20); Gelb = starker Sprung der KalF% gegen den Trend.
+// KalF% = logistische Wahrscheinlichkeit, dass der Kurs über dem Kalman-Trend liegt (Abstand in ATR).
+// Kalibriert an 6N1! 1W (Screenshot-Farben des Originals, ~82 % Wochen-Übereinstimmung).
 indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
 
 // ───────── Eingaben ─────────
@@ -9,8 +10,11 @@ grpR = "Regime"
 float qr      = input.float(0.01, "Kalman Q/R (höher = schneller)", minval = 0.0001, step = 0.001, group = grpR)
 int   atrLen  = input.int(5, "ATR-Länge", minval = 1, group = grpR)
 float gain    = input.float(4.3, "Steilheit KalF%", minval = 0.1, step = 0.1, group = grpR)
-float upper   = input.float(70, "Schwelle Grün (KalF% ≥)", minval = 50, maxval = 100, group = grpR)
-float lower   = input.float(30, "Schwelle Rot (KalF% ≤)", minval = 0, maxval = 50, group = grpR)
+string mode    = input.string("Trend + KalF-Warnung", "Regime-Logik", options = ["Trend + KalF-Warnung", "KalF-Schwellen"], group = grpR, tooltip = "Trend + KalF-Warnung: Grün/Rot = Schlusskurs über/unter SMA, Gelb = starker KalF-Sprung gegen den Trend (am Original kalibriert, ~82 % Übereinstimmung auf 6N1! 1W).\nKalF-Schwellen: Grün ≥ obere, Rot ≤ untere Schwelle, dazwischen Gelb.")
+int   trendLen = input.int(20, "Trend-Länge (SMA)", minval = 2, group = grpR)
+float yT      = input.float(4.0, "Gelb-Empfindlichkeit (kleiner = mehr Gelb)", minval = 0.5, step = 0.5, group = grpR)
+float upper   = input.float(70, "Schwelle Grün (KalF% ≥) – nur KalF-Schwellen", minval = 50, maxval = 100, group = grpR)
+float lower   = input.float(30, "Schwelle Rot (KalF% ≤) – nur KalF-Schwellen", minval = 0, maxval = 50, group = grpR)
 int   confirm = input.int(0, "Regime Confirmation Kerzen", minval = 0, group = grpR)
 
 grpS = "Darstellung"
@@ -49,16 +53,24 @@ float kalf = 100 / (1 + math.exp(-gain * z))
 float volPct = ta.percentrank(atr / close, 100)
 
 // ───────── Regime-Zustand ─────────
-int raw = kalf >= upper ? 1 : kalf <= lower ? -1 : 0
+bool trendMode = mode == "Trend + KalF-Warnung"
+float sma = ta.sma(close, trendLen)
+int raw = trendMode ? (close > sma ? 1 : -1) : (kalf >= upper ? 1 : kalf <= lower ? -1 : 0)
 // Bestätigung: raw muss `confirm` weitere Kerzen gleich bleiben
 int  sinceChange = ta.barssince(raw != raw[1])
 bool held = confirm == 0 or sinceChange >= confirm
-var int state = 0                      // 1 = Grün, -1 = Rot, 0 = Gelb
-if not na(kalf)
+var int base = 0                       // bestätigter Trend: 1 = Long, -1 = Short
+if not na(kalf) and not na(sma)
     if raw != 0 and held
-        state := raw
-    else if raw == 0
-        state := 0
+        base := raw
+    else if raw == 0 and not trendMode
+        base := 0
+// KalF als Logit, um Sprünge gegen den Trend zu messen
+float pK  = math.max(math.min(kalf / 100, 0.99999), 0.00001)
+float lz  = math.log(pK / (1 - pK))
+float dz  = lz - lz[1]
+bool  warn = trendMode and ((base[1] == 1 and dz < -yT) or (base[1] == -1 and dz > yT))
+int state = warn ? 0 : base            // 1 = Grün, -1 = Rot, 0 = Gelb
 
 color stCol = state == 1 ? colG : state == -1 ? colR : colY
 
@@ -70,7 +82,7 @@ var int pG = 0
 var int pR = 0
 var int pY = 0
 var int stBars = 0
-if not na(kalf)
+if not na(kalf) and not na(sma)
     nG += state == 1 ? 1 : 0
     nR += state == -1 ? 1 : 0
     nY += state == 0 ? 1 : 0
@@ -97,8 +109,8 @@ bool showES  = exitS and not exitSP and not onlyPlus
 // ───────── Plots (Pane) ─────────
 plot(kalf, "KalF%", color = stCol, linewidth = 2)
 plot(volPct, "Vol%", color = color.new(color.gray, 40))
-hline(upper, "Grün-Schwelle", color = color.new(colG, 50), linestyle = hline.style_dashed)
-hline(lower, "Rot-Schwelle", color = color.new(colR, 50), linestyle = hline.style_dashed)
+hline(trendMode ? 50 : upper, "Grün-Schwelle", color = color.new(colG, 50), linestyle = hline.style_dashed)
+hline(trendMode ? 50 : lower, "Rot-Schwelle", color = color.new(colR, 50), linestyle = hline.style_dashed)
 
 // ───────── Hauptchart ─────────
 barcolor(colorBars ? color.new(stCol, candleTr) : na, title = "Candles Color")
