@@ -1,0 +1,135 @@
+//@version=6
+// COT Commercials Extreme – farbt den Chart-Hintergrund, wenn die Commercials
+// (Legacy-COT-Report der CFTC) im Verhältnis zur eigenen Historie Extrempunkte erreichen.
+// Base = Root/Basiswährung des Charts, Quote = Quote-Währung (nur bei Forex-Paaren sinnvoll).
+indicator("COT Commercials Extreme", "COT-Extreme", overlay = true)
+
+import TradingView/LibraryCOT/2 as cot
+
+// ───────── Daten ─────────
+grpD = "Daten"
+bool   inclOpt     = input.string("Futures", "Futures/Options", options = ["Futures", "Futures + Options"], group = grpD) == "Futures + Options"
+int    lookback    = input.int(26, "Länge der Historie (Wochen)", minval = 4, maxval = 520, group = grpD)
+float  extPct      = input.float(10, "Extremzone (% oben / unten)", minval = 1, maxval = 49, group = grpD, tooltip = "10 = COT-Index ≥ 90 (Commercials extrem long) bzw. ≤ 10 (extrem short)")
+bool   useRoc      = input.bool(false, "Veränderungsrate verwenden?", group = grpD, tooltip = "Signal nur, wenn der COT-Index sich in den letzten X Wochen um mindestens Y Punkte in Richtung Extrem bewegt hat")
+int    rocLen      = input.int(5, "Veränderungsrate – Wochen (X)", minval = 1, group = grpD)
+float  rocMin      = input.float(20, "Veränderungsrate – min. Punkte (Y)", minval = 0, group = grpD)
+string baseCodeIn  = input.string("", "CFTC-Code Base (leer = automatisch)", group = grpD)
+bool   useQuote    = input.bool(false, "Quote-Währung auswerten (nur Forex-Paare)", group = grpD)
+string quoteCodeIn = input.string("", "CFTC-Code Quote (leer = automatisch)", group = grpD)
+
+// ───────── Anzeige ─────────
+grpA = "Anzeige"
+bool   pairFirst  = input.bool(true, "Pair-Färbung vor Base/Quote priorisieren", group = grpA)
+string bothSrc    = input.string("Base", "Hintergrund-Quelle wenn Base & Quote gleichzeitig aktiv", options = ["Base", "Quote"], group = grpA)
+bool   showArrows = input.bool(true, "Bias-Marker (Pfeile) anzeigen", group = grpA)
+bool   showTable  = input.bool(true, "Info-Tabelle anzeigen", group = grpA)
+int    transp     = input.int(85, "Hintergrund-Transparenz (0–100)", minval = 0, maxval = 100, group = grpA)
+
+grpB = "Base Bias"
+bool  showBL = input.bool(true, "Base Long anzeigen", group = grpB)
+color colBL  = input.color(color.green, "Farbe Base Long", group = grpB)
+bool  showBS = input.bool(true, "Base Short anzeigen", group = grpB)
+color colBS  = input.color(color.red, "Farbe Base Short", group = grpB)
+
+grpQ = "Quote Bias"
+bool  showQL = input.bool(false, "Quote Long anzeigen", group = grpQ, tooltip = "Commercials extrem long in der Quote-Währung → bearish fürs Paar")
+color colQL  = input.color(color.orange, "Farbe Quote Long", group = grpQ)
+bool  showQS = input.bool(false, "Quote Short anzeigen", group = grpQ)
+color colQS  = input.color(color.aqua, "Farbe Quote Short", group = grpQ)
+
+grpP = "Pair Bias (Base & Quote bestätigen sich)"
+color colPL = input.color(color.lime, "Farbe Pair Long", group = grpP)
+color colPS = input.color(color.maroon, "Farbe Pair Short", group = grpP)
+
+// ───────── COT-Daten ─────────
+string baseCode  = baseCodeIn != "" ? baseCodeIn : cot.convertRootToCOTCode("Auto")
+string quoteCode = not useQuote ? "" : quoteCodeIn != "" ? quoteCodeIn : cot.convertRootToCOTCode("Currency")
+
+f_net(string code) =>
+    string tL = cot.COTTickerid("Legacy", code, inclOpt, "Commercial Positions", "Long", "All")
+    string tS = cot.COTTickerid("Legacy", code, inclOpt, "Commercial Positions", "Short", "All")
+    float l = request.security(tL, "1W", close, ignore_invalid_symbol = true)
+    float s = request.security(tS, "1W", close, ignore_invalid_symbol = true)
+    l - s
+
+// COT-Index (0–100) über die letzten `lookback` Wochen + Veränderung über `rocLen` Wochen.
+// Arrays statt ta.highest/lowest, damit die Historie auf jedem Chart-Timeframe in Wochen gemessen wird.
+f_cot(float net) =>
+    var nets = array.new_float()
+    var idxs = array.new_float()
+    if timeframe.change("1W") and not na(net)
+        nets.push(net)
+        if nets.size() > lookback
+            nets.shift()
+        if nets.size() == lookback
+            float lo = nets.min()
+            float hi = nets.max()
+            idxs.push(hi > lo ? (net - lo) / (hi - lo) * 100 : 50)
+            if idxs.size() > rocLen + 1
+                idxs.shift()
+    float idx = idxs.size() > 0 ? idxs.last() : na
+    float roc = idxs.size() > rocLen ? idxs.last() - idxs.first() : na
+    [idx, roc]
+
+// +1 = Commercials extrem long, -1 = extrem short, 0 = neutral
+f_bias(float idx, float roc) =>
+    bool longExt  = idx >= 100 - extPct and (not useRoc or roc >= rocMin)
+    bool shortExt = idx <= extPct and (not useRoc or roc <= -rocMin)
+    longExt ? 1 : shortExt ? -1 : 0
+
+[baseIdx, baseRoc]   = f_cot(f_net(baseCode))
+[quoteIdx, quoteRoc] = f_cot(f_net(quoteCode))
+int baseB  = f_bias(baseIdx, baseRoc)
+int quoteB = useQuote ? f_bias(quoteIdx, quoteRoc) : 0
+
+// ───────── Färbung ─────────
+bool pairL = baseB == 1 and quoteB == -1
+bool pairS = baseB == -1 and quoteB == 1
+
+color baseCol  = baseB == 1 and showBL ? colBL : baseB == -1 and showBS ? colBS : na
+color quoteCol = quoteB == 1 and showQL ? colQL : quoteB == -1 and showQS ? colQS : na
+int   baseDir  = na(baseCol) ? 0 : baseB
+int   quoteDir = na(quoteCol) ? 0 : -quoteB   // Quote-Long ist bearish fürs Paar
+
+color bg  = na
+int   dir = 0
+if pairFirst and pairL
+    bg := colPL
+    dir := 1
+else if pairFirst and pairS
+    bg := colPS
+    dir := -1
+else if not na(baseCol) and not na(quoteCol)
+    bg  := bothSrc == "Base" ? baseCol : quoteCol
+    dir := bothSrc == "Base" ? baseDir : quoteDir
+else if not na(baseCol)
+    bg := baseCol
+    dir := baseDir
+else if not na(quoteCol)
+    bg := quoteCol
+    dir := quoteDir
+
+bgcolor(na(bg) ? na : color.new(bg, transp), title = "COT-Hintergrund")
+
+bool newLong  = dir == 1 and dir[1] != 1
+bool newShort = dir == -1 and dir[1] != -1
+plotshape(showArrows and newLong,  "Bias Long",  shape.triangleup,   location.belowbar, color.new(colBL, 0), size = size.small)
+plotshape(showArrows and newShort, "Bias Short", shape.triangledown, location.abovebar, color.new(colBS, 0), size = size.small)
+
+alertcondition(newLong,  "COT Extrem Long",  "Commercials erreichen Extrem LONG auf {{ticker}}")
+alertcondition(newShort, "COT Extrem Short", "Commercials erreichen Extrem SHORT auf {{ticker}}")
+
+// ───────── Info-Tabelle ─────────
+var table info = table.new(position.top_right, 3, 3, bgcolor = color.new(color.gray, 85), border_width = 1)
+if showTable and barstate.islast
+    info.cell(0, 0, "COT", text_size = size.small)
+    info.cell(1, 0, "Code", text_size = size.small)
+    info.cell(2, 0, "Index", text_size = size.small)
+    info.cell(0, 1, "Base", text_size = size.small)
+    info.cell(1, 1, baseCode == "" ? "–" : baseCode, text_size = size.small)
+    info.cell(2, 1, na(baseIdx) ? "n/a" : str.tostring(baseIdx, "#"), text_size = size.small)
+    if useQuote
+        info.cell(0, 2, "Quote", text_size = size.small)
+        info.cell(1, 2, quoteCode == "" ? "–" : quoteCode, text_size = size.small)
+        info.cell(2, 2, na(quoteIdx) ? "n/a" : str.tostring(quoteIdx, "#"), text_size = size.small)
