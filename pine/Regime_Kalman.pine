@@ -2,19 +2,19 @@
 // Regime – Grün = Long-Regime, Rot = Short-Regime, Gelb = Übergang (Warnung vor dem Wechsel).
 // KalF% = Stochastik über 23 Kerzen (aktuelle inkl.), logistisch gestaucht (Faktor 17.6211)
 //         → reproduziert die KalF%-Werte des Originals exakt (geprüft an 6N1! 1W und SPX 1D).
-// Farblogik: Zustandsautomat, am Original kalibriert (~97 % identische Kerzenfarben).
+// Farblogik: Zustandsautomat, am Original kalibriert (SPX 1D 97,0 % · 6N1! 1W 96,9 % · NYA 1M 98,2 % identische Kerzenfarben).
 indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
 
 // ───────── Eingaben ─────────
 grpR = "Regime (kalibriert – nur ändern, wenn du bewusst abweichen willst)"
 int   len  = input.int(23, "KalF Länge", minval = 2, group = grpR)
 float stp  = input.float(17.6211, "KalF Steilheit", minval = 0.1, group = grpR)
-float hy   = input.float(93, "Grün halten ab KalF% ≥", group = grpR)
+float hy   = input.float(93.5, "Grün halten ab KalF% ≥", group = grpR)
 float hg   = input.float(97, "Rot → Grün direkt ab KalF% ≥", group = grpR)
 float lg   = input.float(3, "Grün → Rot direkt bei KalF% ≤", group = grpR)
 float dK   = input.float(5, "Gelb aus Rot: KalF-Anstieg ≥", group = grpR)
-float lr   = input.float(10, "Gelb aus Rot: vorher KalF% ≤", group = grpR)
-int   lockN = input.int(3, "Sperre nach Gelb (Kerzen)", minval = 0, group = grpR)
+float lr   = input.float(8, "Gelb aus Rot: vorher KalF% ≤", group = grpR)
+int   lockN = input.int(0, "Sperre nach Gelb (Kerzen)", minval = 0, group = grpR)
 
 grpS = "Darstellung"
 bool  colorBars  = input.bool(true, "Kerzen einfärben", group = grpS)
