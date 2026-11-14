@@ -12,6 +12,7 @@ int   nYears  = input.int(10, "Durchschnittsjahre", options = [5, 10, 15, 20, 25
 bool  showS   = input.bool(true, "Saisonalität anzeigen", group = grpS)
 color colS    = input.color(color.blue, "Saisonalität Farbe", group = grpS)
 int   fwdDays = input.int(14, "Vorschau (Kalendertage voraus)", minval = 1, maxval = 365, group = grpS)
+bool  detr    = input.bool(false, "Jahrestrend herausrechnen", group = grpS, tooltip = "Entfernt den durchschnittlichen Jahresanstieg (z. B. beim S&P ca. +8–10 % pro Jahr), damit nur noch die saisonalen Schwankungen sichtbar sind")
 
 grpC = "US Election"
 int   nCyc   = input.int(5, "Anzahl der Zyklen", options = [3, 4, 5, 6, 7, 8], group = grpC, tooltip = "5 Zyklen = die letzten 5 Jahre mit derselben Zyklusphase (= 20 Jahre zurück)")
@@ -82,25 +83,21 @@ f_seas(int r, int d, int n, int step) =>
                 c += 1
     [c >= 2 ? s / c : na, c]
 
-// ───────── Saison-Linie (alle Jahre) ─────────
-[sNow, sCnt]       = f_seas(row, doy, nYears, 1)
-[sEndPrev, sCntP]  = f_seas(row - 1, 365, nYears, 1)
-var float anchorS = na
-if newYear and not na(anchorS) and not na(sEndPrev)
-    anchorS *= sEndPrev
-if na(anchorS) and not na(sNow)
-    anchorS := close / sNow
-float seasLine = isDaily ? anchorS * sNow : na
+// Saisonwert für Tag d, optional ohne durchschnittlichen Jahrestrend
+f_val(int r, int d, int n, int step) =>
+    [a, c] = f_seas(r, d, n, step)
+    [aE, cE] = f_seas(r, 365, n, step)
+    float v = detr and not na(a) and not na(aE) and aE > 0 ? a / math.pow(aE, d / 365.0) : a
+    [v, c]
 
-// ───────── Zyklus-Linie (nur Jahre gleicher US-Zyklusphase) ─────────
-[cNow, cCnt]       = f_seas(row, doy, nCyc, 4)
-[cEndPrev, cCntP]  = f_seas(row - 1, 365, nCyc, 4)
-var float anchorC = na
-if newYear and not na(anchorC) and not na(cEndPrev)
-    anchorC *= cEndPrev
-if na(anchorC) and not na(cNow)
-    anchorC := close / cNow
-float cycLine = isDaily ? anchorC * cNow : na
+// ───────── Saison-Linie (alle Jahre) ─────────
+// Jedes Jahr startet neu beim Schlusskurs des Vorjahres – so ist der Verlauf innerhalb des Jahres sichtbar
+// (keine Verkettung über mehrere Jahre, die den Langfristtrend aufsummiert).
+[sNow, sCnt] = f_val(row, doy, nYears, 1)
+[cNow, cCnt] = f_val(row, doy, nCyc, 4)
+float yBase    = row >= 0 and row < MAXY ? px.get(row, 0) : na
+float seasLine = isDaily ? yBase * sNow : na
+float cycLine  = isDaily ? yBase * cNow : na
 
 int   phase  = yr % 4      // 0 = Wahljahr, 1 = Post-Election, 2 = Midterm, 3 = Pre-Election
 color colCyc = phase == 0 ? colEl : phase == 1 ? colPo : phase == 2 ? colMi : colPr
@@ -109,23 +106,24 @@ plot(showS ? seasLine : na, "Saisonalität", color = colS, linewidth = 2)
 plot(showC ? cycLine : na, "US-Zyklus", color = colCyc, linewidth = 2)
 
 // ───────── Vorschau in die Zukunft ─────────
-f_future(float anchor, float lineNow, int n, int step) =>
+f_future(float lineNow, int n, int step) =>
     chart.point[] pts = array.new<chart.point>()
-    if not na(anchor) and not na(lineNow)
+    if not na(yBase) and not na(lineNow)
         pts.push(chart.point.from_time(time, lineNow))
-        [endCur, endCnt] = f_seas(row, 365, n, step)
+        [endCur, endCnt] = f_val(row, 365, n, step)
         for k = 1 to fwdDays
             int t  = td + k * DAY
             int dw = dayofweek(t, "UTC")
             bool skip = syminfo.type != "crypto" and (dw == dayofweek.saturday or dw == dayofweek.sunday)
             if not skip
-                int y2 = year(t, "UTC")
-                int r2 = y2 - baseYear
+                int r2 = year(t, "UTC") - baseYear
                 int d2 = f_doy(t)
-                [s2, c2] = f_seas(r2, d2, n, step)
-                float a2 = r2 == row ? anchor : anchor * endCur
-                if not na(s2) and not na(a2)
-                    pts.push(chart.point.from_time(time + k * DAY, a2 * s2))
+                // im Folgejahr: Startwert = projizierter Jahresschluss des laufenden Jahres
+                float base2 = r2 == row ? yBase : yBase * endCur
+                // Saisonwert für das Folgejahr: Durchschnitt der n Jahre vor dem Folgejahr
+                [s2, c2] = f_val(r2 == row ? row : row + 1, d2, n, step)
+                if not na(s2) and not na(base2)
+                    pts.push(chart.point.from_time(time + k * DAY, base2 * s2))
     pts
 
 var polyline plS = na
@@ -139,16 +137,16 @@ if barstate.islast
         plS.delete()
         plC.delete()
         if showS
-            chart.point[] a = f_future(anchorS, seasLine, nYears, 1)
+            chart.point[] a = f_future(seasLine, nYears, 1)
             if a.size() > 1
                 plS := polyline.new(a, xloc = xloc.bar_time, line_color = colS, line_width = 2)
         if showC
-            chart.point[] b = f_future(anchorC, cycLine, nCyc, 4)
+            chart.point[] b = f_future(cycLine, nCyc, 4)
             if b.size() > 1
                 plC := polyline.new(b, xloc = xloc.bar_time, line_color = colCyc, line_width = 2)
         if showInfo
             string ph = phase == 0 ? "Wahljahr" : phase == 1 ? "Post-Election" : phase == 2 ? "Midterm" : "Pre-Election"
-            string txt = "Saison: Ø aus " + str.tostring(sCnt) + " Jahren · Vorschau " + str.tostring(fwdDays) + " Tage"
+            string txt = "Saison: Ø aus " + str.tostring(sCnt) + " Jahren · Vorschau " + str.tostring(fwdDays) + " Tage" + (detr ? " · ohne Jahrestrend" : "")
             if showC
                 txt += "\nUS-Zyklus: " + ph + " · " + str.tostring(cCnt) + " Zyklen"
             tb.cell(0, 0, txt, text_size = size.small)
