@@ -20,6 +20,7 @@ Aufruf:
 from __future__ import annotations
 
 import argparse
+import math
 
 import pandas as pd
 
@@ -27,7 +28,8 @@ from friday_rush_backtest import Trade, compare, floor_step, load_tv, summary, t
 
 
 def round_tick(x: float, tick: float) -> float:
-    return round(round(x / tick) * tick, 10)
+    # wie math.round_to_mintick in Pine: kaufmännisch runden (0,5 -> auf), nicht Banker's Rounding
+    return round(math.floor(x / tick + 0.5 + 1e-9) * tick, 10)
 
 
 def load_weekly(path: str) -> pd.DataFrame:
