@@ -26,6 +26,10 @@ import pandas as pd
 from friday_rush_backtest import Trade, compare, floor_step, load_tv, summary, trades_df
 
 
+def round_tick(x: float, tick: float) -> float:
+    return round(round(x / tick) * tick, 10)
+
+
 def load_weekly(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
     df.columns = [c.strip().lower() for c in df.columns]
@@ -37,7 +41,8 @@ def load_weekly(path: str) -> pd.DataFrame:
 
 def run_backtest(df: pd.DataFrame, direction="Long", entry_day=11, exit_day=27,
                  start="2010-01-01", end="2026-10-30", capital=10_000.0,
-                 qty_step=0.1, exchange_tz="America/New_York", sma_len=0):
+                 qty_step=0.1, exchange_tz="America/New_York", sma_len=0,
+                 sl_pct=0.0, tp_pct=0.0, tick=0.1):
     sign = 1 if direction == "Long" else -1
     start_ts = pd.Timestamp(start, tz=exchange_tz)
     end_ts = pd.Timestamp(end, tz=exchange_tz)
@@ -59,12 +64,57 @@ def run_backtest(df: pd.DataFrame, direction="Long", entry_day=11, exit_day=27,
         in_range = start_ts <= bar.time <= end_ts
         pos_before = open_tr is not None
 
-        if open_tr is not None and i > entry_bar:
-            open_tr._hi = max(open_tr._hi, bar.high)
-            open_tr._lo = min(open_tr._lo, bar.low)
+        # ── Stop-Loss / Take-Profit innerhalb der Kerze (TradingView Broker-Emulator) ──
+        # Annahme wie TV: liegt das High näher am Open als das Low, läuft der Kurs
+        # Open -> High -> Low -> Close, sonst Open -> Low -> High -> Close.
+        # Eröffnet die Kerze schon jenseits einer Marke (Gap), wird zum Open gefüllt.
+        stop_fill = None
+        if pos_before and i > entry_bar and (sl_pct > 0 or tp_pct > 0):
+            t = open_tr
+            sl = round_tick(t.entry_price * (1 - sign * sl_pct / 100), tick) if sl_pct > 0 else None
+            tp = round_tick(t.entry_price * (1 + sign * tp_pct / 100), tick) if tp_pct > 0 else None
+            o, h, l = bar.open, bar.high, bar.low
 
-        exit_now, signal = False, ""
-        if pos_before and i > entry_bar:
+            def hit_sl(px_lo, px_hi):
+                return sl is not None and (px_lo <= sl if sign == 1 else px_hi >= sl)
+
+            def hit_tp(px_lo, px_hi):
+                return tp is not None and (px_hi >= tp if sign == 1 else px_lo <= tp)
+
+            if hit_sl(o, o):
+                stop_fill = (o, "Stop-Loss", o, o)
+            elif hit_tp(o, o):
+                stop_fill = (o, "Take-Profit", o, o)
+            else:
+                high_first = abs(h - o) < abs(o - l)
+                legs = [("H", h), ("L", l)] if high_first else [("L", l), ("H", h)]
+                seen_hi, seen_lo = o, o
+                for _, px in legs:
+                    seen_hi, seen_lo = max(seen_hi, px), min(seen_lo, px)
+                    # auf jedem Teilstück zuerst die Marke prüfen, die in diese Richtung liegt
+                    if px >= o:   # Bewegung nach oben
+                        if sign == 1 and hit_tp(px, px):
+                            stop_fill = (tp, "Take-Profit", min(seen_hi, tp), seen_lo); break
+                        if sign == -1 and hit_sl(px, px):
+                            stop_fill = (sl, "Stop-Loss", min(seen_hi, sl), seen_lo); break
+                    if px <= o:   # Bewegung nach unten
+                        if sign == 1 and hit_sl(px, px):
+                            stop_fill = (sl, "Stop-Loss", seen_hi, max(seen_lo, sl)); break
+                        if sign == -1 and hit_tp(px, px):
+                            stop_fill = (tp, "Take-Profit", seen_hi, max(seen_lo, tp)); break
+
+        if open_tr is not None and i > entry_bar:
+            if stop_fill:
+                open_tr._hi = max(open_tr._hi, stop_fill[2])
+                open_tr._lo = min(open_tr._lo, stop_fill[3])
+            else:
+                open_tr._hi = max(open_tr._hi, bar.high)
+                open_tr._lo = min(open_tr._lo, bar.low)
+
+        exit_now, signal, exit_px = False, "", bar.close
+        if stop_fill:
+            exit_now, exit_px, signal = True, stop_fill[0], stop_fill[1]
+        elif pos_before and i > entry_bar:
             is_exit_week = f_day >= exit_day - 3 and month_key == entry_month_key
             new_month = month_key != entry_month_key
             if is_exit_week or new_month:
@@ -73,7 +123,7 @@ def run_backtest(df: pd.DataFrame, direction="Long", entry_day=11, exit_day=27,
         enter_now = is_entry_week and in_range and trend_ok and not pos_before
 
         if exit_now:
-            t, c = open_tr, bar.close
+            t, c = open_tr, exit_px
             t.exit_time, t.exit_day, t.exit_price, t.exit_signal = bar.time, bar.week_start, c, signal
             t.bars = i - entry_bar
             t.pnl = sign * (c - t.entry_price) * t.qty
