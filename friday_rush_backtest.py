@@ -42,6 +42,7 @@ class Settings:
     commission_pct: float = 0.0
     slippage_ticks: int = 0
     exchange_tz: str = "America/New_York"  # Zeitzone, in der timestamp() die Datums-Inputs liest
+    sma_len: int = 0                   # Trendfilter: nur Einstieg, wenn Close > SMA(sma_len); 0 = aus
 
 
 @dataclass
@@ -93,7 +94,11 @@ def run_backtest(df: pd.DataFrame, s: Settings) -> tuple[list[Trade], pd.Series]
     equity = s.initial_capital         # realisiertes Kapital
     equity_curve = []
 
+    sma = df["close"].rolling(s.sma_len).mean() if s.sma_len > 0 else None
+
     for i, bar in df.iterrows():
+        # ta.sma ist na, solange zu wenig Kerzen da sind -> Filter blockiert
+        trend_ok = True if sma is None else bool(bar.close > sma.iloc[i])
         o, h, l, c = bar.open, bar.high, bar.low, bar.close
         trade_day = bar.trading_day
         is_thursday = trade_day.dayofweek == 3           # dayofweek.thursday
@@ -114,7 +119,7 @@ def run_backtest(df: pd.DataFrame, s: Settings) -> tuple[list[Trade], pd.Series]
         exit_now = pos_before and i > entry_bar and is_valid_day
 
         # ── Einstieg: echter Donnerstag zum Close ──
-        enter_now = is_thursday and is_valid_day and in_range and not pos_before
+        enter_now = is_thursday and is_valid_day and in_range and trend_ok and not pos_before
 
         if exit_now:
             t = open_tr

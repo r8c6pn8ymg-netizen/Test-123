@@ -37,7 +37,7 @@ def load_weekly(path: str) -> pd.DataFrame:
 
 def run_backtest(df: pd.DataFrame, direction="Long", entry_day=11, exit_day=27,
                  start="2010-01-01", end="2026-10-30", capital=10_000.0,
-                 qty_step=0.1, exchange_tz="America/New_York"):
+                 qty_step=0.1, exchange_tz="America/New_York", sma_len=0):
     sign = 1 if direction == "Long" else -1
     start_ts = pd.Timestamp(start, tz=exchange_tz)
     end_ts = pd.Timestamp(end, tz=exchange_tz)
@@ -48,7 +48,11 @@ def run_backtest(df: pd.DataFrame, direction="Long", entry_day=11, exit_day=27,
     entry_month_key = None
     curve = []
 
+    sma = df["close"].rolling(sma_len).mean() if sma_len > 0 else None
+
     for i, bar in df.iterrows():
+        # Trendfilter: Einstieg nur, wenn Close > SMA (na = zu wenig Daten -> kein Einstieg)
+        trend_ok = True if sma is None else bool(bar.close > sma.iloc[i])
         f = bar.friday
         f_day, month_key = f.day, f.year * 12 + f.month
         is_entry_week = entry_day - 3 <= f_day <= entry_day + 3
@@ -66,7 +70,7 @@ def run_backtest(df: pd.DataFrame, direction="Long", entry_day=11, exit_day=27,
             if is_exit_week or new_month:
                 exit_now, signal = True, "Exit Ziel" if is_exit_week else "Exit Ersatz"
 
-        enter_now = is_entry_week and in_range and not pos_before
+        enter_now = is_entry_week and in_range and trend_ok and not pos_before
 
         if exit_now:
             t, c = open_tr, bar.close
