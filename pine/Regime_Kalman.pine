@@ -1,0 +1,137 @@
+//@version=6
+// Regime Kalman – Grün = Long-Regime, Rot = Short-Regime, Gelb = Übergang (Regime wird schwächer / wechselt).
+// Kern: Kalman-Filter auf den Schlusskurs; KalF% = logistische Wahrscheinlichkeit, dass der Kurs
+// über dem Kalman-Trend liegt (Abstand in ATR normiert). Kalibriert an 6N1! 1W.
+indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
+
+// ───────── Eingaben ─────────
+grpR = "Regime"
+float qr      = input.float(0.01, "Kalman Q/R (höher = schneller)", minval = 0.0001, step = 0.001, group = grpR)
+int   atrLen  = input.int(5, "ATR-Länge", minval = 1, group = grpR)
+float gain    = input.float(4.3, "Steilheit KalF%", minval = 0.1, step = 0.1, group = grpR)
+float upper   = input.float(70, "Schwelle Grün (KalF% ≥)", minval = 50, maxval = 100, group = grpR)
+float lower   = input.float(30, "Schwelle Rot (KalF% ≤)", minval = 0, maxval = 50, group = grpR)
+int   confirm = input.int(0, "Regime Confirmation Kerzen", minval = 0, group = grpR)
+
+grpS = "Darstellung"
+bool  colorBars  = input.bool(true, "Kerzen einfärben", group = grpS)
+int   candleTr   = input.int(0, "Candle Transparenz (0=solid)", minval = 0, maxval = 100, group = grpS)
+bool  colorBg    = input.bool(false, "Hintergrund im Chart einfärben", group = grpS)
+int   bgTr       = input.int(85, "Hintergrund-Transparenz", minval = 0, maxval = 100, group = grpS)
+color colG       = input.color(color.green, "Farbe Long", group = grpS)
+color colR       = input.color(color.red, "Farbe Short", group = grpS)
+color colY       = input.color(color.yellow, "Farbe Übergang", group = grpS)
+bool  showTable  = input.bool(true, "Tabelle anzeigen", group = grpS)
+int   tblBgTr    = input.int(45, "Table Hintergrund Transparenz", minval = 0, maxval = 100, group = grpS)
+int   tblFrameTr = input.int(45, "Table Frame Transparenz", minval = 0, maxval = 100, group = grpS)
+int   tblBordTr  = input.int(55, "Table Border Transparenz", minval = 0, maxval = 100, group = grpS)
+
+grpE = "Exit Signale"
+bool  exitOn   = input.bool(true, "Exit-Signale aktiv (Punkte, an denen das Regime schwächer wird)", group = grpE)
+int   prec     = input.int(15, "Genauigkeit (höher = präziser, weniger Exit-Warnungen)", minval = 1, maxval = 50, group = grpE)
+bool  onlyPlus = input.bool(false, "Nur EXIT+ (große Skala)", group = grpE)
+
+// ───────── Kalman-Filter (Local Level) ─────────
+var float est = na
+var float P   = 1.0
+if na(est)
+    est := close
+P += qr
+float K = P / (P + 1.0)
+est := est + K * (close - est)
+P := (1 - K) * P
+
+float atr  = ta.atr(atrLen)
+float z    = (close - est) / atr
+float kalf = 100 / (1 + math.exp(-gain * z))
+
+// Volatilität: Perzentil der ATR/Close der letzten 100 Bars
+float volPct = ta.percentrank(atr / close, 100)
+
+// ───────── Regime-Zustand ─────────
+int raw = kalf >= upper ? 1 : kalf <= lower ? -1 : 0
+// Bestätigung: raw muss `confirm` weitere Kerzen gleich bleiben
+int  sinceChange = ta.barssince(raw != raw[1])
+bool held = confirm == 0 or sinceChange >= confirm
+var int state = 0                      // 1 = Grün, -1 = Rot, 0 = Gelb
+if not na(kalf)
+    if raw != 0 and held
+        state := raw
+    else if raw == 0
+        state := 0
+
+color stCol = state == 1 ? colG : state == -1 ? colR : colY
+
+// ───────── Statistik ─────────
+var int nG = 0
+var int nR = 0
+var int nY = 0
+var int pG = 0
+var int pR = 0
+var int pY = 0
+var int stBars = 0
+if not na(kalf)
+    nG += state == 1 ? 1 : 0
+    nR += state == -1 ? 1 : 0
+    nY += state == 0 ? 1 : 0
+    if state != state[1] or bar_index == 0
+        pG += state == 1 ? 1 : 0
+        pR += state == -1 ? 1 : 0
+        pY += state == 0 ? 1 : 0
+        stBars := 1
+    else
+        stBars += 1
+
+// ───────── Exit-Signale ─────────
+// Kurs ist im Regime stark überdehnt (in ATR vom Kalman-Trend) → Regime könnte schwächer werden.
+float T      = prec / 10.0
+float zHigh  = (high - est) / atr
+float zLow   = (low - est) / atr
+bool exitL   = exitOn and state == 1  and zHigh >= T       and zHigh[1] < T
+bool exitLP  = exitOn and state == 1  and zHigh >= T * 1.5 and zHigh[1] < T * 1.5
+bool exitS   = exitOn and state == -1 and zLow <= -T       and zLow[1] > -T
+bool exitSP  = exitOn and state == -1 and zLow <= -T * 1.5 and zLow[1] > -T * 1.5
+bool showEL  = exitL and not exitLP and not onlyPlus
+bool showES  = exitS and not exitSP and not onlyPlus
+
+// ───────── Plots (Pane) ─────────
+plot(kalf, "KalF%", color = stCol, linewidth = 2)
+plot(volPct, "Vol%", color = color.new(color.gray, 40))
+hline(upper, "Grün-Schwelle", color = color.new(colG, 50), linestyle = hline.style_dashed)
+hline(lower, "Rot-Schwelle", color = color.new(colR, 50), linestyle = hline.style_dashed)
+
+// ───────── Hauptchart ─────────
+barcolor(colorBars ? color.new(stCol, candleTr) : na, title = "Candles Color")
+bgcolor(colorBg ? color.new(stCol, bgTr) : na, title = "Hintergrund", force_overlay = true)
+
+plotshape(showEL, "Exit Long",   shape.labeldown, location.abovebar, color.new(colG, 0), text = "EXIT",  textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(showES, "Exit Short",  shape.labelup,   location.belowbar, color.new(colR, 0), text = "EXIT",  textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(exitLP, "Exit+ Long",  shape.labeldown, location.abovebar, color.rgb(0, 100, 0), text = "EXIT+", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(exitSP, "Exit+ Short", shape.labelup,   location.belowbar, color.rgb(128, 0, 0), text = "EXIT+", textcolor = color.white, size = size.tiny, force_overlay = true)
+
+// ───────── Alarme ─────────
+alertcondition(state == 1 and state[1] != 1,   "Regime GRÜN",  "Regime wechselt auf GRÜN (Long) – {{ticker}}")
+alertcondition(state == -1 and state[1] != -1, "Regime ROT",   "Regime wechselt auf ROT (Short) – {{ticker}}")
+alertcondition(state == 0 and state[1] != 0,   "Regime GELB",  "Regime wird schwächer (GELB) – {{ticker}}")
+alertcondition(exitL or exitS,                 "Exit-Signal",  "EXIT-Signal – {{ticker}}")
+
+// ───────── Tabelle ─────────
+var table tb = table.new(position.top_left, 4, 5, bgcolor = color.new(color.navy, tblBgTr), frame_color = color.new(color.white, tblFrameTr), frame_width = 1, border_color = color.new(color.white, tblBordTr), border_width = 1)
+f_pct(int n) =>
+    int tot = nG + nR + nY
+    tot > 0 ? str.tostring(100.0 * n / tot, "#.##") + "%" : "–"
+if showTable and barstate.islast
+    string stName = state == 1 ? "GREEN" : state == -1 ? "RED" : "YELLOW"
+    tb.cell(0, 0, "Regime Kalman", text_color = color.white, text_size = size.small)
+    tb.cell(2, 0, "STATE", text_color = color.white, text_size = size.small)
+    tb.cell(3, 0, stName + " (" + str.tostring(stBars) + " bars)", text_color = color.white, bgcolor = color.new(stCol, 60), text_size = size.small)
+    tb.cell(0, 1, "Time Share", text_color = color.white, text_size = size.small)
+    tb.cell(1, 1, "Green: " + f_pct(nG), text_color = color.white, text_size = size.small)
+    tb.cell(2, 1, "Red: " + f_pct(nR), text_color = color.white, text_size = size.small)
+    tb.cell(3, 1, "Yellow: " + f_pct(nY), text_color = color.white, text_size = size.small)
+    tb.cell(0, 2, "Regime", text_color = color.white, text_size = size.small)
+    tb.cell(1, 2, "KalF%: " + str.tostring(kalf, "#.##"), text_color = color.white, text_size = size.small)
+    tb.cell(2, 2, "Vol%: " + str.tostring(volPct, "#.#"), text_color = color.white, text_size = size.small)
+    tb.cell(3, 2, "z: " + str.tostring(z, "#.##") + " ATR", text_color = color.white, text_size = size.small)
+    tb.cell(0, 3, "Phases G/R/Y", text_color = color.white, text_size = size.small)
+    tb.cell(1, 3, str.tostring(pG) + " / " + str.tostring(pR) + " / " + str.tostring(pY), text_color = color.white, text_size = size.small)
