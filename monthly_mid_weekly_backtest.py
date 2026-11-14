@@ -125,7 +125,7 @@ def main() -> None:
         tv = load_tv(a.tv)
         print("\n── TradingView ──")
         for k, v in summary(tv, pd.Series(dtype=float), a.capital).items():
-            if not k.startswith("Max. Drawdown") and k != "Exit Ersatztag":
+            if k != "Exit Ersatztag":
                 print(f"{k:38s} {v}")
         print(f"{'Exit Ersatz':38s} {int((tv['Signal'] == 'Exit Ersatz').sum())}")
         cmp = compare(py, tv)

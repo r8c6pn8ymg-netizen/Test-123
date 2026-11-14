@@ -160,7 +160,10 @@ def trades_df(trades: list[Trade]) -> pd.DataFrame:
 def summary(tdf: pd.DataFrame, curve: pd.Series, capital: float) -> dict:
     pnl = tdf["G&V USD"]
     wins, losses = pnl[pnl > 0], pnl[pnl < 0]
-    dd = (curve.cummax() - curve).max() if len(curve) else 0.0
+    # TradingView "Max. Drawdown (Schlusskurs zu Schlusskurs)" = auf Basis der
+    # realisierten Equity nach jedem geschlossenen Trade (Startkapital als erster Hochpunkt)
+    eq = pd.concat([pd.Series([0.0]), pnl.cumsum()], ignore_index=True)
+    dd = (eq.cummax() - eq).max()
     return {
         "Trades": len(tdf),
         "Gewinner": len(wins), "Verlierer": len(losses), "Ausgeglichen": int((pnl == 0).sum()),
@@ -248,8 +251,7 @@ def main() -> None:
         tv_curve = pd.Series(dtype=float)
         print("\n── TradingView, gleicher Zeitraum ──")
         for k, v in summary(tv_win, tv_curve, capital).items():
-            if not k.startswith("Max. Drawdown"):
-                print(f"{k:38s} {v}")
+            print(f"{k:38s} {v}")
         cmp = compare(py, tv_win)
         bad = cmp[cmp["Abweichung"] != ""]
         print(f"\n── Trade-für-Trade-Vergleich: {int((cmp['_merge'] == 'both').sum())} gemeinsame Trades, "
