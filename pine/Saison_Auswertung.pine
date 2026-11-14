@@ -15,6 +15,7 @@ int sD = input.int(1,  "Start Tag",   minval = 1, maxval = 31, group = grpD)
 int sM = input.int(1,  "Start Monat", minval = 1, maxval = 12, group = grpD)
 int eD = input.int(31, "Ende Tag",    minval = 1, maxval = 31, group = grpD)
 int eM = input.int(1,  "Ende Monat",  minval = 1, maxval = 12, group = grpD)
+bool exitNext = input.bool(false, "Enddatum kein Handelstag → nächsten Handelstag nehmen", group = grpD, tooltip = "Ohne Haken: Fällt das Enddatum auf ein Wochenende/Feiertag, wird zum Schluss des letzten Handelstags DAVOR ausgestiegen. Mit Haken: Ausstieg zum Schluss des nächsten Handelstags DANACH (wie bei Seasonax).")
 string entryMode = input.string("Eröffnung", "Einstieg am Starttag zur", options = ["Eröffnung", "Schlusskurs"], group = grpD, tooltip = "Eröffnung = Einstieg zum Eröffnungskurs des ersten Handelstags im Zeitraum. Schlusskurs = Einstieg zum Schlusskurs dieses Tages (wie bei Seasonax). Ausstieg ist immer der Schlusskurs des letzten Handelstags im Zeitraum.")
 
 grpZ = "Zyklen & Historie"
@@ -56,13 +57,16 @@ int  yNow   = year(td, "UTC")
 bool wrap   = eM < sM or (eM == sM and eD < sD)          // Zeitraum geht über den Jahreswechsel
 int  tsS    = timestamp("UTC", yNow, sM, sD, 0, 0)
 
-// 1) Ausstieg: erster Handelstag NACH dem Enddatum → Ausstieg zum Schluss der Kerze davor
+// 1) Ausstieg: erster Handelstag NACH dem Enddatum
+//    Standard: Schluss der Kerze davor (letzter Handelstag bis einschließlich Enddatum).
+//    Option "nächsten Handelstag": war das Enddatum selbst kein Handelstag, Ausstieg zum Schluss dieser Kerze.
 if inWin and td > exitTs
+    bool useThis = exitNext and tdPrev < exitTs
     tY.push(entryY)
     tT0.push(entryT)
-    tT1.push(time[1])
+    tT1.push(useThis ? time : time[1])
     tP0.push(entryP)
-    tP1.push(close[1])
+    tP1.push(useThis ? close : close[1])
     inWin := false
 
 // 2) Einstieg: erster Handelstag am/nach dem Startdatum
@@ -165,7 +169,7 @@ if barstate.islast
         tb.cell(1, 0, zr, text_color = tc, text_size = size.small)
         tb.cell(0, 1, "Zyklus", text_color = tc, text_size = size.small)
         string yTxt = yMode == "Letzte X Jahre" ? str.tostring(nYears) + " J." : yMode == "Von–Bis" ? str.tostring(math.min(yFrom, yTo)) + "–" + str.tostring(math.max(yFrom, yTo)) : "manuell"
-        tb.cell(1, 1, cyc + " (" + yTxt + ") · Einstieg " + entryMode, text_color = tc, text_size = size.small)
+        tb.cell(1, 1, cyc + " (" + yTxt + ") · Einstieg " + entryMode + (exitNext ? " · Ausstieg nächster HT" : ""), text_color = tc, text_size = size.small)
         tb.cell(0, 2, "Tradeanzahl", text_color = tc, text_size = size.small)
         tb.cell(1, 2, str.tostring(n), text_color = tc, text_size = size.small)
         tb.cell(0, 3, "Winner", text_color = tc, text_size = size.small)
