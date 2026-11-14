@@ -3,7 +3,7 @@
 // Prüft für einen frei wählbaren Zeitraum im Jahr (z. B. 18.12.–09.01.), wie ein Long- oder Short-Trade
 // in den letzten N Jahren ausgegangen wäre. Zeichnet Start-/Endlinie je Jahr, ein Ergebnis-Label
 // (grün = Gewinn, rot = Verlust) und eine Statistik-Tabelle. Optional nur bestimmte US-Wahlzyklus-Jahre.
-// Einstieg: Eröffnung des ersten Handelstags im Zeitraum · Ausstieg: Schluss des letzten Handelstags.
+// Einstieg: Eröffnung ODER Schlusskurs des ersten Handelstags (wählbar) · Ausstieg: Schluss des letzten Handelstags.
 // Am genauesten auf dem TAGESCHART (D).
 indicator("Saisonalität Auswertung", "Saison-Auswertung", overlay = true, max_lines_count = 500, max_labels_count = 500)
 
@@ -15,10 +15,15 @@ int sD = input.int(1,  "Start Tag",   minval = 1, maxval = 31, group = grpD)
 int sM = input.int(1,  "Start Monat", minval = 1, maxval = 12, group = grpD)
 int eD = input.int(31, "Ende Tag",    minval = 1, maxval = 31, group = grpD)
 int eM = input.int(1,  "Ende Monat",  minval = 1, maxval = 12, group = grpD)
+string entryMode = input.string("Eröffnung", "Einstieg am Starttag zur", options = ["Eröffnung", "Schlusskurs"], group = grpD, tooltip = "Eröffnung = Einstieg zum Eröffnungskurs des ersten Handelstags im Zeitraum. Schlusskurs = Einstieg zum Schlusskurs dieses Tages (wie bei Seasonax). Ausstieg ist immer der Schlusskurs des letzten Handelstags im Zeitraum.")
 
 grpZ = "Zyklen & Historie"
 string cyc    = input.string("Alle Jahre", "Zyklusauswahl", options = ["Alle Jahre", "Wahljahr", "Post-Election", "Midterm", "Pre-Election"], group = grpZ)
-int    nYears = input.int(10, "Historie (Jahre)", options = [5, 10, 15, 20, 25, 30], group = grpZ)
+string yMode  = input.string("Letzte X Jahre", "Jahresauswahl", options = ["Letzte X Jahre", "Von–Bis", "Manuelle Jahre"], group = grpZ)
+int    nYears = input.int(10, "Historie (Jahre) – bei „Letzte X Jahre“", options = [5, 10, 15, 20, 25, 30], group = grpZ)
+int    yFrom  = input.int(2012, "Jahre von – bei „Von–Bis“", minval = 1900, maxval = 2100, group = grpZ, inline = "vb")
+int    yTo    = input.int(2014, "bis", minval = 1900, maxval = 2100, group = grpZ, inline = "vb")
+string yList  = input.string("2016,2018,2020", "Manuelle Jahre (z. B. 2016,2018,2020) – bei „Manuelle Jahre“", group = grpZ)
 bool   ex2020 = input.bool(false, "Jahr 2020 aus der Berechnung ausschließen", group = grpZ)
 
 grpF = "Darstellung"
@@ -65,7 +70,7 @@ if not inWin and not na(tdPrev) and td >= tsS and tdPrev < tsS
     int tsE = timestamp("UTC", wrap ? yNow + 1 : yNow, eM, eD, 0, 0)
     if td <= tsE
         inWin  := true
-        entryP := open
+        entryP := entryMode == "Eröffnung" ? open : close
         entryT := time
         entryY := yNow
         exitTs := tsE
@@ -83,6 +88,15 @@ f_vline(int t, float p, color c, int w, string st) =>
     line.new(t, p, t, p * 1.01, xloc = xloc.bar_time, extend = extend.both, color = c, width = w, style = st)
 
 f_two(int v) => v < 10 ? "0" + str.tostring(v) : str.tostring(v)
+
+// Manuelle Jahresliste einlesen (Komma, Semikolon oder Leerzeichen als Trenner)
+f_inList(int y) =>
+    bool found = false
+    string[] parts = str.split(str.replace_all(str.replace_all(yList, ";", ","), " ", ","), ",")
+    for p in parts
+        if str.length(p) > 0 and str.tonumber(p) == y
+            found := true
+    found
 
 if barstate.islast
     for l in lns
@@ -108,7 +122,8 @@ if barstate.islast
     if tY.size() > 0
         for i = 0 to tY.size() - 1
             int y = tY.get(i)
-            if y >= minY and f_cycOk(y) and not (ex2020 and y == 2020)
+            bool yearOk = yMode == "Letzte X Jahre" ? y >= minY : yMode == "Von–Bis" ? y >= math.min(yFrom, yTo) and y <= math.max(yFrom, yTo) : f_inList(y)
+            if yearOk and f_cycOk(y) and not (ex2020 and y == 2020)
                 float p0  = tP0.get(i)
                 float p1  = tP1.get(i)
                 float pts = (p1 - p0) * sgn
@@ -149,7 +164,8 @@ if barstate.islast
         tb.cell(0, 0, "Zeitraum", text_color = tc, text_size = size.small)
         tb.cell(1, 0, zr, text_color = tc, text_size = size.small)
         tb.cell(0, 1, "Zyklus", text_color = tc, text_size = size.small)
-        tb.cell(1, 1, cyc + " (" + str.tostring(nYears) + " J.)", text_color = tc, text_size = size.small)
+        string yTxt = yMode == "Letzte X Jahre" ? str.tostring(nYears) + " J." : yMode == "Von–Bis" ? str.tostring(math.min(yFrom, yTo)) + "–" + str.tostring(math.max(yFrom, yTo)) : "manuell"
+        tb.cell(1, 1, cyc + " (" + yTxt + ") · Einstieg " + entryMode, text_color = tc, text_size = size.small)
         tb.cell(0, 2, "Tradeanzahl", text_color = tc, text_size = size.small)
         tb.cell(1, 2, str.tostring(n), text_color = tc, text_size = size.small)
         tb.cell(0, 3, "Winner", text_color = tc, text_size = size.small)
