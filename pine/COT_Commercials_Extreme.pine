@@ -1,9 +1,11 @@
 //@version=6
 // COT Commercials Extreme – Base / Quote / Pair
-// Färbt den Hintergrund, wenn die Commercials (Legacy-COT der CFTC) in ihrer eigenen Historie Extrempunkte erreichen.
-//   Base  = Basiswährung bzw. Root des Charts (6E1! / EURUSD → EUR)
-//   Quote = Gegenwährung (6E1! / EURUSD → USD, über den US-Dollar-Index-COT 098662)
-//   Pair  = Base und Quote bestätigen sich gegenseitig (z. B. Commercials extrem long EUR UND extrem short USD)
+// Signal (am Original Opt-COTv7.4 kalibriert, 6E1! 1W: 97,7 % identische Marker):
+//   LONG  = Commercials-Index ≥ 75  UND  Kleinspekulanten-Index ≤ 25  UND  Commercials-Index in 5 Wochen nicht > 10 Punkte gefallen
+//   SHORT = Commercials-Index ≤ 25  UND  Kleinspekulanten-Index ≥ 75  UND  Commercials-Index in 5 Wochen nicht > 10 Punkte gestiegen
+//   Index = (Netto-Position − Min) / (Max − Min) × 100 über die letzten 26 Wochen
+//   Base  = Basiswährung bzw. Root (6E1! / EURUSD → EUR) · Quote = Gegenwährung (USD → US-Dollar-Index 098662)
+//   Pair  = Base und Quote bestätigen sich gegenseitig
 indicator("COT Commercials Extreme", "COT-Extreme", overlay = true, max_labels_count = 500)
 
 import TradingView/LibraryCOT/2 as cot
@@ -12,10 +14,12 @@ import TradingView/LibraryCOT/2 as cot
 grpD = "Daten"
 bool   inclOpt     = input.string("Futures", "Futures/Options", options = ["Futures", "Futures + Options"], group = grpD) == "Futures + Options"
 int    lookback    = input.int(26, "Länge der Historie (Wochen)", minval = 4, maxval = 520, group = grpD)
-float  extPct      = input.float(10, "Extremzone (% oben / unten)", minval = 1, maxval = 49, group = grpD, tooltip = "10 = COT-Index ≥ 90 (Commercials extrem long) bzw. ≤ 10 (extrem short)")
-bool   useRoc      = input.bool(false, "Veränderungsrate verwenden?", group = grpD, tooltip = "Signal nur, wenn der COT-Index sich in den letzten X Wochen um mindestens Y Punkte in Richtung Extrem bewegt hat")
+float  commThr     = input.float(75, "Commercials-Schwelle (Index ≥ / ≤ 100 − Wert)", minval = 50, maxval = 100, group = grpD)
+bool   useSmall    = input.bool(true, "Kleinspekulanten als Gegenbestätigung verwenden", group = grpD, tooltip = "Signal nur, wenn die Kleinspekulanten (Non-Reportables) gleichzeitig extrem auf der Gegenseite stehen")
+float  smallThr    = input.float(25, "Kleinspekulanten-Schwelle (Index ≤ / ≥ 100 − Wert)", minval = 0, maxval = 50, group = grpD)
+bool   useRoc      = input.bool(true, "Veränderungsrate verwenden?", group = grpD, tooltip = "Kein Signal, wenn sich der Commercials-Index in den letzten X Wochen um mehr als Y Punkte gegen das Extrem bewegt hat")
 int    rocLen      = input.int(5, "Veränderungsrate – Wochen (X)", minval = 1, group = grpD)
-float  rocMin      = input.float(20, "Veränderungsrate – min. Punkte (Y)", minval = 0, group = grpD)
+float  rocMax      = input.float(10, "Veränderungsrate – max. Gegenbewegung (Y Punkte)", minval = 0, group = grpD)
 string baseCodeIn  = input.string("", "CFTC-Code Base (leer = automatisch)", group = grpD)
 bool   useQuote    = input.bool(true, "Quote-Währung auswerten", group = grpD)
 string quoteCodeIn = input.string("", "CFTC-Code Quote (leer = automatisch, USD = 098662)", group = grpD)
@@ -29,9 +33,9 @@ bool   showTable  = input.bool(true, "Info-Tabelle anzeigen", group = grpA)
 int    transp     = input.int(85, "Hintergrund-Transparenz (0–100)", minval = 0, maxval = 100, group = grpA)
 
 grpB = "Base Bias"
-bool  showBL = input.bool(true, "Base Long anzeigen", group = grpB, tooltip = "Commercials extrem long in der Basiswährung → bullish fürs Paar (B↑)")
+bool  showBL = input.bool(true, "Base Long anzeigen", group = grpB, tooltip = "Commercials extrem long (Kleinspekulanten extrem short) in der Basiswährung → bullish fürs Paar (B↑)")
 color colBL  = input.color(#4CAF50, "Farbe Base Long", group = grpB)
-bool  showBS = input.bool(true, "Base Short anzeigen", group = grpB, tooltip = "Commercials extrem short in der Basiswährung → bearish fürs Paar (B↓)")
+bool  showBS = input.bool(true, "Base Short anzeigen", group = grpB, tooltip = "Commercials extrem short (Kleinspekulanten extrem long) in der Basiswährung → bearish fürs Paar (B↓)")
 color colBS  = input.color(#F23645, "Farbe Base Short", group = grpB)
 
 grpQ = "Quote Bias"
@@ -51,49 +55,67 @@ string USD_CODE = "098662"   // U.S. Dollar Index (ICE)
 string baseCode  = baseCodeIn != "" ? baseCodeIn : syminfo.basecurrency == "USD" and syminfo.type == "forex" ? USD_CODE : cot.convertRootToCOTCode("Auto")
 string quoteCode = not useQuote ? "" : quoteCodeIn != "" ? quoteCodeIn : syminfo.currency == "USD" ? USD_CODE : cot.convertRootToCOTCode("Currency")
 
-f_net(string code) =>
-    string tL = cot.COTTickerid("Legacy", code, inclOpt, "Commercial Positions", "Long", "All")
-    string tS = cot.COTTickerid("Legacy", code, inclOpt, "Commercial Positions", "Short", "All")
-    float l = request.security(tL, "1W", close, ignore_invalid_symbol = true)
-    float s = request.security(tS, "1W", close, ignore_invalid_symbol = true)
+// Netto-Position einer Händlergruppe.
+// "1D" statt "1W": liefert den letzten veröffentlichten Report innerhalb der Chartkerze
+// (mit "1W" lag der Wert wegen versetzter Wochengrenzen eine Woche zurück).
+f_net(string code, string metric) =>
+    string tL = cot.COTTickerid("Legacy", code, inclOpt, metric, "Long", "All")
+    string tS = cot.COTTickerid("Legacy", code, inclOpt, metric, "Short", "All")
+    float l = request.security(tL, "1D", close, ignore_invalid_symbol = true)
+    float s = request.security(tS, "1D", close, ignore_invalid_symbol = true)
     l - s
 
-// COT-Index (0–100) über die letzten `lookback` Wochen + Veränderung über `rocLen` Wochen.
+// COT-Index (0–100) über `lookback` Wochen + Veränderung über `rocLen` Wochen.
+// Ein Wert pro Woche; innerhalb der Woche (Tages-/Intraday-Chart) wird der letzte Wert aktualisiert.
 f_cot(float net) =>
     var nets = array.new_float()
     var idxs = array.new_float()
-    if timeframe.change("1W") and not na(net)
-        nets.push(net)
-        if nets.size() > lookback
-            nets.shift()
+    float idx = na
+    float roc = na
+    if not na(net)
+        if timeframe.change("1W") or nets.size() == 0
+            nets.push(net)
+            if nets.size() > lookback
+                nets.shift()
+            idxs.push(na)
+            if idxs.size() > rocLen + 1
+                idxs.shift()
+        else
+            nets.set(nets.size() - 1, net)
         if nets.size() == lookback
             float lo = nets.min()
             float hi = nets.max()
-            idxs.push(hi > lo ? (net - lo) / (hi - lo) * 100 : 50)
-            if idxs.size() > rocLen + 1
-                idxs.shift()
-    float idx = idxs.size() > 0 ? idxs.last() : na
-    float roc = idxs.size() > rocLen ? idxs.last() - idxs.first() : na
+            idxs.set(idxs.size() - 1, hi > lo ? (net - lo) / (hi - lo) * 100 : 50)
+        idx := idxs.last()
+        float first = idxs.first()
+        roc := idxs.size() > rocLen and not na(first) and not na(idx) ? idx - first : na
     [idx, roc]
 
-// +1 = Commercials extrem long, -1 = extrem short, 0 = neutral
-f_bias(float idx, float roc) =>
-    bool longExt  = idx >= 100 - extPct and (not useRoc or roc >= rocMin)
-    bool shortExt = idx <= extPct and (not useRoc or roc <= -rocMin)
+// +1 = Long-Extrem, -1 = Short-Extrem, 0 = neutral
+f_bias(float commIdx, float commRoc, float smallIdx) =>
+    bool okRocL = not useRoc or na(commRoc) or commRoc >= -rocMax
+    bool okRocS = not useRoc or na(commRoc) or commRoc <= rocMax
+    bool smL    = not useSmall or smallIdx <= smallThr
+    bool smS    = not useSmall or smallIdx >= 100 - smallThr
+    bool longExt  = commIdx >= commThr and smL and okRocL
+    bool shortExt = commIdx <= 100 - commThr and smS and okRocS
     longExt ? 1 : shortExt ? -1 : 0
 
-[baseIdx, baseRoc]   = f_cot(f_net(baseCode))
-[quoteIdx, quoteRoc] = f_cot(f_net(quoteCode))
-int baseB  = f_bias(baseIdx, baseRoc)
-int quoteB = useQuote ? f_bias(quoteIdx, quoteRoc) : 0
+[bCommIdx, bCommRoc] = f_cot(f_net(baseCode, "Commercial Positions"))
+[bSmallIdx, bSmallRoc] = f_cot(f_net(baseCode, "Nonreportable Positions"))
+[qCommIdx, qCommRoc] = f_cot(f_net(quoteCode, "Commercial Positions"))
+[qSmallIdx, qSmallRoc] = f_cot(f_net(quoteCode, "Nonreportable Positions"))
+
+int baseB  = f_bias(bCommIdx, bCommRoc, bSmallIdx)
+int quoteB = useQuote ? f_bias(qCommIdx, qCommRoc, qSmallIdx) : 0
 
 // ───────── Zustände ─────────
 bool bL = baseB == 1  and showBL
 bool bS = baseB == -1 and showBS
 bool qL = quoteB == 1  and showQL
 bool qS = quoteB == -1 and showQS
-bool pB = baseB == 1  and quoteB == -1 and showPB     // Pair Bullish: EUR-Commercials long + USD-Commercials short
-bool pS = baseB == -1 and quoteB == 1  and showPS     // Pair Bearish: EUR-Commercials short + USD-Commercials long
+bool pB = baseB == 1  and quoteB == -1 and showPB
+bool pS = baseB == -1 and quoteB == 1  and showPS
 
 color baseCol  = bL ? colBL : bS ? colBS : na
 color quoteCol = qL ? colQL : qS ? colQS : na
@@ -118,30 +140,34 @@ plotshape(showMarks and bS, "Base Short Marker",  shape.triangledown, location.a
 plotshape(showMarks and qL, "Quote Long Marker",  shape.triangledown, location.abovebar, colQL, text = "Q↓", textcolor = color.blue, size = size.tiny)
 plotshape(showMarks and qS, "Quote Short Marker", shape.triangleup,   location.belowbar, colQS, text = "Q↑", textcolor = color.blue, size = size.tiny)
 
-// Werte für Datenfenster / CSV-Export (zum Kalibrieren)
-plot(baseIdx,  "Base COT-Index",  display = display.data_window)
-plot(quoteIdx, "Quote COT-Index", display = display.data_window)
-plot(baseRoc,  "Base Veränderung",  display = display.data_window)
-plot(quoteRoc, "Quote Veränderung", display = display.data_window)
+// Werte für Datenfenster / CSV-Export
+plot(bCommIdx,  "Base Commercials-Index",       display = display.data_window)
+plot(bSmallIdx, "Base Kleinspekulanten-Index",  display = display.data_window)
+plot(qCommIdx,  "Quote Commercials-Index",      display = display.data_window)
+plot(qSmallIdx, "Quote Kleinspekulanten-Index", display = display.data_window)
 
 // ───────── Alarme ─────────
-alertcondition(baseB == 1 and baseB[1] != 1,   "Base Long",    "COT: Commercials extrem LONG in der Basiswährung – {{ticker}}")
-alertcondition(baseB == -1 and baseB[1] != -1, "Base Short",   "COT: Commercials extrem SHORT in der Basiswährung – {{ticker}}")
-alertcondition(quoteB == 1 and quoteB[1] != 1,   "Quote Long",  "COT: Commercials extrem LONG in der Gegenwährung – {{ticker}}")
-alertcondition(quoteB == -1 and quoteB[1] != -1, "Quote Short", "COT: Commercials extrem SHORT in der Gegenwährung – {{ticker}}")
+alertcondition(baseB == 1 and baseB[1] != 1,     "Base Long",    "COT: Base LONG-Extrem – {{ticker}}")
+alertcondition(baseB == -1 and baseB[1] != -1,   "Base Short",   "COT: Base SHORT-Extrem – {{ticker}}")
+alertcondition(quoteB == 1 and quoteB[1] != 1,   "Quote Long",   "COT: Quote LONG-Extrem – {{ticker}}")
+alertcondition(quoteB == -1 and quoteB[1] != -1, "Quote Short",  "COT: Quote SHORT-Extrem – {{ticker}}")
 alertcondition(pB and not pB[1], "Pair Bullish", "COT: Pair Bullish (Base Long + Quote Short) – {{ticker}}")
 alertcondition(pS and not pS[1], "Pair Bearish", "COT: Pair Bearish (Base Short + Quote Long) – {{ticker}}")
 
 // ───────── Info-Tabelle ─────────
-var table info = table.new(position.top_right, 3, 3, bgcolor = color.new(color.gray, 85), border_width = 1)
+var table info = table.new(position.top_right, 4, 3, bgcolor = color.new(color.gray, 85), border_width = 1)
+f_num(float v) => na(v) ? "n/a" : str.tostring(v, "#")
 if showTable and barstate.islast
     info.cell(0, 0, "COT", text_size = size.small)
     info.cell(1, 0, "Code", text_size = size.small)
-    info.cell(2, 0, "Index", text_size = size.small)
+    info.cell(2, 0, "Comm.", text_size = size.small)
+    info.cell(3, 0, "Klein", text_size = size.small)
     info.cell(0, 1, "Base", text_size = size.small)
     info.cell(1, 1, baseCode == "" ? "–" : baseCode, text_size = size.small)
-    info.cell(2, 1, na(baseIdx) ? "n/a" : str.tostring(baseIdx, "#"), text_size = size.small)
+    info.cell(2, 1, f_num(bCommIdx), text_size = size.small)
+    info.cell(3, 1, f_num(bSmallIdx), text_size = size.small)
     if useQuote
         info.cell(0, 2, "Quote", text_size = size.small)
         info.cell(1, 2, quoteCode == "" ? "–" : quoteCode, text_size = size.small)
-        info.cell(2, 2, na(quoteIdx) ? "n/a" : str.tostring(quoteIdx, "#"), text_size = size.small)
+        info.cell(2, 2, f_num(qCommIdx), text_size = size.small)
+        info.cell(3, 2, f_num(qSmallIdx), text_size = size.small)
