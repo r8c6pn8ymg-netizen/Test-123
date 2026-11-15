@@ -4,14 +4,14 @@
 //         → reproduziert die KalF%-Werte des Originals exakt (geprüft an 6N1! 1W und SPX 1D).
 // Farblogik: Zustandsautomat mit Bestätigung nach Gelb, am Original geprüft (9 Märkte):
 //   SPX 1D, 6N1! 1W, NYA 1M, AUDNZD 1W, NZDCHF 1W, XCUUSD 1D, AUDCHF 1W, NZDJPY 1W/1D
-//   → 16 abweichende Kerzen bei rund 5.000 verglichenen (≈ 99,7 % identische Farben).
+//   → 12 abweichende Kerzen bei 5.245 verglichenen (≈ 99,8 % identische Farben).
 indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
 
 // ───────── Eingaben ─────────
 grpR = "Regime (kalibriert – nur ändern, wenn du bewusst abweichen willst)"
 int   len  = input.int(23, "KalF Länge", minval = 2, group = grpR)
 float stp  = input.float(17.6211, "KalF Steilheit", minval = 0.1, group = grpR)
-float hy   = input.float(93.5, "Grün halten ab KalF% ≥", group = grpR)
+float hy   = input.float(93.33, "Grün halten ab KalF% ≥", group = grpR)
 float hg   = input.float(97, "Rot → Grün direkt ab KalF% ≥", group = grpR)
 float lg   = input.float(3, "Grün → Rot direkt bei KalF% ≤", group = grpR)
 float lr   = input.float(6.7, "Gelb aus Rot: KalF% steigt über", group = grpR, tooltip = "Gelb aus Rot, wenn KalF% von unter diesem Wert auf diesen Wert oder darüber steigt. Am Original geprüft (9 Märkte).")
