@@ -2,8 +2,9 @@
 // Regime – Grün = Long-Regime, Rot = Short-Regime, Gelb = Übergang (Warnung vor dem Wechsel).
 // KalF% = Stochastik über 23 Kerzen (aktuelle inkl.), logistisch gestaucht (Faktor 17.6211)
 //         → reproduziert die KalF%-Werte des Originals exakt (geprüft an 6N1! 1W und SPX 1D).
-// Farblogik: Zustandsautomat mit Bestätigung nach Gelb, am Original geprüft:
-//   SPX 1D 99,6 % · 6N1! 1W 99,2 % · NYA 1M 100 % · AUDNZD 1W 100 % identische Kerzenfarben.
+// Farblogik: Zustandsautomat mit Bestätigung nach Gelb, am Original geprüft (9 Märkte):
+//   SPX 1D, 6N1! 1W, NYA 1M, AUDNZD 1W, NZDCHF 1W, XCUUSD 1D, AUDCHF 1W, NZDJPY 1W/1D
+//   → 16 abweichende Kerzen bei rund 5.000 verglichenen (≈ 99,7 % identische Farben).
 indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
 
 // ───────── Eingaben ─────────
@@ -13,8 +14,7 @@ float stp  = input.float(17.6211, "KalF Steilheit", minval = 0.1, group = grpR)
 float hy   = input.float(93.5, "Grün halten ab KalF% ≥", group = grpR)
 float hg   = input.float(97, "Rot → Grün direkt ab KalF% ≥", group = grpR)
 float lg   = input.float(3, "Grün → Rot direkt bei KalF% ≤", group = grpR)
-float dK   = input.float(5, "Gelb aus Rot: KalF-Anstieg ≥", group = grpR)
-float lr   = input.float(8, "Gelb aus Rot: vorher KalF% ≤", group = grpR)
+float lr   = input.float(6.7, "Gelb aus Rot: KalF% steigt über", group = grpR, tooltip = "Gelb aus Rot, wenn KalF% von unter diesem Wert auf diesen Wert oder darüber steigt. Am Original geprüft (9 Märkte).")
 float hc   = input.float(97, "Bestätigung Grün nach Gelb: KalF% ≥", group = grpR)
 float lc   = input.float(3, "Bestätigung Rot nach Gelb: KalF% ≤", group = grpR)
 
@@ -79,7 +79,7 @@ if not na(kalf)
     else
         if not conf and kalf <= lc
             conf := true
-        bool up = conf and kalf - k1 >= dK and k1 <= lr
+        bool up = conf and k1 < lr and kalf >= lr
         if kalf >= hg and not up
             disp := 1
             st   := 1
