@@ -1,0 +1,22 @@
+                   In-Sample 2010–2026 | ohne SL/TP In-Sample 2010–2026 | SL 6 / TP 5 Out-of-Sample 2000–2009 | ohne SL/TP Out-of-Sample 2000–2009 | SL 6 / TP 5
+Trades                                        202.0                             202.0                                118.0                                 118.0
+Ø Trade %                                     0.421                             0.453                               -0.018                                -0.078
+Std Trade %                                   2.917                             2.784                                3.578                                 3.332
+t-Wert (Ø>0)                                  2.050                             2.312                               -0.055                                -0.255
+p-Wert (einseitig)                            0.021                             0.011                                0.522                                 0.600
+95%-KI Ø Trade %                    +0.01 bis +0.82                   +0.07 bis +0.84                      -0.67 bis +0.63                       -0.67 bis +0.53
+Sharpe p.a.                                   0.448                             0.543                               -0.000                                -0.078
+Sharpe Markt p.a.                             0.773                             0.773                               -0.039                                -0.039
+t-Wert Sharpe                                 1.842                             2.233                               -0.001                                -0.246
+Alpha p.a. %                                 -1.161                             0.550                                0.376                                -0.636
+t-Wert Alpha                                 -0.558                             0.289                                0.120                                -0.214
+p-Wert Alpha                                  0.577                             0.772                                0.905                                 0.831
+Beta                                          0.503                             0.388                                0.480                                 0.343
+t-Wert Beta                                    10.7                              11.4                                7.536                                 7.259
+R²                                            0.506                             0.397                                0.484                                 0.348
+Gesamtrendite %                               114.2                             130.4                               -9.211                                 -14.6
+Zufall Median %                               175.3                             166.8                                -13.7                                 -11.9
+p-Wert Permutation                            0.701                             0.628                                0.456                                 0.530
+
+Mehrfachtest: ca. 2385 getestete Varianten -> Bonferroni-Schwelle p < 0.000021 (entspricht etwa t > 4.10)
+Benötigte Trades für t = 1,96 bei Ø 0.42 % und Std 2.92 %: ca. 185 (= 15 Jahre bei 12 Trades/Jahr)
