@@ -2,21 +2,23 @@
 // Regime – Grün = Long-Regime, Rot = Short-Regime, Gelb = Übergang (Warnung vor dem Wechsel).
 // KalF% = Stochastik über 23 Kerzen (aktuelle inkl.), logistisch gestaucht (Faktor 17.6211)
 //         → reproduziert die KalF%-Werte des Originals exakt (geprüft an 6N1! 1W und SPX 1D).
-// Farblogik: Zustandsautomat mit Bestätigung nach Gelb, am Original geprüft (9 Märkte):
-//   SPX 1D, 6N1! 1W, NYA 1M, AUDNZD 1W, NZDCHF 1W, XCUUSD 1D, AUDCHF 1W, NZDJPY 1W/1D
-//   → 12 abweichende Kerzen bei 5.245 verglichenen (≈ 99,8 % identische Farben).
+// Farblogik: Zustandsautomat mit Bestätigung nach Gelb. Schwellen symmetrisch:
+//   93,36 / 6,64  = Schlusskurs 15 % der Spanne über/unter der Mitte (Stochastik 65 / 35)
+//   97,14 / 2,86  = Schlusskurs 20 % der Spanne über/unter der Mitte (Stochastik 70 / 30)
+//   Am Original geprüft (11 Datensätze: SPX 1D, 6N1! 1W, NYA 1M, AUDNZD 1W, NZDCHF 1W,
+//   XCUUSD 1D, AUDCHF 1W, NZDJPY 1W/1D, GBPCHF 1W/1D) → 4 von 7.172 Kerzen abweichend (99,94 %).
 indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
 
 // ───────── Eingaben ─────────
 grpR = "Regime (kalibriert – nur ändern, wenn du bewusst abweichen willst)"
 int   len  = input.int(23, "KalF Länge", minval = 2, group = grpR)
 float stp  = input.float(17.6211, "KalF Steilheit", minval = 0.1, group = grpR)
-float hy   = input.float(93.33, "Grün halten ab KalF% ≥", group = grpR)
-float hg   = input.float(97, "Rot → Grün direkt ab KalF% ≥", group = grpR)
-float lg   = input.float(3, "Grün → Rot direkt bei KalF% ≤", group = grpR)
-float lr   = input.float(6.7, "Gelb aus Rot: KalF% steigt über", group = grpR, tooltip = "Gelb aus Rot, wenn KalF% von unter diesem Wert auf diesen Wert oder darüber steigt. Am Original geprüft (9 Märkte).")
-float hc   = input.float(97, "Bestätigung Grün nach Gelb: KalF% ≥", group = grpR)
-float lc   = input.float(3, "Bestätigung Rot nach Gelb: KalF% ≤", group = grpR)
+float hy   = input.float(93.36, "Grün halten ab KalF% ≥", group = grpR)
+float hg   = input.float(97.14, "Rot → Grün direkt ab KalF% ≥", group = grpR)
+float lg   = input.float(2.86, "Grün → Rot direkt bei KalF% ≤", group = grpR)
+float lr   = input.float(6.64, "Gelb aus Rot: KalF% steigt über", group = grpR, tooltip = "Gelb aus Rot, wenn KalF% von unter diesem Wert auf diesen Wert oder darüber steigt.")
+float hc   = input.float(97.14, "Bestätigung Grün nach Gelb: KalF% ≥", group = grpR)
+float lc   = input.float(2.86, "Bestätigung Rot nach Gelb: KalF% ≤", group = grpR)
 
 grpS = "Darstellung"
 bool  colorBars  = input.bool(true, "Kerzen einfärben", group = grpS)
