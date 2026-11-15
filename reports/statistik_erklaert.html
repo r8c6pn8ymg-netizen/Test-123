@@ -1,0 +1,254 @@
+<title>Zufall oder Vorteil?</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: eine ruhige Lesespalte, jede Kennzahl = Frage, Alltagsbeispiel, Grafik, Regel, unser Ergebnis */
+:root{
+  --bg:#f7f8f6; --card:#ffffff; --fg:#15181c; --muted:#5a6068; --line:#dfe2df;
+  --is:#2a78d6; --oos:#eb6834; --zero:#15181c; --good:#0a7d32; --bad:#c23b3a; --warn:#9a6a00;
+  --good-bg:#e6f4ea; --bad-bg:#fbe9e8; --warn-bg:#fbf1d9; --tint:#eef3fa;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141619; --card:#1c1f23; --fg:#eceeef; --muted:#a3a9b0; --line:#30343a;
+  --is:#4b93ea; --oos:#f07a45; --zero:#eceeef; --good:#4cc46f; --bad:#f07070; --warn:#e3b341;
+  --good-bg:#16301f; --bad-bg:#3a1c1c; --warn-bg:#352a12; --tint:#1d2a3a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141619; --card:#1c1f23; --fg:#eceeef; --muted:#a3a9b0; --line:#30343a;
+  --is:#4b93ea; --oos:#f07a45; --zero:#eceeef; --good:#4cc46f; --bad:#f07070; --warn:#e3b341;
+  --good-bg:#16301f; --bad-bg:#3a1c1c; --warn-bg:#352a12; --tint:#1d2a3a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:2.1rem}
+h2{font-size:1.4rem}
+p{margin:0}
+.lead{color:var(--muted);font-size:1.05rem}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.q{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.ex{background:var(--tint);border-radius:8px;padding:12px 14px}
+.ex b{font-weight:600}
+.rule{border-left:3px solid var(--fg);padding:4px 0 4px 12px;font-weight:500}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.res > div{border-radius:8px;padding:12px;min-width:0}
+.res .lab{font-size:.8rem;color:var(--muted)}
+.res .val{font-family:var(--display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.ok{background:var(--good-bg)} .no{background:var(--bad-bg)} .mid{background:var(--warn-bg)}
+.verdict{font-size:.85rem;font-weight:600}
+.ok .verdict{color:var(--good)} .no .verdict{color:var(--bad)} .mid .verdict{color:var(--warn)}
+svg{width:100%;height:auto;display:block}
+svg text{fill:var(--muted);font-family:var(--body);font-size:12px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.8rem}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.8rem;font-weight:600;white-space:nowrap}
+@media (max-width:520px){.res{grid-template-columns:1fr} h1{font-size:1.7rem}}
+</style>
+
+<div class="wrap">
+<header style="display:flex;flex-direction:column;gap:10px">
+  <h1>Zufall oder Vorteil?</h1>
+  <p class="lead">Was t-Wert, p-Wert, Konfidenzintervall, Beta und R² bedeuten, erklärt am Backtest „S&amp;P 500, 11. rein, 27. raus“ (ohne SL/TP). Jede Zahl auf dieser Seite wird aus den echten Trades berechnet.</p>
+  <div class="legend"><span><span class="dot" style="background:var(--is)"></span>In-Sample 2010–2026 (damit wurde entwickelt)</span><span><span class="dot" style="background:var(--oos)"></span>Out-of-Sample 2000–2009 (nie benutzt)</span></div>
+</header>
+
+<section>
+  <div class="q">Die Grundfrage</div>
+  <h2>Glück oder echtes Können?</h2>
+  <p>Jede Strategie hat gute und schlechte Trades. Am Ende steht ein Durchschnitt. Die ganze Statistik beantwortet nur eine Frage: <b>Ist dieser Durchschnitt so gut, dass Glück als Erklärung nicht mehr reicht?</b></p>
+  <div class="ex"><b>Beispiel Münze:</b> Du wirfst 10 Mal und bekommst 6 Mal Kopf. Ist die Münze gezinkt? Nein, das passiert mit einer normalen Münze ständig. Du wirfst 1.000 Mal und bekommst 750 Mal Kopf. Das schafft eine normale Münze praktisch nie. Jetzt ist klar: gezinkt.<br><br>Genauso bei Trades: Ein paar gute Trades beweisen nichts. Erst wenn der Vorteil groß genug und über genug Trades stabil ist, ist er „echt“.</div>
+</section>
+
+<section>
+  <div class="q">Kennzahl 1</div>
+  <h2>t-Wert: Wie weit weg von „kein Vorteil“?</h2>
+  <p>Der t-Wert vergleicht den Durchschnitt pro Trade mit dem Rauschen, also wie stark die einzelnen Trades schwanken. <b>Je größer der t-Wert, desto weniger kann Zufall den Durchschnitt erklären.</b></p>
+  <div class="ex"><b>Rechnung in Worten:</b> t = Durchschnitt pro Trade ÷ (Schwankung ÷ Wurzel aus der Anzahl Trades).<br>Mehr Trades oder ein größerer Durchschnitt machen t größer. Starke Schwankung macht t kleiner.</div>
+  <p>Die Glocke zeigt, welche t-Werte eine Strategie <b>ohne jeden Vorteil</b> durch reines Glück erreicht. Fast alle landen zwischen −2 und +2.</p>
+  <svg id="bell" viewBox="0 0 640 230" role="img" aria-label="Glockenkurve mit den t-Werten der Strategie"></svg>
+  <div class="res" id="tres"></div>
+  <div class="rule">Regel: t über 2 = „wahrscheinlich kein Zufall“. t über 3 = deutlich. t zwischen −2 und 2 = vom Zufall nicht zu unterscheiden.</div>
+</section>
+
+<section>
+  <div class="q">Kennzahl 2</div>
+  <h2>p-Wert: Wie oft schafft das reines Glück?</h2>
+  <p>Der p-Wert ist dieselbe Information wie der t-Wert, nur als Prozentzahl. Er sagt: <b>Wenn die Strategie in Wahrheit nichts kann, wie oft käme trotzdem so ein gutes Ergebnis heraus?</b></p>
+  <div class="ex"><b>Beispiel:</b> p = 0,02 heißt: Eine nutzlose Strategie schafft so ein Ergebnis nur in 2 von 100 Fällen. Das ist selten, also spricht es für einen echten Vorteil.<br>p = 0,50 heißt: Eine nutzlose Strategie schafft das in jedem zweiten Fall. Das Ergebnis beweist also gar nichts.</div>
+  <div class="res" id="pres"></div>
+  <div class="rule">Regel: p unter 0,05 (5 %) = signifikant. p unter 0,01 = stark. p über 0,05 = kein Beleg für einen Vorteil.</div>
+</section>
+
+<section>
+  <div class="q">Kennzahl 3</div>
+  <h2>Konfidenzintervall: Wo liegt der wahre Durchschnitt?</h2>
+  <p>Aus ein paar hundert Trades kennt man den „wahren“ Durchschnitt nie genau. Das Intervall ist die Spanne, in der er <b>mit 95 % Sicherheit</b> liegt.</p>
+  <div class="ex"><b>Beispiel Wahlumfrage:</b> „Partei A: 30 %, plus/minus 3 %.“ Der wahre Wert liegt also irgendwo zwischen 27 % und 33 %.<br><br><b>Der wichtige Punkt:</b> Liegt die <b>Null</b> innerhalb der Spanne, dann kann der wahre Durchschnitt pro Trade auch 0 % sein, also gar kein Vorteil. Liegt die ganze Spanne rechts von der Null, ist der Vorteil gesichert.</div>
+  <svg id="ci" viewBox="0 0 640 170" role="img" aria-label="Konfidenzintervalle der durchschnittlichen Trade-Rendite"></svg>
+  <div class="rule">Regel: Ganze Spanne über 0 = Vorteil belegt. Null liegt in der Spanne = Vorteil nicht belegt.</div>
+</section>
+
+<section>
+  <div class="q">Kennzahl 4</div>
+  <h2>Beta, R² und Alpha: Wie viel macht der Markt?</h2>
+  <p>Jeder Punkt ist eine Woche: links/rechts, wie viel der S&amp;P 500 gemacht hat, oben/unten, wie viel unsere Strategie gemacht hat. Die Linie ist der Durchschnittszusammenhang.</p>
+  <svg id="scatter" viewBox="0 0 640 360" role="img" aria-label="Streudiagramm Wochenrenditen Strategie gegen S&amp;P 500"></svg>
+  <div class="ex" id="betaex"></div>
+  <div class="res" id="bres"></div>
+  <div class="rule">Regel: Hohes R² und Alpha nahe 0 = die Strategie macht im Kern nur den Markt nach. Eine echte Strategie braucht ein Alpha deutlich über 0 (mit t über 2).</div>
+</section>
+
+<section>
+  <div class="q">Kennzahl 5</div>
+  <h2>Zufallstest: Besser als blind kaufen?</h2>
+  <p>Wir lassen den Computer 10.000 Mal zufällige Wochen kaufen, mit genau denselben Haltedauern wie die Strategie. Die Balken zeigen, was dabei herauskam. Die Linie ist unsere Strategie.</p>
+  <svg id="perm" viewBox="0 0 640 230" role="img" aria-label="Verteilung zufälliger Einstiege, In-Sample"></svg>
+  <div class="ex" id="permex"></div>
+  <div class="rule">Regel: Eine gute Strategie liegt weit rechts, besser als mindestens 95 % der Zufallsläufe.</div>
+</section>
+
+<section>
+  <div class="q">Spickzettel</div>
+  <h2>Feste Regeln auf einen Blick</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Kennzahl</th><th>Gut</th><th>Kein Beleg</th><th>Kurz gesagt</th></tr></thead>
+    <tbody>
+      <tr><td>t-Wert</td><td>über 2</td><td>−2 bis 2</td><td>Abstand zum Zufall</td></tr>
+      <tr><td>p-Wert</td><td>unter 0,05</td><td>über 0,05</td><td>Wie oft schafft das Glück</td></tr>
+      <tr><td>95-%-Intervall</td><td>komplett über 0</td><td>enthält die 0</td><td>Spanne für den wahren Schnitt</td></tr>
+      <tr><td>Alpha</td><td>über 0, t über 2</td><td>nahe 0</td><td>Rendite ohne Marktanteil</td></tr>
+      <tr><td>R²</td><td>niedrig (eigene Quelle)</td><td>hoch und Alpha ≈ 0</td><td>Anteil, den der Markt erklärt</td></tr>
+      <tr><td>Zufallstest</td><td>besser als 95 %</td><td>irgendwo in der Mitte</td><td>Vergleich mit blindem Kaufen</td></tr>
+      <tr><td>Viele Varianten probiert</td><td colspan="2">Schwelle erhöhen: bei ~2.400 getesteten Varianten muss t über 4,1 liegen</td><td>Wer oft würfelt, trifft auch mal</td></tr>
+    </tbody>
+  </table></div>
+  <div class="rule">Wichtigste Regel: Zählt nur das <b>Out-of-Sample</b>-Ergebnis. In-Sample sieht fast immer gut aus, weil man dort optimiert hat.</div>
+</section>
+
+<section>
+  <div class="q">Ergebnis</div>
+  <h2>Was das für unseren Backtest heißt</h2>
+  <div class="tbl"><table id="summary"></table></div>
+  <p id="verdict"></p>
+</section>
+</div>
+
+<script>
+const DATA = {"is": {"trades": [-6.21, 2.7, 1.44, -0.64, -4.08, -1.36, 2.19, -1.36, 3.52, 1.55, -0.82, 1.32, -1.31, -0.7, 0.73, 2.67, -0.5, -0.2, -3.83, -0.17, -1.98, 4.94, -8.32, 0.19, 2.11, 1.72, 2.74, 2.42, -2.63, 2.75, 2.15, 0.37, -1.71, -1.17, 2.63, -0.79, 2.1, 0.02, 1.16, -0.42, 0.97, -1.25, 0.68, -3.45, 0.23, 3.32, 1.99, 3.72, -2.83, 1.14, 0.9, 2.63, 2.4, 1.28, 0.54, 3.72, -0.13, 3.07, 1.36, 4.32, -2.25, 0.44, 0.38, 0.77, -0.18, 0.5, 0.4, -5.05, -1.88, 3.32, 3.75, 2.58, 0.92, 4.29, 0.92, 0.85, 2.66, -3.33, 2.34, -0.69, 1.98, -0.11, 2.32, -0.48, 0.86, 2.38, -1.0, 2.22, 1.03, -0.21, 0.5, 0.09, 2.28, 1.08, 0.78, 0.91, 3.13, 2.72, -5.26, 0.55, -0.26, -2.17, 0.64, 1.45, 0.39, -3.91, -0.74, -4.49, 2.69, 3.61, 3.18, 0.98, -1.93, 2.07, 0.36, -0.02, -1.3, 1.68, 1.74, 2.02, 0.9, -11.62, -5.1, 1.52, 4.21, -0.74, 0.72, 4.2, -1.3, -5.69, 0.97, 1.11, -3.28, -3.29, 0.74, 1.61, 0.66, 0.92, 0.73, 1.02, -0.13, 5.02, -2.23, 0.22, -5.26, -0.91, 8.04, -7.75, 3.79, 0.24, 5.82, -5.56, -11.71, 9.07, 0.91, -2.14, 1.73, -2.93, 2.62, 0.6, 2.24, 3.29, 1.75, -1.42, -3.75, -4.74, 3.33, 3.54, 2.28, 2.13, 2.31, -0.44, 1.66, 0.77, -2.74, 5.68, 1.91, -0.06, 0.51, -1.23, 4.77, -2.72, -1.2, 3.08, 4.2, 3.25, 2.26, 0.95, 0.93, 4.31, 1.43, 1.46, -0.44, 0.53, -4.02, 4.96, 2.45, -1.32, -2.26, -0.87, 1.13, -2.98], "pts": [[-0.79, -0.78], [-3.89, -3.88], [-1.64, -1.63], [-0.72, 0.0], [0.87, 0.0], [3.13, 3.13], [-0.42, -0.42], [3.1, 0.0], [0.99, 0.0], [0.86, 0.85], [0.58, 0.57], [0.99, 0.0], [1.38, 0.0], [-0.19, -0.19], [2.11, 2.09], [-2.51, -2.49], [-6.39, 0.0], [2.23, 0.0], [-4.23, -4.2], [0.16, 0.16], [-2.25, 0.0], [2.51, 0.0], [2.37, 2.36], [-3.64, -3.63], [-5.03, 0.0], [5.42, 0.0], [-1.22, -1.21], [3.55, 3.54], [-0.1, -0.1], [1.82, 0.0], [-3.77, 0.0], [-0.7, -0.7], [-0.66, -0.66], [3.75, 0.0], [0.46, 0.0], [1.44, 1.43], [2.05, 2.04], [-0.22, 0.0], [1.66, 0.0], [0.94, 0.94], [0.59, 0.58], [0.02, 0.02], [3.6, 0.0], [-2.18, 0.0], [0.04, 0.04], [-0.86, -0.86], [2.97, 0.0], [1.28, 0.0], [0.28, 0.28], [1.04, 1.03], [0.06, 0.0], [1.11, 0.0], [1.71, 0.0], [-0.76, -0.75], [-0.55, -0.55], [2.71, 0.0], [1.4, 0.0], [1.04, 1.03], [-1.72, -1.7], [0.1, 0.0], [-1.28, 0.0], [-1.92, -1.91], [2.7, 2.69], [1.42, 0.0], [-0.32, 0.0], [-0.64, -0.63], [1.34, 1.33], [1.96, 1.94], [-1.72, 0.0], [-0.18, 0.0], [-0.34, -0.34], [-0.17, -0.16], [-2.32, 0.0], [-2.25, 0.0], [0.04, 0.04], [-0.24, -0.23], [5.61, 0.0], [0.31, 0.0], [-2.06, -2.05], [2.2, 2.19], [-3.92, -3.9], [-7.19, 0.0], [-1.72, 0.0], [-4.69, -4.67], [4.74, 4.72], [-0.24, 0.0], [-1.69, 0.0], [5.35, 5.3], [-6.55, -6.48], [-0.44, -0.44], [2.13, 0.0], [5.98, 0.0], [1.12, 1.11], [3.78, 3.75], [-2.48, 0.0], [0.85, 0.0], [-3.81, -3.77], [-4.69, -4.63], [7.39, 0.0], [0.88, 0.0], [-2.83, -2.83], [3.74, 3.73], [-0.61, -0.61], [1.61, 0.0], [0.88, 0.0], [2.04, 2.03], [0.07, 0.07], [2.17, 0.0], [-0.17, 0.0], [1.39, 1.37], [0.33, 0.33], [0.29, 0.0], [0.09, 0.0], [2.43, 2.4], [-0.51, -0.5], [0.82, 0.81], [-0.74, 0.0], [-1.99, 0.0], [0.6, 0.59], [1.81, 1.79], [-2.44, 0.0], [-1.15, 0.0], [-4.3, -4.29], [1.74, 1.74], [-3.02, 0.0], [3.73, 0.0], [1.29, 1.28], [-0.58, -0.58], [2.04, 2.02], [-0.55, 0.0], [0.16, 0.0], [0.43, 0.43], [1.71, 1.69], [0.36, 0.0], [1.07, 0.0], [0.87, 0.86], [-0.5, -0.49], [-0.32, 0.0], [2.23, 0.0], [1.94, 0.0], [-0.38, -0.38], [-1.34, -1.33], [1.4, 0.0], [-2.21, 0.0], [0.32, 0.32], [-1.49, -1.47], [0.16, 0.0], [-2.43, 0.0], [-1.45, -1.44], [3.63, 3.6], [0.5, 0.49], [0.13, 0.0], [-0.32, 0.0], [1.17, 1.16], [-1.94, -1.93], [4.57, 0.0], [0.38, 0.0], [0.94, 0.94], [1.14, 1.14], [0.68, 0.0], [0.31, 0.0], [0.13, 0.12], [-0.28, -0.27], [0.17, 0.17], [2.17, 0.0], [0.61, 0.61], [-0.24, -0.24], [0.79, 0.79], [-1.01, 0.0], [2.29, 0.0], [-2.11, -2.1], [1.73, 1.72], [2.04, 0.0], [1.2, 0.0], [2.07, 2.06], [-1.07, -1.07], [-1.15, 0.0], [0.78, 0.0], [-1.02, 0.0], [-2.11, -2.1], [0.87, 0.87], [1.59, 0.0], [2.96, 0.0], [0.71, 0.7], [-0.02, -0.02], [1.06, 0.0], [-1.07, 0.0], [-2.1, -2.09], [0.47, 0.46], [-1.83, -1.82], [1.36, 0.0], [1.98, 0.0], [1.3, 1.29], [-1.06, -1.05], [-0.08, 0.0], [0.75, 0.0], [2.42, 2.42], [0.88, 0.88], [0.1, 0.0], [0.51, 0.0], [1.56, 1.54], [0.37, 0.36], [0.06, 0.05], [-0.04, 0.0], [-1.65, 0.0], [2.42, 2.39], [1.27, 1.26], [-0.54, 0.0], [0.6, 0.0], [-0.2, -0.2], [-2.63, -2.6], [-0.43, 0.0], [0.81, 0.0], [2.31, 0.0], [-0.13, -0.12], [1.26, 1.26], [0.99, 0.0], [-1.96, 0.0], [1.38, 1.36], [-0.48, -0.47], [0.4, 0.0], [-2.65, 0.0], [2.71, 2.71], [-0.08, -0.08], [0.95, 0.0], [-0.14, 0.0], [-0.03, -0.03], [1.2, 1.19], [1.22, 1.2], [1.34, 0.0], [-0.68, 0.0], [1.38, 1.38], [-0.1, -0.1], [1.24, 0.0], [-0.9, 0.0], [0.54, 0.53], [0.01, 0.0], [-2.68, 0.0], [0.33, 0.0], [1.22, 1.21], [1.7, 1.69], [0.75, 0.75], [0.21, 0.0], [-1.11, 0.0], [1.25, 1.24], [-1.37, -1.35], [-0.76, 0.0], [-3.14, 0.0], [-1.01, -1.01], [4.12, 4.1], [2.72, 0.0], [0.68, 0.0], [0.39, 0.0], [1.16, 1.14], [0.2, 0.2], [0.38, 0.0], [-3.52, 0.0], [3.42, 3.36], [0.87, 0.86], [-1.65, 0.0], [-0.63, 0.0], [-1.07, -1.07], [1.5, 1.49], [-2.65, -2.64], [3.23, 0.0], [1.84, 0.0], [0.59, 0.58], [-0.14, -0.14], [-1.62, 0.0], [-0.99, 0.0], [2.7, 2.66], [-2.25, -2.22], [0.38, 0.0], [1.68, 0.0], [-0.94, -0.93], [1.73, 1.71], [-0.51, 0.0], [0.25, 0.0], [0.51, 0.5], [0.16, 0.16], [-0.85, -0.84], [-0.78, 0.0], [0.03, 0.0], [0.72, 0.72], [-0.22, -0.22], [-1.5, 0.0], [0.22, 0.0], [2.37, 2.33], [-1.92, -1.89], [0.99, 0.0], [-1.33, 0.0], [0.76, 0.0], [-5.81, -5.74], [0.81, 0.8], [-3.34, 0.0], [2.07, 0.0], [-0.19, -0.19], [-1.69, -1.67], [1.39, 0.0], [3.21, 0.0], [0.98, 0.96], [1.88, 1.86], [0.43, 0.42], [0.88, 0.0], [-3.91, 0.0], [3.74, 3.69], [0.01, 0.01], [-0.08, 0.0], [-4.02, 0.0], [-0.2, -0.2], [2.79, 2.77], [-0.75, 0.0], [-6.07, 0.0], [-1.91, -1.88], [1.2, 1.18], [1.66, 1.63], [-3.01, 0.0], [-0.79, 0.0], [2.85, 2.83], [1.39, 1.38], [2.69, 0.0], [1.26, 0.0], [1.33, 1.31], [-0.41, -0.4], [1.66, 0.0], [-1.16, 0.0], [1.58, 1.56], [0.52, 0.52], [-1.23, -1.22], [-0.37, 0.0], [-0.62, 0.0], [0.31, 0.31], [2.34, 2.33], [-0.1, 0.0], [-0.1, 0.0], [-1.35, -1.34], [-2.01, -1.99], [3.77, 0.0], [1.14, 0.0], [1.16, 1.16], [0.98, 0.98], [0.17, 0.17], [0.23, 0.0], [0.11, 0.0], [0.0, 0.0], [-0.69, -0.68], [0.5, 0.0], [-2.7, 0.0], [0.84, 0.84], [1.18, 1.17], [-0.05, -0.05], [-0.53, 0.0], [-0.94, 0.0], [0.43, 0.42], [-0.54, -0.53], [-2.01, 0.0], [3.72, 0.0], [0.89, 0.88], [1.42, 1.41], [-0.97, 0.0], [2.62, 0.0], [0.55, 0.55], [0.1, 0.1], [-1.13, -1.12], [1.63, 0.0], [0.02, 0.0], [-0.36, -0.36], [1.23, 1.23], [-0.06, 0.0], [0.68, 0.0], [1.37, 1.36], [0.99, 0.98], [0.65, 0.0], [-0.38, 0.0], [0.31, 0.31], [-1.31, -1.3], [0.48, 0.0], [-0.16, 0.0], [-0.96, 0.0], [0.4, 0.4], [1.81, 1.79], [0.77, 0.0], [-0.5, 0.0], [-0.3, -0.3], [1.33, 1.32], [0.92, 0.0], [-0.27, 0.0], [0.28, 0.27], [-0.08, -0.08], [-0.4, -0.4], [0.03, 0.0], [1.41, 0.0], [0.52, 0.52], [-0.02, -0.02], [0.17, 0.0], [-1.42, 0.0], [-0.65, -0.65], [0.75, 0.75], [1.25, 0.0], [-0.49, 0.0], [1.53, 1.52], [0.07, 0.07], [0.67, 0.66], [1.21, 0.0], [0.19, 0.0], [0.83, 0.81], [0.25, 0.25], [0.24, 0.0], [-0.21, 0.0], [-0.15, -0.15], [0.93, 0.92], [1.53, 0.0], [0.39, 0.0], [0.86, 0.85], [0.52, 0.51], [-0.46, -0.46], [2.42, 0.0], [1.67, 0.0], [0.96, 0.95], [2.16, 2.15], [-3.93, 0.0], [-5.11, 0.0], [4.31, 4.25], [0.57, 0.56], [-2.09, -2.06], [3.55, 0.0], [-1.33, -1.32], [-5.96, -5.9], [2.1, 2.08], [-1.45, 0.0], [2.04, 0.0], [0.59, 0.59], [-0.04, -0.04], [-0.25, 0.0], [2.41, 0.0], [-0.54, -0.54], [0.28, 0.28], [0.48, 0.0], [1.66, 0.0], [0.05, 0.05], [-0.92, -0.91], [-1.3, -1.29], [1.49, 0.0], [1.5, 0.0], [0.02, 0.02], [0.61, 0.61], [0.75, 0.0], [-0.21, 0.0], [0.57, 0.56], [0.88, 0.87], [0.88, 0.0], [-0.99, 0.0], [1.17, 0.0], [0.75, 0.75], [-0.36, -0.36], [-0.87, 0.0], [-4.19, 0.0], [-0.16, -0.16], [-3.76, -3.75], [2.28, 0.0], [2.08, 0.0], [-1.38, -1.37], [-4.09, -4.04], [4.93, 4.88], [-4.56, 0.0], [-1.12, 0.0], [-7.09, -7.08], [2.79, 2.79], [1.72, 0.0], [2.62, 0.0], [3.08, 3.06], [-0.38, -0.37], [1.52, 0.0], [0.11, 0.0], [2.56, 2.54], [0.62, 0.62], [0.4, 0.39], [-2.05, 0.0], [2.76, 2.73], [-0.79, -0.78], [1.2, 1.18], [2.02, 0.0], [0.49, 0.0], [-0.05, -0.05], [1.03, 1.02], [0.38, 0.0], [-2.13, 0.0], [-0.88, -0.88], [-1.06, -1.05], [-2.73, 0.0], [4.53, 0.0], [0.47, 0.0], [1.88, 1.87], [0.19, 0.19], [1.31, 0.0], [0.77, 0.0], [-1.41, -1.39], [1.8, 1.77], [-2.9, 0.0], [-0.39, 0.0], [-1.11, -1.1], [-1.38, -1.37], [2.53, 2.49], [2.04, 0.0], [0.8, 0.0], [-0.62, -0.62], [-0.69, -0.68], [-0.57, 0.0], [0.67, 0.0], [0.65, 0.65], [1.02, 1.02], [1.45, 0.0], [0.89, 0.0], [0.96, 0.94], [-0.23, -0.23], [1.02, 1.0], [0.09, 0.0], [0.82, 0.0], [1.62, 1.61], [0.39, 0.39], [-0.03, 0.0], [0.88, 0.0], [1.87, 1.84], [-0.95, -0.94], [-1.92, 0.0], [2.93, 0.0], [1.7, 0.0], [-1.25, -1.24], [-10.5, -10.4], [-0.82, 0.0], [-10.11, 0.0], [-14.58, -14.35], [11.09, 10.9], [-1.61, 0.0], [12.34, 0.0], [2.92, 2.9], [-1.36, -1.35], [-0.42, 0.0], [3.98, 0.0], [-2.64, -2.62], [3.53, 3.49], [3.39, 3.36], [4.17, 0.0], [-4.79, 0.0], [1.06, 1.04], [-1.78, -1.75], [3.73, 0.0], [2.04, 0.0], [1.06, 1.06], [-0.33, -0.33], [2.01, 0.0], [2.37, 0.0], [0.44, 0.0], [0.8, 0.79], [3.37, 3.31], [-2.68, 0.0], [-2.29, 0.0], [-0.34, -0.33], [-0.97, -0.96], [1.8, 0.0], [3.88, 0.0], [-0.34, -0.33], [-0.36, -0.35], [-5.04, -4.98], [7.05, 0.0], [1.97, 0.0], [-0.88, -0.86], [1.86, 1.83], [1.93, 0.0], [-0.8, 0.0], [1.78, 1.77], [-0.65, -0.65], [1.5, 0.0], [1.91, 0.0], [-1.98, -1.95], [2.23, 2.19], [-3.48, -3.42], [5.04, 0.0], [1.27, 0.0], [-0.94, -0.94], [-2.37, -2.35], [0.83, 0.0], [2.63, 0.0], [-0.92, -0.92], [1.67, 1.67], [1.61, 0.0], [2.12, 0.0], [1.42, 1.39], [-0.14, -0.14], [0.34, 0.33], [1.08, 0.0], [-1.31, 0.0], [-0.4, -0.39], [1.07, 1.04], [0.55, 0.0], [0.41, 0.0], [-2.18, -2.16], [3.17, 3.13], [1.48, 0.0], [0.5, 0.0], [-0.99, -0.97], [1.84, 1.8], [-0.1, -0.1], [0.79, 0.0], [0.63, 0.0], [-0.53, -0.53], [1.56, 1.55], [0.54, 0.0], [-1.58, 0.0], [-0.97, -0.95], [0.84, 0.83], [-2.15, 0.0], [0.65, 0.0], [1.91, 1.9], [1.44, 1.43], [1.6, 1.59], [1.79, 0.0], [-0.14, 0.0], [0.32, 0.32], [-2.54, -2.5], [-1.05, 0.0], [4.04, 0.0], [-1.83, -1.8], [2.09, 2.05], [0.93, 0.0], [-2.02, 0.0], [-0.08, 0.0], [-6.07, -5.9], [0.86, 0.84], [1.46, 0.0], [-1.5, 0.0], [-1.73, -1.72], [0.83, 0.83], [-1.41, 0.0], [-2.67, 0.0], [6.36, 6.27], [1.58, 1.56], [0.04, 0.0], [-1.24, 0.0], [-2.13, -2.07], [-3.12, -3.04], [-2.71, -2.64], [-0.61, 0.0], [-2.41, 0.0], [-2.82, -2.81], [6.8, 6.79], [-1.44, 0.0], [-4.99, 0.0], [-5.74, -5.66], [6.34, 6.24], [-2.27, 0.0], [2.04, 0.0], [-1.01, -0.99], [2.48, 2.44], [4.31, 4.23], [0.24, 0.0], [3.35, 0.0], [-1.26, -1.25], [-4.35, -4.32], [-2.72, 0.0], [3.45, 0.0], [-4.46, -4.46], [-4.87, -4.87], [-2.85, -2.84], [1.3, 0.0], [-1.41, 0.0], [4.88, 4.87], [3.99, 3.98], [-3.8, 0.0], [6.02, 0.0], [-0.67, -0.67], [1.59, 1.57], [0.87, 0.0], [-3.27, 0.0], [-2.2, -2.18], [-0.02, -0.02], [0.07, 0.07], [1.2, 0.0], [2.79, 0.0], [-0.72, -0.71], [2.47, 2.41], [1.6, 0.0], [-1.09, 0.0], [-0.28, -0.28], [-2.66, -2.62], [2.0, 0.0], [-4.2, 0.0], [0.97, 0.95], [1.63, 1.61], [3.26, 0.0], [0.12, 0.0], [0.78, 0.0], [-0.36, -0.35], [0.96, 0.94], [-0.91, 0.0], [-0.36, 0.0], [1.62, 1.6], [0.61, 0.6], [1.7, 0.0], [0.47, 0.0], [2.61, 2.56], [-1.52, -1.5], [2.22, 2.18], [-0.92, 0.0], [2.27, 0.0], [0.72, 0.72], [1.02, 1.01], [-2.25, 0.0], [-0.25, 0.0], [-2.25, -2.25], [0.85, 0.85], [2.47, 0.0], [-1.17, 0.0], [-0.19, -0.19], [-2.92, -2.87], [-0.67, -0.66], [0.45, 0.0], [0.23, 0.0], [-2.34, -2.32], [-2.45, -2.42], [5.93, 0.0], [1.1, 0.0], [2.29, 2.29], [1.02, 1.02], [0.88, 0.0], [0.17, 0.0], [2.45, 2.4], [0.71, 0.69], [0.36, 0.35], [-1.45, 0.0], [1.69, 0.0], [1.31, 1.29], [0.95, 0.93], [1.31, 0.0], [1.49, 0.0], [-0.48, -0.47], [1.66, 1.63], [0.94, 0.92], [-0.04, 0.0], [-0.2, -0.19], [2.17, 2.12], [0.33, 0.33], [-0.77, 0.0], [-1.6, 0.0], [-3.06, -3.02], [2.7, 2.66], [0.67, 0.0], [1.61, 0.0], [1.68, 1.64], [-0.01, -0.01], [-0.37, 0.0], [1.11, 0.0], [1.62, 0.0], [0.71, 0.69], [0.06, 0.06], [1.63, 0.0], [0.97, 0.0], [-1.93, -1.92], [-0.83, -0.83], [-2.47, 0.0], [0.25, 0.0], [4.08, 3.96], [1.34, 1.31], [0.2, 0.19], [-4.4, 0.0], [4.21, 0.0], [1.39, 1.35], [0.51, 0.5], [0.29, 0.0], [1.09, 0.0], [0.97, 0.96], [-1.02, -1.0], [-1.3, 0.0], [4.67, 0.0], [-2.05, -2.01], [1.64, 1.61], [0.95, 0.94], [0.95, 0.0], [-0.66, 0.0], [-1.95, -1.92], [0.73, 0.72], [-0.63, 0.0], [-1.88, 0.0], [3.01, 2.99], [1.71, 1.7], [-1.02, 0.0], [-0.16, 0.0], [1.41, 0.0], [-1.62, -1.61], [-1.13, -1.12], [-3.09, 0.0], [-2.41, 0.0], [0.81, 0.79], [-2.0, -1.94], [-8.88, 0.0], [5.92, 0.0], [-1.21, -1.21], [4.34, 4.34], [2.92, 0.0], [-0.41, 0.0], [4.68, 4.65], [-2.16, -2.15], [1.74, 1.73], [1.7, 0.0], [-0.47, 0.0], [-0.01, -0.01], [3.26, 3.18], [0.98, 0.0], [0.35, 0.0], [0.72, 0.71], [1.54, 1.52], [-2.46, 0.0], [2.65, 0.0], [0.71, 0.71], [0.33, 0.33], [-0.09, -0.09], [0.28, 0.0], [1.59, 0.0], [1.16, 1.13], [-0.22, -0.22], [1.04, 0.0], [-3.02, 0.0], [2.48, 2.45], [1.78, 1.76], [0.66, 0.0], [-1.41, 0.0], [0.06, 0.0], [-1.94, -1.91], [3.44, 3.38], [0.43, 0.0], [-0.6, 0.0], [0.14, 0.14], [1.32, 1.29], [-1.02, 0.0], [1.57, 0.0], [-0.35, -0.35], [-0.55, -0.54], [0.47, 0.46], [-0.14, 0.0], [-1.39, 0.0], [1.2, 1.17], [-0.66, -0.64], [-1.91, 0.0], [-1.68, 0.0], [-1.27, -1.27], [-2.79, -2.78], [3.29, 0.0], [3.99, 0.0], [4.42, 4.3], [0.52, 0.51], [0.78, 0.0], [2.44, 0.0], [-0.01, -0.01], [0.96, 0.94], [1.48, 1.44], [-2.93, 0.0], [1.03, 0.0], [0.64, 0.63], [-1.95, -1.92], [2.34, 0.0], [0.99, 0.0], [-1.63, -1.6], [-0.64, -0.63], [0.92, 0.0], [3.72, 0.0], [0.34, 0.0], [-1.4, -1.4], [0.53, 0.53], [-0.05, 0.0], [-0.68, 0.0], [0.0, 0.0], [1.13, 1.13], [-0.27, 0.0], [1.22, 0.0], [-2.03, -1.96], [-0.31, -0.3], [-0.67, -0.65], [-2.66, 0.0], [2.14, 0.0]], "perm": {"counts": [79, 405, 911, 1220, 1400, 1291, 1058, 926, 735, 556, 381, 283, 197, 179, 103, 80, 46, 41, 28, 19, 17, 12, 7, 4, 7, 5, 2, 2, 0, 0, 3, 0, 0, 1, 0, 0, 0, 1, 0, 1], "edges": [-54.8, -14.8, 25.2, 65.1, 105.1, 145.1, 185.1, 225.0, 265.0, 305.0, 344.9, 384.9, 424.9, 464.9, 504.8, 544.8, 584.8, 624.8, 664.7, 704.7, 744.7, 784.7, 824.6, 864.6, 904.6, 944.5, 984.5, 1024.5, 1064.5, 1104.4, 1144.4, 1184.4, 1224.4, 1264.3, 1304.3, 1344.3, 1384.3, 1424.2, 1464.2, 1504.2, 1544.1]}, "real": 114.2, "permMedian": 175.1, "pPerm": 0.71}, "oos": {"trades": [-7.17, -3.87, 9.49, 7.06, -3.03, -0.16, -5.97, 2.36, -3.88, 0.39, -1.77, -3.62, 2.78, -6.13, -5.93, 5.88, 2.58, -3.21, -0.81, -0.45, -4.72, 1.18, 1.71, 3.37, -1.07, 3.25, -1.45, -3.12, 2.73, -1.74, -7.45, 0.83, -7.01, 7.47, 4.65, -1.59, -7.14, 0.75, 3.62, 3.51, 3.24, -1.25, 0.06, 3.11, -2.13, -0.89, 0.74, 2.03, 0.82, -0.08, -1.12, -2.81, 2.28, -0.18, -1.0, 4.04, -1.23, 0.72, -0.13, 1.86, -1.11, 0.51, -2.39, -2.06, 3.87, -0.54, 1.84, -2.06, -1.02, 0.99, 2.72, -0.88, -0.3, 1.77, 1.67, 1.67, -0.85, 1.43, 3.43, 2.24, 2.85, 0.86, 1.46, 0.6, -0.59, -3.54, 1.28, 2.84, 0.65, -0.29, -6.02, 1.77, 2.86, -1.7, 1.88, 0.72, -5.02, -0.05, 2.1, 4.88, 0.87, -6.0, 1.48, -1.04, -3.09, -2.49, 2.62, -0.78, -7.24, -11.09, 7.84, 1.12, -1.09, -2.89, 11.4, 2.47, 0.16, -3.29], "pts": [[1.64, 0.0], [-1.62, -1.62], [-5.63, -5.61], [4.72, 0.0], [-2.62, 0.0], [-2.96, -2.91], [-0.94, -0.93], [5.68, 0.0], [-1.0, 0.0], [4.97, 4.97], [4.3, 4.3], [-1.89, 0.0], [1.19, 0.0], [-10.54, 0.0], [5.74, 5.74], [1.25, 1.25], [-1.36, 0.0], [-0.81, 0.0], [-0.99, -0.98], [-2.06, -2.04], [7.21, 0.0], [-1.37, 0.0], [0.51, 0.51], [-1.57, -1.55], [0.91, 0.9], [1.67, 0.0], [2.1, 0.0], [-1.97, -1.97], [-4.07, -4.07], [3.03, 0.0], [0.61, 0.0], [1.35, 1.34], [0.99, 0.98], [0.95, 0.0], [-1.73, 0.0], [-1.92, -1.91], [-1.17, -1.16], [-0.84, -0.84], [-1.91, 0.0], [-2.47, 0.0], [1.65, 1.65], [-1.24, -1.23], [3.41, 0.0], [-4.25, 0.0], [0.12, 0.12], [-1.89, -1.87], [-1.98, 0.0], [4.16, 0.0], [-4.21, -4.18], [-0.47, -0.47], [1.09, 1.09], [-1.66, 0.0], [1.53, 0.0], [1.84, 1.82], [0.93, 0.92], [-0.41, 0.0], [-2.57, 0.0], [-1.01, -1.0], [-4.27, -4.23], [-0.94, -0.93], [-0.06, 0.0], [-6.72, -6.64], [-0.93, -0.92], [1.8, 1.78], [-2.75, 0.0], [4.88, 0.0], [5.03, 4.99], [0.81, 0.81], [1.08, 0.0], [-1.65, 0.0], [3.72, 3.67], [-1.09, -1.08], [-1.35, 0.0], [0.34, 0.0], [-4.0, -3.97], [0.91, 0.9], [-0.08, -0.08], [-2.76, 0.0], [2.11, 0.0], [-0.39, -0.39], [-0.42, -0.42], [0.71, 0.0], [-1.99, 0.0], [-2.37, -2.34], [1.97, 1.94], [-4.33, 0.0], [-4.22, 0.0], [0.62, 0.0], [-11.6, -11.45], [7.78, 7.66], [2.93, 0.0], [1.89, 0.0], [-1.67, -1.66], [2.9, 2.88], [-1.58, 0.0], [3.04, 0.0], [1.64, 1.63], [1.02, 1.01], [-0.94, -0.93], [1.65, 0.0], [-3.04, 0.0], [1.94, 1.93], [1.41, 1.4], [0.99, 0.0], [-2.29, 0.0], [-1.57, -1.56], [0.51, 0.5], [-0.98, 0.0], [-2.32, 0.0], [0.73, 0.72], [-1.3, -1.29], [3.85, 3.81], [2.87, 0.0], [0.16, 0.16], [-1.5, -1.48], [-0.11, -0.11], [-2.15, 0.0], [-1.04, 0.0], [1.28, 1.27], [-4.35, -4.33], [-0.27, 0.0], [-1.71, 0.0], [4.89, 4.84], [-2.06, -2.04], [-1.54, 0.0], [-3.71, 0.0], [-1.97, 0.0], [-1.81, -1.79], [0.07, 0.07], [-0.08, 0.0], [-6.84, 0.0], [-7.99, -7.98], [0.59, 0.59], [1.34, 0.0], [5.14, 0.0], [2.22, 2.21], [1.3, 1.3], [-2.64, -2.62], [-2.42, 0.0], [-0.46, 0.0], [-4.99, -4.99], [-2.13, -2.13], [-3.24, 0.0], [4.33, 0.0], [5.88, 5.87], [1.5, 1.5], [0.37, 0.0], [-0.7, 0.0], [1.69, 1.68], [2.29, 2.27], [0.61, 0.61], [-2.57, 0.0], [-2.49, 0.0], [0.71, 0.71], [-2.28, -2.28], [3.79, 0.0], [2.09, 0.0], [-2.78, -2.75], [-4.48, -4.43], [-0.66, 0.0], [-3.04, 0.0], [0.63, 0.0], [1.59, 1.58], [-0.83, -0.82], [-1.46, 0.0], [0.53, 0.0], [7.5, 7.46], [-3.61, -3.59], [1.78, 0.0], [-1.21, 0.0], [2.91, 2.91], [0.58, 0.58], [3.48, 0.0], [0.35, 0.0], [1.17, 1.16], [-1.18, -1.17], [3.26, 3.23], [2.51, 0.0], [0.08, 0.0], [0.72, 0.71], [-1.96, -1.95], [0.97, 0.0], [1.26, 0.0], [-0.48, -0.48], [0.54, 0.54], [-1.85, 0.0], [-0.27, 0.0], [1.34, 1.33], [0.24, 0.24], [1.5, 1.49], [1.33, 0.0], [-0.27, 0.0], [1.74, 1.73], [-3.8, -3.78], [3.31, 0.0], [0.8, 0.0], [0.12, 0.12], [-1.0, -1.0], [2.12, 0.0], [0.24, 0.0], [-0.27, 0.0], [-1.44, -1.43], [2.21, 2.2], [0.31, 0.0], [1.19, 0.0], [1.36, 1.35], [0.66, 0.66], [1.15, 0.0], [1.21, 0.0], [1.6, 1.58], [0.16, 0.16], [-0.92, -0.91], [1.03, 0.0], [0.26, 0.0], [-0.15, -0.15], [0.07, 0.07], [1.05, 0.0], [-3.14, 0.0], [-0.96, -0.96], [-0.15, -0.15], [3.04, 0.0], [-0.22, 0.0], [-0.41, -0.41], [0.53, 0.53], [-2.92, -2.91], [-0.78, 0.0], [-0.27, 0.0], [-0.19, -0.19], [2.48, 2.45], [0.16, 0.0], [1.25, 0.0], [-0.13, -0.13], [-0.05, -0.05], [-0.79, 0.0], [-1.12, 0.0], [-1.02, -1.02], [-1.38, -1.37], [1.43, 1.42], [-3.42, 0.0], [0.08, 0.0], [3.16, 3.12], [0.86, 0.85], [0.52, 0.0], [0.92, 0.0], [0.42, 0.41], [-1.64, -1.62], [1.93, 0.0], [-0.83, 0.0], [-1.24, -1.22], [-1.13, -1.11], [3.15, 3.11], [3.19, 0.0], [1.54, 0.0], [-1.17, -1.17], [1.06, 1.05], [0.72, 0.0], [-0.27, 0.0], [0.52, 0.52], [1.33, 1.33], [0.15, 0.0], [-2.12, 0.0], [-0.14, 0.0], [-1.4, -1.39], [0.3, 0.3], [2.7, 0.0], [0.19, 0.0], [-0.31, -0.3], [0.82, 0.81], [0.88, 0.0], [-1.8, 0.0], [-0.87, -0.86], [-1.54, -1.53], [0.13, 0.0], [0.71, 0.0], [-3.27, -3.23], [0.83, 0.82], [0.42, 0.41], [1.25, 0.0], [-1.48, 0.0], [3.05, 3.01], [0.8, 0.79], [-0.23, 0.0], [0.18, 0.0], [1.58, 1.56], [-2.09, -2.06], [0.23, 0.0], [1.47, 0.0], [1.32, 1.31], [0.47, 0.47], [0.04, 0.04], [-0.63, 0.0], [0.33, 0.0], [-0.87, -0.86], [-1.2, -1.18], [1.07, 0.0], [1.93, 0.0], [-0.29, -0.29], [-1.83, -1.8], [1.11, 1.1], [-2.68, 0.0], [-0.78, 0.0], [-0.59, -0.59], [1.59, 1.59], [1.81, 0.0], [1.2, 0.0], [1.1, 1.1], [1.6, 1.6], [-0.25, 0.0], [-0.45, 0.0], [0.63, 0.62], [0.11, 0.11], [-1.61, -1.59], [2.98, 0.0], [0.16, 0.0], [-2.03, -2.01], [1.76, 1.74], [-1.53, 0.0], [0.24, 0.0], [1.59, 1.58], [0.17, 0.17], [-0.17, 0.0], [-0.44, 0.0], [2.01, 1.98], [-0.33, -0.32], [-0.63, 0.0], [0.05, 0.0], [-0.49, 0.0], [1.72, 1.71], [-0.05, -0.05], [1.16, 0.0], [-2.61, 0.0], [-1.87, -1.86], [1.04, 1.03], [0.62, 0.0], [-2.79, 0.0], [-0.06, -0.06], [-0.56, -0.56], [2.07, 2.06], [-0.37, 0.0], [-2.32, 0.0], [0.33, 0.33], [3.09, 3.08], [0.06, 0.0], [-0.99, 0.0], [2.81, 2.78], [-0.55, -0.55], [1.23, 0.0], [-0.92, 0.0], [1.62, 1.6], [-0.39, -0.38], [1.6, 1.59], [1.03, 0.0], [1.19, 0.0], [0.22, 0.22], [0.64, 0.64], [-0.94, 0.0], [1.22, 0.0], [1.47, 1.45], [-0.01, -0.01], [-0.31, 0.0], [0.94, 0.0], [1.23, 1.22], [-1.14, -1.14], [0.53, 0.53], [-0.61, 0.0], [1.49, 0.0], [-0.01, -0.01], [-0.58, -0.57], [1.84, 0.0], [-0.71, 0.0], [1.21, 1.19], [-0.3, -0.29], [-4.41, -4.35], [1.13, 0.0], [-1.13, -1.13], [3.54, 3.53], [-1.06, -1.06], [1.61, 0.0], [0.63, 0.0], [2.17, 2.15], [0.65, 0.65], [0.77, 0.0], [0.02, 0.0], [1.12, 1.12], [-0.47, -0.47], [1.36, 0.0], [-1.86, 0.0], [1.67, 1.66], [-1.98, -1.96], [0.05, 0.05], [1.8, 0.0], [1.44, 0.0], [-1.19, -1.18], [-4.9, -4.87], [-1.78, 0.0], [1.43, 0.0], [-0.53, -0.53], [2.32, 2.3], [-0.37, 0.0], [-1.38, 0.0], [2.11, 0.0], [2.8, 2.78], [0.07, 0.07], [2.02, 0.0], [0.27, 0.0], [-3.92, -3.87], [2.31, 2.28], [-1.67, 0.0], [-3.71, 0.0], [0.34, 0.34], [-1.23, -1.23], [2.8, 2.78], [1.59, 0.0], [-2.44, 0.0], [1.12, 1.12], [-0.4, -0.4], [-4.52, 0.0], [-0.75, 0.0], [-5.41, -5.34], [0.41, 0.4], [4.87, 0.0], [-4.59, 0.0], [1.4, 1.39], [0.23, 0.23], [-1.66, -1.64], [-2.8, 0.0], [-0.41, 0.0], [3.21, 3.2], [-1.08, -1.07], [4.2, 0.0], [-2.74, 0.0], [4.31, 4.29], [0.54, 0.54], [1.15, 0.0], [-1.81, 0.0], [2.67, 2.64], [-3.47, -3.44], [1.78, 1.76], [-2.83, 0.0], [-0.05, 0.0], [-3.1, -3.09], [-3.0, -3.0], [-1.21, 0.0], [-1.85, 0.0], [1.71, 1.7], [-0.23, -0.23], [0.2, 0.0], [2.86, 0.0], [0.15, 0.15], [-0.46, -0.46], [-0.73, -0.73], [-3.16, 0.0], [0.76, 0.0], [0.27, 0.27], [-3.35, -3.35], [-9.38, 0.0], [-18.2, 0.0], [4.6, 4.58], [-6.78, -6.75], [10.49, 0.0], [-3.9, 0.0], [-6.2, 0.0], [-8.39, -8.39], [12.02, 12.02], [-2.24, 0.0], [0.41, 0.0], [0.93, 0.93], [-1.7, -1.7], [6.76, 0.0], [-4.44, 0.0], [-4.53, -4.49], [-2.13, -2.11], [-0.73, -0.73], [5.17, 0.0], [-4.81, 0.0], [-6.86, -6.8], [-4.54, -4.51], [-7.03, 0.0], [10.71, 0.0], [1.57, 1.56], [6.17, 6.12], [3.26, 0.0], [1.67, 0.0], [1.52, 1.5], [-0.39, -0.39], [1.3, 0.0], [5.89, 0.0], [-4.98, -4.97], [0.46, 0.46], [3.62, 3.61], [2.28, 0.0], [0.65, 0.0], [-2.64, -2.63], [-0.25, -0.25], [-2.45, 0.0], [-1.93, 0.0], [6.97, 6.93], [4.14, 4.11], [0.84, 0.0], [2.33, 0.0], [-0.63, 0.0], [2.19, 2.19], [0.27, 0.27], [-1.21, 0.0], [2.59, 0.0], [2.46, 2.45], [-2.24, -2.24], [-1.84, 0.0], [4.52, 0.0], [1.51, 1.5], [-0.74, -0.74], [-4.02, -3.99], [3.19, 0.0], [2.26, 0.0], [-0.19, 0.0], [0.01, 0.0]], "perm": {"counts": [14, 124, 438, 820, 1067, 1210, 1117, 1059, 916, 727, 576, 479, 370, 290, 218, 140, 116, 89, 52, 57, 32, 28, 15, 10, 11, 4, 2, 7, 4, 2, 1, 0, 1, 2, 0, 0, 0, 1, 0, 1], "edges": [-89.8, -79.3, -68.8, -58.2, -47.7, -37.2, -26.7, -16.1, -5.6, 4.9, 15.4, 25.9, 36.5, 47.0, 57.5, 68.0, 78.5, 89.1, 99.6, 110.1, 120.6, 131.1, 141.7, 152.2, 162.7, 173.2, 183.7, 194.3, 204.8, 215.3, 225.8, 236.4, 246.9, 257.4, 267.9, 278.4, 289.0, 299.5, 310.0, 320.5, 331.0]}, "real": -9.2, "permMedian": -14.3, "pPerm": 0.45}};
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mean = a => a.reduce((s,x)=>s+x,0)/a.length;
+const sd = a => {const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1));};
+const de = (x,d=2) => x.toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d});
+function ncdf(x){const t=1/(1+0.2316419*Math.abs(x));const d=0.3989423*Math.exp(-x*x/2);const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p;}
+
+function stat(key){
+  const r=DATA[key].trades, n=r.length, m=mean(r), s=sd(r), se=s/Math.sqrt(n), t=m/se;
+  const pts=DATA[key].pts, xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  const mx=mean(xs), my=mean(ys);
+  let sxy=0,sxx=0; for(let i=0;i<xs.length;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)**2;}
+  const beta=sxy/sxx, alpha=my-beta*mx;
+  let ssr=0,sst=0; for(let i=0;i<xs.length;i++){ssr+=(ys[i]-alpha-beta*xs[i])**2;sst+=(ys[i]-my)**2;}
+  const r2=1-ssr/sst, seA=Math.sqrt(ssr/(xs.length-2))*Math.sqrt(1/xs.length+mx*mx/sxx);
+  return {n,m,s,t,p:1-ncdf(t),lo:m-1.96*se,hi:m+1.96*se,beta,alpha,r2,tA:alpha/seA,pA:2*(1-ncdf(Math.abs(alpha/seA)))};
+}
+const S={is:stat("is"),oos:stat("oos")};
+const NS="http://www.w3.org/2000/svg";
+function el(svg,tag,attrs,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!==undefined)e.textContent=text;svg.appendChild(e);return e;}
+
+function card(cls,lab,val,verdict){return `<div class="${cls}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="verdict">${verdict}</div></div>`;}
+
+function draw(){
+  // --- Glocke
+  const b=document.getElementById("bell"); b.innerHTML="";
+  const W=640,H=230,L=20,R=620,T=20,B=190, X=v=>L+(v+4)/8*(R-L), Y=v=>B-v/0.4*(B-T);
+  let d=`M${X(-4)},${B}`; for(let v=-4;v<=4.001;v+=0.05)d+=` L${X(v)},${Y(Math.exp(-v*v/2)/Math.sqrt(2*Math.PI))}`; d+=` L${X(4)},${B}Z`;
+  el(b,"path",{d,fill:css("--line"),stroke:"none"});
+  let tail=`M${X(2)},${B}`; for(let v=2;v<=4.001;v+=0.05)tail+=` L${X(v)},${Y(Math.exp(-v*v/2)/Math.sqrt(2*Math.PI))}`; tail+=` L${X(4)},${B}Z`;
+  el(b,"path",{d:tail,fill:css("--good"),opacity:.35});
+  el(b,"line",{x1:L,x2:R,y1:B,y2:B,stroke:css("--muted"),"stroke-width":1});
+  for(let v=-4;v<=4;v++){el(b,"line",{x1:X(v),x2:X(v),y1:B,y2:B+5,stroke:css("--muted")});el(b,"text",{x:X(v),y:B+20,"text-anchor":"middle"},String(v));}
+  el(b,"text",{x:X(0),y:Y(0.399)-6,"text-anchor":"middle"},"Hier landet reines Glück");
+  el(b,"text",{x:X(3),y:Y(0.06)-8,"text-anchor":"middle",style:`fill:${css("--good")}`},"selten durch Glück");
+  [["is",S.is.t,"In-Sample"],["oos",S.oos.t,"Out-of-Sample"]].forEach(([k,t,lab],i)=>{
+    const c=css(k==="is"?"--is":"--oos");
+    el(b,"line",{x1:X(t),x2:X(t),y1:T+10+i*22,y2:B,stroke:c,"stroke-width":3});
+    el(b,"text",{x:X(t)+(k==="is"?6:-6),y:T+20+i*22,"text-anchor":k==="is"?"start":"end",style:`fill:${c};font-weight:600`},`${lab}: t = ${de(t)}`);
+  });
+  document.getElementById("tres").innerHTML=
+    card(S.is.t>2?"ok":"mid","In-Sample t-Wert",de(S.is.t),S.is.t>2?"knapp über 2: sieht nach Vorteil aus":"unter 2: kein Beleg")+
+    card(Math.abs(S.oos.t)<2?"no":"ok","Out-of-Sample t-Wert",de(S.oos.t),"mitten in der Glocke: nicht von Glück zu unterscheiden");
+  document.getElementById("pres").innerHTML=
+    card(S.is.p<0.05?"ok":"no","In-Sample p-Wert",de(S.is.p,3),`nur in ${Math.round(S.is.p*100)} von 100 Fällen durch Glück`)+
+    card(S.oos.p<0.05?"ok":"no","Out-of-Sample p-Wert",de(S.oos.p,2),`in ${Math.round(S.oos.p*100)} von 100 Fällen durch Glück`);
+
+  // --- Konfidenzintervall
+  const c=document.getElementById("ci"); c.innerHTML="";
+  const cx=v=>60+(v+1)/2*(600-60);
+  el(c,"line",{x1:cx(0),x2:cx(0),y1:10,y2:135,stroke:css("--zero"),"stroke-width":2});
+  el(c,"text",{x:cx(0),y:155,"text-anchor":"middle",style:`fill:${css("--fg")};font-weight:600`},"0 % = kein Vorteil");
+  for(let v=-1;v<=1.001;v+=0.5){el(c,"text",{x:cx(v),y:140,"text-anchor":"middle"},`${de(v,1)} %`);}
+  [["is",S.is,"In-Sample",40],["oos",S.oos,"Out-of-Sample",95]].forEach(([k,s,lab,y])=>{
+    const col=css(k==="is"?"--is":"--oos");
+    el(c,"line",{x1:cx(s.lo),x2:cx(s.hi),y1:y,y2:y,stroke:col,"stroke-width":10,"stroke-linecap":"round",opacity:.45});
+    el(c,"circle",{cx:cx(s.m),cy:y,r:7,fill:col,stroke:css("--card"),"stroke-width":2});
+    el(c,"text",{x:cx(s.hi)+10,y:y+4,style:`fill:${col};font-weight:600`},`${lab}`);
+    el(c,"text",{x:cx(s.lo),y:y-12,"text-anchor":"start"},`${de(s.lo)} % bis ${de(s.hi)} %`);
+  });
+
+  // --- Streudiagramm
+  const sv=document.getElementById("scatter"); sv.innerHTML="";
+  const sX=v=>60+(v+10)/20*(620-60), sY=v=>320-(v+8)/16*(320-20);
+  for(let v=-10;v<=10;v+=5){el(sv,"line",{x1:sX(v),x2:sX(v),y1:20,y2:320,stroke:css("--line")});el(sv,"text",{x:sX(v),y:338,"text-anchor":"middle"},`${v} %`);}
+  for(let v=-8;v<=8;v+=4){el(sv,"line",{x1:60,x2:620,y1:sY(v),y2:sY(v),stroke:css("--line")});el(sv,"text",{x:52,y:sY(v)+4,"text-anchor":"end"},`${v} %`);}
+  el(sv,"text",{x:340,y:356,"text-anchor":"middle"},"S&P 500 in dieser Woche");
+  el(sv,"text",{x:14,y:170,"text-anchor":"middle",transform:"rotate(-90 14 170)"},"Strategie in dieser Woche");
+  DATA.is.pts.forEach(([x,y])=>{if(Math.abs(x)>10||Math.abs(y)>8)return;el(sv,"circle",{cx:sX(x),cy:sY(y),r:3,fill:y===0?css("--muted"):css("--is"),opacity:y===0?.35:.55});});
+  el(sv,"line",{x1:sX(-10),y1:sY(S.is.alpha+S.is.beta*-10),x2:sX(10),y2:sY(S.is.alpha+S.is.beta*10),stroke:css("--fg"),"stroke-width":2,"stroke-dasharray":"6 4"});
+  el(sv,"text",{x:sX(4),y:sY(S.is.alpha+S.is.beta*10)+30,style:`fill:${css("--fg")};font-weight:600`},`Linie: Beta = ${de(S.is.beta)}`);
+  el(sv,"text",{x:sX(-9.5),y:sY(0)-8},"graue Punkte: Wochen ohne Position (Strategie = 0 %)");
+
+  const bi=S.is;
+  document.getElementById("betaex").innerHTML=
+   `<b>Beta = ${de(bi.beta)}:</b> Steigt der S&amp;P 500 in einer Woche um 2 %, steigt die Strategie im Schnitt um ${de(2*bi.beta,1)} %. Fällt er um 2 %, fällt sie im Schnitt um ${de(2*bi.beta,1)} %. Sie geht also halb so stark mit, weil sie nur etwa die Hälfte der Wochen investiert ist.<br><br>`+
+   `<b>R² = ${Math.round(bi.r2*100)} %:</b> So viel vom Auf und Ab der Strategie lässt sich allein damit erklären, was der S&amp;P 500 gemacht hat. Kennst du die Wochenbewegung des S&amp;P, kannst du die Wochenbewegung der Strategie schon zu ${Math.round(bi.r2*100)} % vorhersagen. Der Rest kommt fast nur von den Wochen ohne Position.<br><br>`+
+   `<b>Alpha = ${de(bi.alpha*52,1)} % pro Jahr:</b> Das ist das, was die Strategie <i>zusätzlich</i> zum Markt verdient. Genau das wäre der eigentliche Vorteil der Regel „11. rein, 27. raus“. Er ist praktisch null.`;
+  document.getElementById("bres").innerHTML=
+    card("mid","Beta / R² (In-Sample)",`${de(S.is.beta)} / ${Math.round(S.is.r2*100)} %`,"Markt erklärt gut die Hälfte")+
+    card(Math.abs(S.is.tA)<2?"no":"ok","Alpha (In-Sample)",`${de(S.is.alpha*52,1)} % p. a.`,`t = ${de(S.is.tA)}: kein eigener Vorteil`);
+
+  // --- Zufallstest
+  const pv=document.getElementById("perm"); pv.innerHTML="";
+  const P=DATA.is.perm, maxc=Math.max(...P.counts), e0=P.edges[0], e1=P.edges[P.edges.length-1];
+  const px=v=>40+(v-e0)/(e1-e0)*(600-40), py=v=>190-v/maxc*(190-20);
+  P.counts.forEach((cnt,i)=>{const x0=px(P.edges[i]),x1=px(P.edges[i+1]);el(pv,"rect",{x:x0+1,y:py(cnt),width:Math.max(1,x1-x0-2),height:190-py(cnt),fill:css("--line")});});
+  el(pv,"line",{x1:40,x2:600,y1:190,y2:190,stroke:css("--muted")});
+  for(let v=0;v<=e1;v+=200){if(v<e0)continue;el(pv,"text",{x:px(v),y:208,"text-anchor":"middle"},`${v} %`);}
+  el(pv,"text",{x:320,y:226,"text-anchor":"middle"},"Gesamtrendite 2010–2026 bei zufälligem Einstieg");
+  const real=DATA.is.real, med=DATA.is.permMedian;
+  el(pv,"line",{x1:px(med),x2:px(med),y1:20,y2:190,stroke:css("--muted"),"stroke-dasharray":"4 4"});
+  el(pv,"text",{x:px(med)+6,y:30},`Zufall Median ${de(med,0)} %`);
+  el(pv,"line",{x1:px(real),x2:px(real),y1:20,y2:190,stroke:css("--is"),"stroke-width":3});
+  el(pv,"text",{x:px(real)-6,y:48,"text-anchor":"end",style:`fill:${css("--is")};font-weight:600`},`Strategie ${de(real,0)} %`);
+  const beatIS=Math.round((1-DATA.is.pPerm)*100), beatOOS=Math.round((1-DATA.oos.pPerm)*100);
+  document.getElementById("permex").innerHTML=`<b>In-Sample:</b> Die Strategie (${de(real,0)} %) war nur besser als ${beatIS} % der Zufallsläufe. Blind kaufen brachte im Mittel ${de(med,0)} %.<br><b>Out-of-Sample:</b> Strategie ${de(DATA.oos.real,1)} %, blind kaufen im Mittel ${de(DATA.oos.permMedian,1)} %. Besser als ${beatOOS} % der Zufallsläufe, also ebenfalls Mittelfeld.`;
+
+  // --- Zusammenfassung
+  const pill=(ok,t)=>`<span class="pill ${ok?"ok":"no"}" style="color:var(${ok?"--good":"--bad"})">${t}</span>`;
+  document.getElementById("summary").innerHTML=`<thead><tr><th>Prüfung</th><th>In-Sample</th><th>Out-of-Sample</th></tr></thead><tbody>
+   <tr><td>t-Wert (über 2?)</td><td>${de(S.is.t)} ${pill(S.is.t>2,S.is.t>2?"knapp ja":"nein")}</td><td>${de(S.oos.t)} ${pill(S.oos.t>2,"nein")}</td></tr>
+   <tr><td>p-Wert (unter 0,05?)</td><td>${de(S.is.p,3)} ${pill(S.is.p<0.05,S.is.p<0.05?"ja":"nein")}</td><td>${de(S.oos.p,2)} ${pill(S.oos.p<0.05,"nein")}</td></tr>
+   <tr><td>95-%-Intervall über 0?</td><td>${de(S.is.lo)} bis ${de(S.is.hi)} % ${pill(S.is.lo>0,S.is.lo>0?"gerade so":"nein")}</td><td>${de(S.oos.lo)} bis ${de(S.oos.hi)} % ${pill(S.oos.lo>0,"nein")}</td></tr>
+   <tr><td>Alpha über 0 (t über 2)?</td><td>${de(S.is.alpha*52,1)} % p. a. ${pill(S.is.tA>2,"nein")}</td><td>${de(S.oos.alpha*52,1)} % p. a. ${pill(S.oos.tA>2,"nein")}</td></tr>
+   <tr><td>Besser als 95 % Zufall?</td><td>${beatIS} % ${pill(beatIS>=95,"nein")}</td><td>${beatOOS} % ${pill(beatOOS>=95,"nein")}</td></tr>
+   <tr><td>Nach Mehrfachtest (t über 4,1)?</td><td>${de(S.is.t)} ${pill(S.is.t>4.1,"nein")}</td><td>${de(S.oos.t)} ${pill(false,"nein")}</td></tr></tbody>`;
+  document.getElementById("verdict").innerHTML=`<b>Klartext:</b> In den Jahren, mit denen wir entwickelt haben, sah die Strategie knapp nach einem Vorteil aus. In den Jahren, die sie nie gesehen hat, war davon nichts mehr übrig. Was sie verdient, kommt daher, dass sie etwa die Hälfte der Zeit im S&amp;P 500 investiert ist. Die Regel „11. rein, 27. raus“ selbst bringt keinen messbaren Vorteil. Wer einfach den S&amp;P 500 hält, macht dasselbe, nur doppelt so oft.`;
+}
+draw();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+</script>
