@@ -1,116 +1,62 @@
 //@version=6
-// Sentiment Fear & Greed – eigener Angst/Gier-Index pro Asset aus TradingView-Daten.
-// Jeder Baustein wird auf 0–100 umgerechnet (Lage im Vergleich zur eigenen Historie),
-// der Durchschnitt ergibt den Score. Grün = Gier (bullishes Sentiment), Rot = Angst (bearishes Sentiment).
-// Gedacht für den Tageschart (1D).
-indicator("Sentiment Fear & Greed", "Sentiment", overlay = true)
+// Sentiment Fear & Greed v2 – schneller Stimmungs-Oszillator (0 = Panik, 100 = Euphorie).
+// Bausteine: RSI, Lage in der Kursspanne (Stochastik), Abstand zum Durchschnitt (Z-Score),
+// optional ein Volatilitätsindex (VIX & Co.).
+// Kontra-Modus (Standard): extreme Gier = ROT (Top-Gefahr), extreme Angst = GRÜN (Tief-Chance).
+// Marker erscheinen erst, wenn die Extremstimmung KIPPT – das sind die eigentlichen Signale.
+indicator("Sentiment Fear & Greed v2", "Sentiment v2", overlay = true)
 
 // ───────── Allgemein ─────────
 grpG = "Allgemein"
-string assetIn   = input.string("Auto", "Asset", options = ["Auto", "S&P 500", "Nasdaq", "DAX", "Gold", "Silber"], group = grpG, tooltip = "Auto erkennt das Asset am Chart-Symbol. Falls die Erkennung nicht passt, hier fest einstellen.")
-int    len       = input.int(252, "Historie (Bars)", minval = 50, maxval = 2000, group = grpG, tooltip = "252 = ca. 1 Jahr auf dem Tageschart")
-int    smoothLen = input.int(5, "Glättung (EMA)", minval = 1, group = grpG)
+string mode     = input.string("Kontra-Signal", "Anzeige", options = ["Kontra-Signal", "Stimmung direkt"], group = grpG, tooltip = "Kontra-Signal: Gier = rot, Angst = grün.\nStimmung direkt: Gier = grün, Angst = rot.")
+int   rsiLen    = input.int(9, "RSI-Länge", minval = 2, group = grpG)
+int   stLen     = input.int(13, "Spannen-Länge (Stochastik)", minval = 2, group = grpG)
+int   zLen      = input.int(20, "Durchschnitt-Länge (Z-Score)", minval = 5, group = grpG)
+int   smoothLen = input.int(1, "Glättung (1 = aus)", minval = 1, group = grpG, tooltip = "Höher = ruhiger, aber später")
 
-// ───────── Zonen & Farben ─────────
-grpZ = "Zonen & Farben"
-float greedLvl  = input.float(60, "Gier ab", minval = 50, maxval = 100, group = grpZ)
-float extGreed  = input.float(75, "Extreme Gier ab", minval = 50, maxval = 100, group = grpZ)
-float fearLvl   = input.float(40, "Angst bis", minval = 0, maxval = 50, group = grpZ)
-float extFear   = input.float(25, "Extreme Angst bis", minval = 0, maxval = 50, group = grpZ)
-color colG      = input.color(color.green, "Farbe Gier", group = grpZ)
-color colR      = input.color(color.red, "Farbe Angst", group = grpZ)
-int   transp    = input.int(88, "Transparenz normal", minval = 0, maxval = 100, group = grpZ)
-int   transpExt = input.int(72, "Transparenz extrem", minval = 0, maxval = 100, group = grpZ)
-bool  showArrows = input.bool(true, "Marker bei Eintritt in Extremzone", group = grpZ)
-bool  showTable  = input.bool(true, "Info-Tabelle anzeigen", group = grpZ)
-string tablePos  = input.string("Mitte rechts", "Tabellen-Position", options = ["Oben rechts", "Mitte rechts", "Unten rechts", "Oben links", "Unten links"], group = grpZ)
+// ───────── Zonen ─────────
+grpZ = "Zonen & Signale"
+float greedLvl  = input.float(80, "Gier-Zone ab", minval = 50, maxval = 100, group = grpZ)
+float extGreed  = input.float(85, "Extreme Gier ab", minval = 50, maxval = 100, group = grpZ)
+float fearLvl   = input.float(20, "Angst-Zone bis", minval = 0, maxval = 50, group = grpZ)
+float extFear   = input.float(15, "Extreme Angst bis", minval = 0, maxval = 50, group = grpZ)
+float topCross  = input.float(70, "Top-Signal, wenn Score darunter fällt", minval = 50, maxval = 100, group = grpZ)
+float lowCross  = input.float(30, "Tief-Signal, wenn Score darüber steigt", minval = 0, maxval = 50, group = grpZ)
+int   sigLook   = input.int(4, "Extrem muss in den letzten X Bars gewesen sein", minval = 1, group = grpZ)
 
-// ───────── Bausteine an/aus ─────────
-grpB = "Bausteine"
-bool useMom = input.bool(true, "Momentum (Kurs vs. 125-Tage-Linie)", group = grpB)
-bool useStr = input.bool(true, "Kursstärke (Lage in 52-Wochen-Spanne)", group = grpB)
-bool useVol = input.bool(true, "Volatilitätsindex (invertiert)", group = grpB)
-bool useRV  = input.bool(true, "Ersatz: realisierte Volatilität, falls kein Vola-Index", group = grpB)
-bool usePC  = input.bool(true, "Put/Call-Ratio (nur US-Indizes)", group = grpB)
-bool useBr  = input.bool(true, "Marktbreite (% Aktien über 200-Tage-Linie)", group = grpB)
-bool useSh  = input.bool(true, "Aktien vs. Anleihen (nur Aktienindizes)", group = grpB)
-bool useCr  = input.bool(true, "Junk Bonds vs. Staatsanleihen (nur Aktienindizes)", group = grpB)
+// ───────── Optik ─────────
+grpA = "Anzeige"
+color colRed    = input.color(color.red, "Rot", group = grpA)
+color colGreen  = input.color(color.green, "Grün", group = grpA)
+int   transp    = input.int(85, "Transparenz Zone", minval = 0, maxval = 100, group = grpA)
+int   transpExt = input.int(70, "Transparenz extrem", minval = 0, maxval = 100, group = grpA)
+bool  showZones = input.bool(true, "Hintergrund-Zonen anzeigen", group = grpA)
+bool  showSig   = input.bool(true, "Signal-Marker anzeigen", group = grpA)
+bool  showTable = input.bool(true, "Info-Tabelle anzeigen", group = grpA)
+string tablePos = input.string("Mitte rechts", "Tabellen-Position", options = ["Oben rechts", "Mitte rechts", "Unten rechts", "Oben links", "Unten links"], group = grpA)
 
-// ───────── Symbole (anpassbar, falls eines nicht geladen wird) ─────────
-grpS = "Symbole"
-string vixSym   = input.symbol("CBOE:VIX", "Vola S&P 500", group = grpS)
-string vxnSym   = input.symbol("CBOE:VXN", "Vola Nasdaq", group = grpS)
-string vdaxSym  = input.string("", "Vola DAX (z. B. VDAX, falls verfügbar)", group = grpS)
-string gvzSym   = input.symbol("CBOE:GVZ", "Vola Gold", group = grpS)
-string vxslvSym = input.symbol("CBOE:VXSLV", "Vola Silber", group = grpS)
-string pcSym    = input.symbol("USI:PCC", "Put/Call-Ratio", group = grpS)
-string spxBrSym = input.symbol("INDEX:S5TH", "Marktbreite S&P 500", group = grpS)
-string ndxBrSym = input.symbol("INDEX:NDTH", "Marktbreite Nasdaq", group = grpS)
-string daxBrSym = input.string("", "Marktbreite DAX (leer = aus)", group = grpS)
-string bondSym  = input.symbol("NASDAQ:TLT", "Staatsanleihen (Safe Haven)", group = grpS)
-string hySym    = input.symbol("AMEX:HYG", "Junk Bonds", group = grpS)
-string igSym    = input.symbol("NASDAQ:IEF", "Staatsanleihen mittel", group = grpS)
-
-// ───────── Asset-Erkennung ─────────
-f_detect() =>
-    string r = str.upper(syminfo.root)
-    string t = str.upper(syminfo.ticker)
-    string d = str.upper(syminfo.description)
-    bool silver = r == "SI" or r == "SIL" or str.contains(t, "XAG") or t == "SLV" or str.startswith(d, "SILBER") or str.startswith(d, "SILVER")
-    bool gold   = r == "GC" or r == "MGC" or str.contains(t, "XAU") or t == "GLD" or str.startswith(d, "GOLD ")
-    bool ndx    = r == "NQ" or r == "MNQ" or t == "NDX" or t == "NAS100" or t == "US100" or t == "QQQ" or str.contains(d, "NASDAQ 100") or str.contains(d, "NASDAQ-100")
-    bool spx    = r == "ES" or r == "MES" or t == "SPX" or t == "US500" or t == "SPX500" or t == "SPY" or str.contains(d, "S&P 500")
-    bool dax    = r == "FDAX" or r == "FDXM" or r == "FDXS" or t == "DAX" or t == "DE40" or t == "GER40" or t == "DEU40" or t == "GER30" or str.contains(d, "DAX")
-    silver ? "Silber" : gold ? "Gold" : ndx ? "Nasdaq" : spx ? "S&P 500" : dax ? "DAX" : "Unbekannt"
-
-string asset   = assetIn == "Auto" ? f_detect() : assetIn
-bool   isUS    = asset == "S&P 500" or asset == "Nasdaq"
-bool   isEq    = isUS or asset == "DAX"
-
-string volSym = asset == "S&P 500" ? vixSym : asset == "Nasdaq" ? vxnSym : asset == "DAX" ? vdaxSym : asset == "Gold" ? gvzSym : asset == "Silber" ? vxslvSym : ""
-string brSym  = asset == "S&P 500" ? spxBrSym : asset == "Nasdaq" ? ndxBrSym : asset == "DAX" ? daxBrSym : ""
-
-// ───────── Daten holen ─────────
-f_close(string sym) =>
-    string s = sym == "" ? syminfo.tickerid : sym
-    float v = request.security(s, timeframe.period, close, ignore_invalid_symbol = true)
-    sym != "" ? v : na
-
-float volIdx = f_close(volSym)
-float pc     = f_close(isUS ? pcSym : "")
-float br     = f_close(brSym)
-float bond   = f_close(isEq ? bondSym : "")
-float hy     = f_close(isEq ? hySym : "")
-float ig     = f_close(isEq ? igSym : "")
+// ───────── Optional: Volatilitätsindex ─────────
+grpV = "Volatilitätsindex (optional)"
+bool   useVol  = input.bool(false, "Vola-Index einbeziehen", group = grpV, tooltip = "Hoher VIX = Angst. Wird invertiert und als 4. Baustein gemittelt.")
+int    volLen  = input.int(52, "Vola-Vergleichszeitraum (Bars)", minval = 10, group = grpV)
+string volSym  = input.symbol("CBOE:VIX", "Vola-Symbol", group = grpV, tooltip = "S&P/Dow: CBOE:VIX · Nasdaq: CBOE:VXN · Gold: CBOE:GVZ · Silber: CBOE:VXSLV")
 
 // ───────── Bausteine (0 = Angst, 100 = Gier) ─────────
-float c_mom = ta.percentrank(close / ta.sma(close, 125) - 1, len)
+float c_rsi = ta.rsi(close, rsiLen)
 
-float hi52  = ta.highest(high, len)
-float lo52  = ta.lowest(low, len)
-float c_str = hi52 > lo52 ? (close - lo52) / (hi52 - lo52) * 100 : na
+float lo   = ta.lowest(low, stLen)
+float hi   = ta.highest(high, stLen)
+float c_st = hi > lo ? (close - lo) / (hi - lo) * 100 : 50
 
-float c_vix = 100 - ta.percentrank(volIdx, len)
-float rv    = ta.stdev(math.log(close / close[1]), 20)
-float c_rv  = 100 - ta.percentrank(rv, len)
-bool  volIsRV = na(c_vix)
-float c_vol = not volIsRV ? c_vix : useRV ? c_rv : na
+float sd  = ta.stdev(close, zLen)
+float c_z = sd > 0 ? math.max(0, math.min(100, 50 + 20 * (close - ta.sma(close, zLen)) / sd)) : 50
 
-float c_pc = 100 - ta.percentrank(ta.ema(pc, 5), len)
-float c_br = math.max(0, math.min(100, br))
-float c_sh = ta.percentrank(ta.roc(close, 20) - ta.roc(bond, 20), len)
-float c_cr = ta.percentrank(ta.roc(hy / ig, 20), len)
+float volIdx = request.security(volSym, timeframe.period, close, ignore_invalid_symbol = true)
+float volPr  = ta.percentrank(volIdx, volLen)
+float c_vol  = useVol and not na(volIdx) ? 100 - volPr : na
 
 // ───────── Score ─────────
-float v_mom = useMom ? c_mom : na
-float v_str = useStr ? c_str : na
-float v_vol = useVol ? c_vol : na
-float v_pc  = usePC and isUS ? c_pc : na
-float v_br  = useBr and brSym != "" ? c_br : na
-float v_sh  = useSh and isEq ? c_sh : na
-float v_cr  = useCr and isEq ? c_cr : na
-
-array<float> vals = array.from(v_mom, v_str, v_vol, v_pc, v_br, v_sh, v_cr)
+array<float> vals = array.from(c_rsi, c_st, c_z, c_vol)
 float sum = 0.0
 int   cnt = 0
 for v in vals
@@ -118,45 +64,56 @@ for v in vals
         sum += v
         cnt += 1
 float raw   = cnt > 0 ? sum / cnt : na
-float score = ta.ema(raw, smoothLen)
+float score = smoothLen > 1 ? ta.ema(raw, smoothLen) : raw
 
-// ───────── Färbung ─────────
-color bg = na(score) ? na : score >= extGreed ? color.new(colG, transpExt) : score >= greedLvl ? color.new(colG, transp) : score <= extFear ? color.new(colR, transpExt) : score <= fearLvl ? color.new(colR, transp) : na
+// ───────── Farben ─────────
+bool  kontra   = mode == "Kontra-Signal"
+color colGreed = kontra ? colRed : colGreen
+color colFear  = kontra ? colGreen : colRed
+
+color bg = na
+if showZones and not na(score)
+    if score >= extGreed
+        bg := color.new(colGreed, transpExt)
+    else if score >= greedLvl
+        bg := color.new(colGreed, transp)
+    else if score <= extFear
+        bg := color.new(colFear, transpExt)
+    else if score <= fearLvl
+        bg := color.new(colFear, transp)
 bgcolor(bg, title = "Sentiment-Hintergrund")
 
-bool newExtGreed = score >= extGreed and score[1] < extGreed
-bool newExtFear  = score <= extFear and score[1] > extFear
-plotshape(showArrows and newExtGreed, "Extreme Gier", shape.triangleup, location.belowbar, color.new(colG, 0), size = size.small)
-plotshape(showArrows and newExtFear, "Extreme Angst", shape.triangledown, location.abovebar, color.new(colR, 0), size = size.small)
+// ───────── Signale: Extremstimmung kippt ─────────
+bool topSig = ta.highest(score, sigLook) >= extGreed and ta.crossunder(score, topCross)
+bool lowSig = ta.lowest(score, sigLook) <= extFear and ta.crossover(score, lowCross)
+plotshape(showSig and topSig, "Top-Signal (Gier kippt)", shape.triangledown, location.abovebar, color.new(colGreed, 0), size = size.small)
+plotshape(showSig and lowSig, "Tief-Signal (Angst dreht)", shape.triangleup, location.belowbar, color.new(colFear, 0), size = size.small)
 plot(score, "Sentiment-Score", display = display.data_window)
 
-alertcondition(newExtGreed, "Sentiment Extreme Gier", "Sentiment erreicht EXTREME GIER auf {{ticker}}")
-alertcondition(newExtFear, "Sentiment Extreme Angst", "Sentiment erreicht EXTREME ANGST auf {{ticker}}")
+alertcondition(topSig, "Top-Signal", "Sentiment: extreme Gier kippt auf {{ticker}}")
+alertcondition(lowSig, "Tief-Signal", "Sentiment: extreme Angst dreht auf {{ticker}}")
+alertcondition(ta.crossover(score, extGreed), "Extreme Gier erreicht", "Sentiment: EXTREME GIER auf {{ticker}}")
+alertcondition(ta.crossunder(score, extFear), "Extreme Angst erreicht", "Sentiment: EXTREME ANGST auf {{ticker}}")
 
 // ───────── Info-Tabelle ─────────
 f_label(float s) =>
     na(s) ? "n/a" : s >= extGreed ? "Extreme Gier" : s >= greedLvl ? "Gier" : s <= extFear ? "Extreme Angst" : s <= fearLvl ? "Angst" : "Neutral"
 
 f_cellCol(float s) =>
-    na(s) ? color.new(color.gray, 85) : s >= greedLvl ? color.new(colG, 70) : s <= fearLvl ? color.new(colR, 70) : color.new(color.gray, 85)
+    na(s) ? color.new(color.gray, 85) : s >= greedLvl ? color.new(colGreed, 70) : s <= fearLvl ? color.new(colFear, 70) : color.new(color.gray, 85)
 
 string pos = tablePos == "Oben rechts" ? position.top_right : tablePos == "Unten rechts" ? position.bottom_right : tablePos == "Oben links" ? position.top_left : tablePos == "Unten links" ? position.bottom_left : position.middle_right
-var table info = table.new(pos, 2, 10, bgcolor = color.new(color.gray, 85), border_width = 1)
+var table info = table.new(pos, 2, 6, bgcolor = color.new(color.gray, 85), border_width = 1)
 
-f_row(int row, string name, float v, bool applicable) =>
+f_row(int row, string name, float v, bool active) =>
     info.cell(0, row, name, text_size = size.small, text_color = chart.fg_color, text_halign = text.align_left)
-    string txt = not applicable ? "–" : na(v) ? "n/a" : str.tostring(v, "#")
-    info.cell(1, row, txt, text_size = size.small, text_color = chart.fg_color, bgcolor = applicable ? f_cellCol(v) : color.new(color.gray, 85))
+    info.cell(1, row, not active ? "–" : na(v) ? "n/a" : str.tostring(v, "#"), text_size = size.small, text_color = chart.fg_color, bgcolor = active ? f_cellCol(v) : color.new(color.gray, 85))
 
 if showTable and barstate.islast
-    info.cell(0, 0, "Sentiment · " + asset, text_size = size.small, text_color = chart.fg_color, text_halign = text.align_left)
+    info.cell(0, 0, "Sentiment", text_size = size.small, text_color = chart.fg_color, text_halign = text.align_left)
     info.cell(1, 0, f_label(score), text_size = size.small, text_color = chart.fg_color, bgcolor = f_cellCol(score))
     f_row(1, "Score (0–100)", score, true)
-    f_row(2, "Momentum 125", c_mom, useMom)
-    f_row(3, "Kursstärke 52W", c_str, useStr)
-    f_row(4, volIsRV ? "Vola (realisiert)" : "Vola-Index", c_vol, useVol)
-    f_row(5, "Put/Call", c_pc, usePC and isUS)
-    f_row(6, "Marktbreite", c_br, useBr and brSym != "")
-    f_row(7, "Aktien vs. Anleihen", c_sh, useSh and isEq)
-    f_row(8, "Junk Bonds", c_cr, useCr and isEq)
-    f_row(9, "Aktive Bausteine", cnt, true)
+    f_row(2, "RSI " + str.tostring(rsiLen), c_rsi, true)
+    f_row(3, "Spanne " + str.tostring(stLen), c_st, true)
+    f_row(4, "Z-Score " + str.tostring(zLen), c_z, true)
+    f_row(5, "Vola-Index", c_vol, useVol)
