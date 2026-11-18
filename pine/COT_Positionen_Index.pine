@@ -1,0 +1,143 @@
+//@version=6
+// COT Positionen & Index – Commercials / Non-Commercials / Retail + US-Dollar
+// Daten: CFTC Legacy-Report (wie das Original: Commercial Hedgers / Large Traders / Small Traders)
+//   Netto-Position = Long − Short
+//   Index = (Netto − Min) / (Max − Min) × 100 über die letzten N Wochen (inkl. aktueller Woche)
+//   → am Original geprüft (6E, 6B, 6J, DX · 26 und 52 Wochen): exakt identische Indexwerte.
+// Hintergrund: Grün = gewählte Gruppe extrem long (Index ≥ Schwelle), Rot = extrem short (Index ≤ 100 − Schwelle)
+// US-Dollar (DXY-Future, CFTC 098662) optional als zweiter Hintergrund in eigenen Farben.
+indicator("COT Positionen & Index", "COT", overlay = false, max_labels_count = 500)
+
+import TradingView/LibraryCOT/2 as cot
+
+// ───────── Eingaben ─────────
+grpD = "Daten"
+bool   inclOpt   = input.string("Futures", "Futures/Options", options = ["Futures", "Futures + Options"], group = grpD) == "Futures + Options"
+string codeIn    = input.string("", "CFTC-Code Währung (leer = automatisch)", group = grpD, tooltip = "Automatisch: 6E1!/EURUSD → Euro, 6B1!/GBPUSD → Pfund, 6J1! → Yen, DX1! → US-Dollar usw.")
+int    lookback  = input.int(52, "Index-Länge (Wochen)", minval = 4, maxval = 520, group = grpD, tooltip = "Original: 26 und 52 Wochen. Im Backtest war 52 stabiler.")
+
+grpH = "Hintergrund (Extrem-Positionierung)"
+string bgGroup = input.string("Commercials", "Gruppe für Hintergrund", options = ["Commercials", "Non-Commercials", "Retail"], group = grpH)
+float  thr     = input.float(80, "Extrem ab Index ≥ (short: ≤ 100 − Wert)", minval = 50, maxval = 100, group = grpH)
+bool   showBg  = input.bool(true, "Hintergrund Währung anzeigen", group = grpH)
+color  colL    = input.color(#4CAF50, "Farbe extrem long", group = grpH)
+color  colS    = input.color(#F23645, "Farbe extrem short", group = grpH)
+bool   showUsd = input.bool(false, "US-Dollar zusätzlich anzeigen", group = grpH, tooltip = "Gleiche Gruppe und Schwelle, Daten des US-Dollar-Index-Futures (098662). Wird auf DX-Charts automatisch ausgeblendet.")
+color  colUL   = input.color(#2962FF, "Farbe USD extrem long", group = grpH)
+color  colUS   = input.color(#FF9800, "Farbe USD extrem short", group = grpH)
+int    transp  = input.int(80, "Hintergrund-Transparenz", minval = 0, maxval = 100, group = grpH)
+
+grpF = "Unteres Fenster"
+string paneMode = input.string("Netto-Positionen", "Anzeige", options = ["Netto-Positionen", "Index (0–100)"], group = grpF)
+bool   pC       = input.bool(true, "Commercials", inline = "c", group = grpF)
+color  cC       = input.color(#F23645, "", inline = "c", group = grpF)
+bool   pN       = input.bool(true, "Non-Commercials", inline = "n", group = grpF)
+color  cN       = input.color(#2962FF, "", inline = "n", group = grpF)
+bool   pR       = input.bool(true, "Retail", inline = "r", group = grpF)
+color  cR       = input.color(#4CAF50, "", inline = "r", group = grpF)
+bool   pU       = input.bool(false, "US-Dollar (gewählte Gruppe)", inline = "u", group = grpF)
+color  cU       = input.color(#FF9800, "", inline = "u", group = grpF)
+
+grpM = "Marker im Chart (Beginn einer Extrem-Phase)"
+bool mC = input.bool(false, "Commercials (C↑ / C↓)", group = grpM)
+bool mN = input.bool(false, "Non-Commercials (N↑ / N↓)", group = grpM)
+bool mR = input.bool(false, "Retail (R↑ / R↓)", group = grpM)
+bool showTable = input.bool(true, "Tabelle anzeigen", group = grpM)
+
+// ───────── CFTC-Codes ─────────
+string USD_CODE = "098662"
+string code  = codeIn != "" ? codeIn : syminfo.basecurrency == "USD" and syminfo.type == "forex" ? USD_CODE : cot.convertRootToCOTCode("Auto")
+bool   isUsd = code == USD_CODE
+
+// Netto-Position (Long − Short). "1D": letzter veröffentlichter Report innerhalb der Chartkerze.
+f_net(string c, string metric) =>
+    string tL = cot.COTTickerid("Legacy", c, inclOpt, metric, "Long", "All")
+    string tS = cot.COTTickerid("Legacy", c, inclOpt, metric, "Short", "All")
+    float l = request.security(tL, "1D", close, ignore_invalid_symbol = true)
+    float s = request.security(tS, "1D", close, ignore_invalid_symbol = true)
+    l - s
+
+// Index 0–100 über `lookback` Wochen, ein Wert pro Woche (auf Tagescharts wird die laufende Woche aktualisiert)
+f_idx(float net) =>
+    var nets = array.new_float()
+    float idx = na
+    if not na(net)
+        if timeframe.change("1W") or nets.size() == 0
+            nets.push(net)
+            if nets.size() > lookback
+                nets.shift()
+        else
+            nets.set(nets.size() - 1, net)
+        if nets.size() == lookback
+            float lo = nets.min()
+            float hi = nets.max()
+            idx := hi > lo ? (net - lo) / (hi - lo) * 100 : 50
+    idx
+
+f_ext(float idx) => na(idx) ? 0 : idx >= thr ? 1 : idx <= 100 - thr ? -1 : 0
+
+// ───────── Daten ─────────
+float netC = f_net(code, "Commercial Positions")
+float netN = f_net(code, "Noncommercial Positions")
+float netR = f_net(code, "Nonreportable Positions")
+float idxC = f_idx(netC)
+float idxN = f_idx(netN)
+float idxR = f_idx(netR)
+
+string uMetric = bgGroup == "Commercials" ? "Commercial Positions" : bgGroup == "Non-Commercials" ? "Noncommercial Positions" : "Nonreportable Positions"
+bool   useUsd  = (showUsd or pU) and not isUsd
+float  netU    = useUsd ? f_net(USD_CODE, uMetric) : na
+float  idxU    = f_idx(netU)
+
+float idxSel = bgGroup == "Commercials" ? idxC : bgGroup == "Non-Commercials" ? idxN : idxR
+int   extSel = f_ext(idxSel)
+int   extU   = f_ext(idxU)
+int   extC   = f_ext(idxC)
+int   extN   = f_ext(idxN)
+int   extR   = f_ext(idxR)
+
+// ───────── Hintergrund im Chart ─────────
+bgcolor(showBg and extSel == 1  ? color.new(colL, transp) : showBg and extSel == -1 ? color.new(colS, transp) : na, "Hintergrund Währung", force_overlay = true)
+bgcolor(showUsd and useUsd and extU == 1 ? color.new(colUL, transp) : showUsd and useUsd and extU == -1 ? color.new(colUS, transp) : na, "Hintergrund USD", force_overlay = true)
+
+// ───────── Unteres Fenster ─────────
+bool isNet = paneMode == "Netto-Positionen"
+plot(pC ? (isNet ? netC : idxC) : na, "Commercials", cC, 2)
+plot(pN ? (isNet ? netN : idxN) : na, "Non-Commercials", cN, 2)
+plot(pR ? (isNet ? netR : idxR) : na, "Retail", cR, 2)
+plot(pU and useUsd ? (isNet ? netU : idxU) : na, "US-Dollar", cU, 2, plot.style_stepline)
+plot(isNet ? 0 : na, "Nulllinie", color.new(color.gray, 50))
+plot(isNet ? na : thr, "Schwelle oben", color.new(colL, 40), 1, plot.style_circles)
+plot(isNet ? na : 100 - thr, "Schwelle unten", color.new(colS, 40), 1, plot.style_circles)
+
+// ───────── Marker (erste Woche einer Extrem-Phase) ─────────
+plotshape(mC and extC == 1  and extC[1] != 1,  "C long",  shape.labelup,   location.belowbar, color.new(cC, 0), text = "C↑", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(mC and extC == -1 and extC[1] != -1, "C short", shape.labeldown, location.abovebar, color.new(cC, 0), text = "C↓", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(mN and extN == 1  and extN[1] != 1,  "N long",  shape.labelup,   location.belowbar, color.new(cN, 0), text = "N↑", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(mN and extN == -1 and extN[1] != -1, "N short", shape.labeldown, location.abovebar, color.new(cN, 0), text = "N↓", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(mR and extR == 1  and extR[1] != 1,  "R long",  shape.labelup,   location.belowbar, color.new(cR, 0), text = "R↑", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(mR and extR == -1 and extR[1] != -1, "R short", shape.labeldown, location.abovebar, color.new(cR, 0), text = "R↓", textcolor = color.white, size = size.tiny, force_overlay = true)
+
+// ───────── Alarme ─────────
+alertcondition(extSel == 1  and extSel[1] != 1,  "Extrem long",  "COT: gewählte Gruppe extrem long – {{ticker}}")
+alertcondition(extSel == -1 and extSel[1] != -1, "Extrem short", "COT: gewählte Gruppe extrem short – {{ticker}}")
+
+// ───────── Tabelle ─────────
+var table tb = table.new(position.top_right, 4, 6, bgcolor = color.new(color.navy, 45), frame_color = color.new(color.white, 45), frame_width = 1, border_color = color.new(color.white, 55), border_width = 1)
+f_stat(int e) => e == 1 ? "EXTREM LONG" : e == -1 ? "EXTREM SHORT" : "neutral"
+f_bg(int e) => e == 1 ? color.new(colL, 50) : e == -1 ? color.new(colS, 50) : na
+f_row(int r, string name, float net, float idx, int e) =>
+    tb.cell(0, r, name, text_color = color.white, text_size = size.small)
+    tb.cell(1, r, str.tostring(net, "#,###"), text_color = color.white, text_size = size.small)
+    tb.cell(2, r, str.tostring(idx, "#.#"), text_color = color.white, text_size = size.small)
+    tb.cell(3, r, f_stat(e), text_color = color.white, bgcolor = f_bg(e), text_size = size.small)
+if showTable and barstate.islast
+    tb.cell(0, 0, "COT " + code, text_color = color.white, text_size = size.small)
+    tb.cell(1, 0, "Netto", text_color = color.white, text_size = size.small)
+    tb.cell(2, 0, "Index " + str.tostring(lookback) + "W", text_color = color.white, text_size = size.small)
+    tb.cell(3, 0, "Status", text_color = color.white, text_size = size.small)
+    f_row(1, "Commercials", netC, idxC, extC)
+    f_row(2, "Non-Commercials", netN, idxN, extN)
+    f_row(3, "Retail", netR, idxR, extR)
+    if useUsd
+        f_row(4, "USD " + bgGroup, netU, idxU, extU)
