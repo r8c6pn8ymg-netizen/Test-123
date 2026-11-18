@@ -1,0 +1,186 @@
+//@version=6
+// Saisonalität Auswertung (im Hauptchart)
+// Prüft für einen frei wählbaren Zeitraum im Jahr (z. B. 18.12.–09.01.), wie ein Long- oder Short-Trade
+// in den letzten N Jahren ausgegangen wäre. Zeichnet Start-/Endlinie je Jahr, ein Ergebnis-Label
+// (grün = Gewinn, rot = Verlust) und eine Statistik-Tabelle. Optional nur bestimmte US-Wahlzyklus-Jahre.
+// Einstieg: Eröffnung ODER Schlusskurs des ersten Handelstags (wählbar) · Ausstieg: Schluss des letzten Handelstags.
+// Am genauesten auf dem TAGESCHART (D).
+indicator("Saisonalität Auswertung", "Saison-Auswertung", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+// ───────── Eingaben ─────────
+string dir = input.string("Long", "Handelsrichtung", options = ["Long", "Short"], group = "Handelsrichtung")
+
+grpD = "Einstellungen Datum"
+int sD = input.int(1,  "Start Tag",   minval = 1, maxval = 31, group = grpD)
+int sM = input.int(1,  "Start Monat", minval = 1, maxval = 12, group = grpD)
+int eD = input.int(31, "Ende Tag",    minval = 1, maxval = 31, group = grpD)
+int eM = input.int(1,  "Ende Monat",  minval = 1, maxval = 12, group = grpD)
+bool exitNext = input.bool(false, "Enddatum kein Handelstag → nächsten Handelstag nehmen", group = grpD, tooltip = "Ohne Haken: Fällt das Enddatum auf ein Wochenende/Feiertag, wird zum Schluss des letzten Handelstags DAVOR ausgestiegen. Mit Haken: Ausstieg zum Schluss des nächsten Handelstags DANACH (wie bei Seasonax).")
+string entryMode = input.string("Eröffnung", "Einstieg am Starttag zur", options = ["Eröffnung", "Schlusskurs"], group = grpD, tooltip = "Eröffnung = Einstieg zum Eröffnungskurs des ersten Handelstags im Zeitraum. Schlusskurs = Einstieg zum Schlusskurs dieses Tages (wie bei Seasonax). Ausstieg ist immer der Schlusskurs des letzten Handelstags im Zeitraum.")
+
+grpZ = "Zyklen & Historie"
+string cyc    = input.string("Alle Jahre", "Zyklusauswahl", options = ["Alle Jahre", "Wahljahr", "Post-Election", "Midterm", "Pre-Election"], group = grpZ)
+string yMode  = input.string("Letzte X Jahre", "Jahresauswahl", options = ["Letzte X Jahre", "Von–Bis", "Manuelle Jahre"], group = grpZ)
+int    nYears = input.int(10, "Historie (Jahre) – bei „Letzte X Jahre“", options = [5, 10, 15, 20, 25, 30], group = grpZ)
+int    yFrom  = input.int(2012, "Jahre von – bei „Von–Bis“", minval = 1900, maxval = 2100, group = grpZ, inline = "vb")
+int    yTo    = input.int(2014, "bis", minval = 1900, maxval = 2100, group = grpZ, inline = "vb")
+string yList  = input.string("2016,2018,2020", "Manuelle Jahre (z. B. 2016,2018,2020) – bei „Manuelle Jahre“", group = grpZ)
+bool   ex2020 = input.bool(false, "Jahr 2020 aus der Berechnung ausschließen", group = grpZ)
+
+grpF = "Darstellung"
+color colStart = input.color(color.blue, "Start Line Color", group = grpF)
+color colEnd   = input.color(color.red, "End Line Color", group = grpF)
+int   wStart   = input.int(2, "Stärke der Startlinie", minval = 1, maxval = 5, group = grpF)
+int   wEnd     = input.int(2, "Stärke der Endlinie", minval = 1, maxval = 5, group = grpF)
+color colWin   = input.color(color.green, "Farbe Gewinn", group = grpF)
+color colLoss  = input.color(color.red, "Farbe Verlust", group = grpF)
+bool  showLbl  = input.bool(true, "Ergebnis-Labels anzeigen", group = grpF)
+bool  showNext = input.bool(true, "Nächsten Zeitraum (Zukunft) gestrichelt anzeigen", group = grpF)
+bool  showTbl  = input.bool(true, "Statistik-Tabelle anzeigen", group = grpF)
+
+// ───────── Trades der Vergangenheit erfassen ─────────
+var int[]   tY  = array.new_int()     // Jahr des Einstiegs
+var int[]   tT0 = array.new_int()     // Zeit Einstiegskerze
+var int[]   tT1 = array.new_int()     // Zeit Ausstiegskerze
+var float[] tP0 = array.new_float()   // Einstiegskurs
+var float[] tP1 = array.new_float()   // Ausstiegskurs
+
+var bool  inWin  = false
+var float entryP = na
+var int   entryT = na
+var int   entryY = na
+var int   exitTs = na
+
+int  td     = time_tradingday
+int  tdPrev = td[1]
+int  yNow   = year(td, "UTC")
+bool wrap   = eM < sM or (eM == sM and eD < sD)          // Zeitraum geht über den Jahreswechsel
+int  tsS    = timestamp("UTC", yNow, sM, sD, 0, 0)
+
+// 1) Ausstieg: erster Handelstag NACH dem Enddatum
+//    Standard: Schluss der Kerze davor (letzter Handelstag bis einschließlich Enddatum).
+//    Option "nächsten Handelstag": war das Enddatum selbst kein Handelstag, Ausstieg zum Schluss dieser Kerze.
+if inWin and td > exitTs
+    bool useThis = exitNext and tdPrev < exitTs
+    tY.push(entryY)
+    tT0.push(entryT)
+    tT1.push(useThis ? time : time[1])
+    tP0.push(entryP)
+    tP1.push(useThis ? close : close[1])
+    inWin := false
+
+// 2) Einstieg: erster Handelstag am/nach dem Startdatum
+if not inWin and not na(tdPrev) and td >= tsS and tdPrev < tsS
+    int tsE = timestamp("UTC", wrap ? yNow + 1 : yNow, eM, eD, 0, 0)
+    if td <= tsE
+        inWin  := true
+        entryP := entryMode == "Eröffnung" ? open : close
+        entryT := time
+        entryY := yNow
+        exitTs := tsE
+
+// ───────── Auswertung & Zeichnen am letzten Balken ─────────
+var line[]  lns = array.new_line()
+var label[] lbs = array.new_label()
+var table   tb  = table.new(position.top_right, 2, 9, bgcolor = color.new(#1e222d, 10), border_width = 1, border_color = color.new(color.gray, 60))
+
+f_cycOk(int y) =>
+    int ph = y % 4
+    cyc == "Alle Jahre" or (cyc == "Wahljahr" and ph == 0) or (cyc == "Post-Election" and ph == 1) or (cyc == "Midterm" and ph == 2) or (cyc == "Pre-Election" and ph == 3)
+
+f_vline(int t, float p, color c, int w, string st) =>
+    line.new(t, p, t, p * 1.01, xloc = xloc.bar_time, extend = extend.both, color = c, width = w, style = st)
+
+f_two(int v) => v < 10 ? "0" + str.tostring(v) : str.tostring(v)
+
+// Manuelle Jahresliste einlesen (Komma, Semikolon oder Leerzeichen als Trenner)
+f_inList(int y) =>
+    bool found = false
+    string[] parts = str.split(str.replace_all(str.replace_all(yList, ";", ","), " ", ","), ",")
+    for p in parts
+        if str.length(p) > 0 and str.tonumber(p) == y
+            found := true
+    found
+
+if barstate.islast
+    for l in lns
+        l.delete()
+    lns.clear()
+    for l in lbs
+        l.delete()
+    lbs.clear()
+
+    int  curY   = year(timenow, "UTC")
+    bool hasCur = tY.size() > 0 and tY.last() == curY
+    int  minY   = curY - nYears + (hasCur ? 1 : 0)
+    float sgn   = dir == "Long" ? 1.0 : -1.0
+
+    int   n = 0
+    int   win = 0
+    float sumPct = 0.0
+    float sumWin = 0.0
+    float sumLoss = 0.0
+    float best = na
+    float worst = na
+
+    if tY.size() > 0
+        for i = 0 to tY.size() - 1
+            int y = tY.get(i)
+            bool yearOk = yMode == "Letzte X Jahre" ? y >= minY : yMode == "Von–Bis" ? y >= math.min(yFrom, yTo) and y <= math.max(yFrom, yTo) : f_inList(y)
+            if yearOk and f_cycOk(y) and not (ex2020 and y == 2020)
+                float p0  = tP0.get(i)
+                float p1  = tP1.get(i)
+                float pts = (p1 - p0) * sgn
+                float pct = pts / p0 * 100
+                bool  w   = pct > 0
+                n += 1
+                win += w ? 1 : 0
+                sumPct += pct
+                if w
+                    sumWin += pct
+                else
+                    sumLoss += pct
+                best  := na(best) ? pct : math.max(best, pct)
+                worst := na(worst) ? pct : math.min(worst, pct)
+                lns.push(f_vline(tT0.get(i), p0, colStart, wStart, line.style_solid))
+                lns.push(f_vline(tT1.get(i), p1, colEnd, wEnd, line.style_solid))
+                if showLbl
+                    string txt = "Ergebnis " + str.tostring(y) + ":\nPunkte: " + str.tostring(pts, format.mintick) + "\nProzent: " + str.tostring(pct, "#.##") + "%"
+                    lbs.push(label.new(tT1.get(i), p1, txt, xloc = xloc.bar_time, yloc = yloc.abovebar, color = w ? colWin : colLoss, style = label.style_label_down, textcolor = color.white, size = size.small))
+
+    // Nächster (bzw. laufender) Zeitraum gestrichelt
+    if showNext
+        int off = time - td                                   // Versatz Kerzenzeit ↔ Handelstag
+        if inWin
+            lns.push(f_vline(entryT, close, colStart, wStart, line.style_dashed))
+            lns.push(f_vline(exitTs + off, close, colEnd, wEnd, line.style_dashed))
+        else
+            int yS  = td < tsS ? yNow : yNow + 1
+            int nS  = timestamp("UTC", yS, sM, sD, 0, 0)
+            int nE  = timestamp("UTC", wrap ? yS + 1 : yS, eM, eD, 0, 0)
+            lns.push(f_vline(nS + off, close, colStart, wStart, line.style_dashed))
+            lns.push(f_vline(nE + off, close, colEnd, wEnd, line.style_dashed))
+
+    if showTbl
+        color tc = color.yellow
+        int loss = n - win
+        string zr = f_two(sD) + "." + f_two(sM) + ".–" + f_two(eD) + "." + f_two(eM) + ". · " + dir
+        tb.cell(0, 0, "Zeitraum", text_color = tc, text_size = size.small)
+        tb.cell(1, 0, zr, text_color = tc, text_size = size.small)
+        tb.cell(0, 1, "Zyklus", text_color = tc, text_size = size.small)
+        string yTxt = yMode == "Letzte X Jahre" ? str.tostring(nYears) + " J." : yMode == "Von–Bis" ? str.tostring(math.min(yFrom, yTo)) + "–" + str.tostring(math.max(yFrom, yTo)) : "manuell"
+        tb.cell(1, 1, cyc + " (" + yTxt + ") · Einstieg " + entryMode + (exitNext ? " · Ausstieg nächster HT" : ""), text_color = tc, text_size = size.small)
+        tb.cell(0, 2, "Tradeanzahl", text_color = tc, text_size = size.small)
+        tb.cell(1, 2, str.tostring(n), text_color = tc, text_size = size.small)
+        tb.cell(0, 3, "Winner", text_color = tc, text_size = size.small)
+        tb.cell(1, 3, str.tostring(win), text_color = tc, text_size = size.small)
+        tb.cell(0, 4, "Loser", text_color = tc, text_size = size.small)
+        tb.cell(1, 4, str.tostring(loss), text_color = tc, text_size = size.small)
+        tb.cell(0, 5, "TQ in %", text_color = tc, text_size = size.small)
+        tb.cell(1, 5, n > 0 ? str.tostring(100.0 * win / n, "#.##") : "–", text_color = tc, text_size = size.small)
+        tb.cell(0, 6, "Ø Ergebnis pro Trade in %", text_color = tc, text_size = size.small)
+        tb.cell(1, 6, n > 0 ? str.tostring(sumPct / n, "#.##") : "–", text_color = tc, text_size = size.small)
+        tb.cell(0, 7, "Ø Gewinn-Trade / Ø Verlust-Trade %", text_color = tc, text_size = size.small)
+        tb.cell(1, 7, (win > 0 ? str.tostring(sumWin / win, "#.##") : "–") + " / " + (loss > 0 ? str.tostring(sumLoss / loss, "#.##") : "–"), text_color = tc, text_size = size.small)
+        tb.cell(0, 8, "Bester / Schlechtester Trade %", text_color = tc, text_size = size.small)
+        tb.cell(1, 8, n > 0 ? str.tostring(best, "#.##") + " / " + str.tostring(worst, "#.##") : "–", text_color = tc, text_size = size.small)

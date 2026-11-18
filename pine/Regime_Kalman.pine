@@ -1,0 +1,167 @@
+//@version=6
+// Regime – Grün = Long-Regime, Rot = Short-Regime, Gelb = Übergang (Warnung vor dem Wechsel).
+// KalF% = Stochastik über 23 Kerzen (aktuelle inkl.), logistisch gestaucht (Faktor 17.6211)
+//         → reproduziert die KalF%-Werte des Originals exakt (geprüft an 6N1! 1W und SPX 1D).
+// Farblogik: Zustandsautomat mit Bestätigung nach Gelb. Schwellen symmetrisch:
+//   93,36 / 6,64  = Schlusskurs 15 % der Spanne über/unter der Mitte (Stochastik 65 / 35)
+//   97,14 / 2,86  = Schlusskurs 20 % der Spanne über/unter der Mitte (Stochastik 70 / 30)
+//   Am Original geprüft (11 Datensätze: SPX 1D, 6N1! 1W, NYA 1M, AUDNZD 1W, NZDCHF 1W,
+//   XCUUSD 1D, AUDCHF 1W, NZDJPY 1W/1D, GBPCHF 1W/1D) → 4 von 7.172 Kerzen abweichend (99,94 %).
+indicator("Regime Kalman", "Regime", overlay = false, max_labels_count = 500)
+
+// ───────── Eingaben ─────────
+grpR = "Regime (kalibriert – nur ändern, wenn du bewusst abweichen willst)"
+int   len  = input.int(23, "KalF Länge", minval = 2, group = grpR)
+float stp  = input.float(17.6211, "KalF Steilheit", minval = 0.1, group = grpR)
+float hy   = input.float(93.36, "Grün halten ab KalF% ≥", group = grpR)
+float hg   = input.float(97.14, "Rot → Grün direkt ab KalF% ≥", group = grpR)
+float lg   = input.float(2.86, "Grün → Rot direkt bei KalF% ≤", group = grpR)
+float lr   = input.float(6.64, "Gelb aus Rot: KalF% steigt über", group = grpR, tooltip = "Gelb aus Rot, wenn KalF% von unter diesem Wert auf diesen Wert oder darüber steigt.")
+float hc   = input.float(97.14, "Bestätigung Grün nach Gelb: KalF% ≥", group = grpR)
+float lc   = input.float(2.86, "Bestätigung Rot nach Gelb: KalF% ≤", group = grpR)
+
+grpS = "Darstellung"
+bool  colorBars  = input.bool(true, "Kerzen einfärben", group = grpS)
+int   candleTr   = input.int(0, "Candle Transparenz (0=solid)", minval = 0, maxval = 100, group = grpS)
+bool  colorBg    = input.bool(false, "Hintergrund im Chart einfärben", group = grpS)
+int   bgTr       = input.int(85, "Hintergrund-Transparenz", minval = 0, maxval = 100, group = grpS)
+color colG       = input.color(color.green, "Farbe Long", group = grpS)
+color colR       = input.color(color.red, "Farbe Short", group = grpS)
+color colY       = input.color(color.yellow, "Farbe Übergang", group = grpS)
+bool  showTable  = input.bool(true, "Tabelle anzeigen", group = grpS)
+int   tblBgTr    = input.int(45, "Table Hintergrund Transparenz", minval = 0, maxval = 100, group = grpS)
+int   tblFrameTr = input.int(45, "Table Frame Transparenz", minval = 0, maxval = 100, group = grpS)
+int   tblBordTr  = input.int(55, "Table Border Transparenz", minval = 0, maxval = 100, group = grpS)
+
+grpE = "Exit Signale"
+bool  exitOn   = input.bool(true, "Exit-Signale aktiv (Punkte, an denen das Regime schwächer wird)", group = grpE)
+int   prec     = input.int(15, "Genauigkeit (höher = präziser, weniger Exit-Warnungen)", minval = 1, maxval = 50, group = grpE)
+bool  onlyPlus = input.bool(false, "Nur EXIT+ (große Skala)", group = grpE)
+
+// ───────── KalF% (exakt wie Original) ─────────
+float hh   = ta.highest(high, len)
+float ll   = ta.lowest(low, len)
+float kalf = na(hh) or na(ll) ? na : hh > ll ? 100 / (1 + math.exp(-stp * (close - (hh + ll) / 2) / (hh - ll))) : 50.0
+float k1   = nz(kalf[1], kalf)
+
+// Volatilität (Info): Perzentil der ATR/Close der letzten 100 Bars
+float volPct = ta.percentrank(ta.atr(14) / close, 100)
+
+// ───────── Zustandsautomat ─────────
+// st: 1 = Long, -1 = Short   |   disp: 1 = Grün, -1 = Rot, 0 = Gelb
+// conf: Nach einem Gelb-Wechsel ist die neue Farbe "unbestätigt":
+//   unbestätigtes Grün bleibt grün, bis KalF% ≥ Bestätigung oben (dann normal) oder ≤ Grün→Rot (dann Rot)
+//   unbestätigtes Rot kann erst wieder gelb werden, wenn KalF% einmal ≤ Bestätigung unten war
+var int  st   = -1
+var bool conf = true
+int disp = na
+if not na(kalf)
+    if st == 1
+        if not conf
+            if kalf <= lg
+                disp := -1
+                st   := -1
+                conf := true
+            else
+                disp := 1
+                if kalf >= hc
+                    conf := true
+        else
+            if kalf >= hy
+                disp := 1
+            else if k1 >= hy
+                disp := 0
+                st   := -1
+                conf := kalf <= lc
+            else if kalf <= lg
+                disp := -1
+                st   := -1
+            else
+                disp := 1
+    else
+        if not conf and kalf <= lc
+            conf := true
+        bool up = conf and k1 < lr and kalf >= lr
+        if kalf >= hg and not up
+            disp := 1
+            st   := 1
+            conf := true
+        else if up
+            disp := 0
+            st   := 1
+            conf := kalf >= hc
+        else
+            disp := -1
+
+color stCol = na(disp) ? na : disp == 1 ? colG : disp == -1 ? colR : colY
+
+// ───────── Statistik ─────────
+var int nG = 0
+var int nR = 0
+var int nY = 0
+var int pG = 0
+var int pR = 0
+var int pY = 0
+var int stBars = 0
+if not na(disp)
+    nG += disp == 1 ? 1 : 0
+    nR += disp == -1 ? 1 : 0
+    nY += disp == 0 ? 1 : 0
+    if disp != nz(disp[1], 99)
+        pG += disp == 1 ? 1 : 0
+        pR += disp == -1 ? 1 : 0
+        pY += disp == 0 ? 1 : 0
+        stBars := 1
+    else
+        stBars += 1
+
+// ───────── Exit-Signale (Näherung: starke Kerze im Regime, in ATR gemessen) ─────────
+float atr20  = ta.sma(ta.tr(true), 20)[1]
+float bodyA  = (close - open) / atr20
+float kx     = prec / 18.75
+bool exitL   = exitOn and disp == 1  and bodyA >= kx
+bool exitS   = exitOn and disp == -1 and bodyA <= -kx
+bool exitLP  = exitL and bodyA >= kx * 1.75
+bool exitSP  = exitS and bodyA <= -kx * 1.75
+bool showEL  = exitL and not exitLP and not onlyPlus
+bool showES  = exitS and not exitSP and not onlyPlus
+
+// ───────── Plots (Pane) ─────────
+plot(kalf, "KalF%", color = stCol, linewidth = 2)
+plot(volPct, "Vol%", color = color.new(color.gray, 40))
+hline(hy, "Grün-Schwelle", color = color.new(colG, 50), linestyle = hline.style_dashed)
+hline(lr, "Rot-Schwelle", color = color.new(colR, 50), linestyle = hline.style_dashed)
+
+// ───────── Hauptchart ─────────
+barcolor(colorBars ? color.new(stCol, candleTr) : na, title = "Candles Color")
+bgcolor(colorBg and not na(stCol) ? color.new(stCol, bgTr) : na, title = "Hintergrund", force_overlay = true)
+
+plotshape(showEL, "Exit Long",   shape.labeldown, location.abovebar, color.new(colG, 0), text = "EXIT",  textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(showES, "Exit Short",  shape.labelup,   location.belowbar, color.new(colR, 0), text = "EXIT",  textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(exitLP, "Exit+ Long",  shape.labeldown, location.abovebar, color.rgb(0, 100, 0), text = "EXIT+", textcolor = color.white, size = size.tiny, force_overlay = true)
+plotshape(exitSP, "Exit+ Short", shape.labelup,   location.belowbar, color.rgb(128, 0, 0), text = "EXIT+", textcolor = color.white, size = size.tiny, force_overlay = true)
+
+// ───────── Alarme ─────────
+alertcondition(disp == 1 and disp[1] != 1,   "Regime GRÜN",  "Regime wechselt auf GRÜN (Long) – {{ticker}}")
+alertcondition(disp == -1 and disp[1] != -1, "Regime ROT",   "Regime wechselt auf ROT (Short) – {{ticker}}")
+alertcondition(disp == 0 and disp[1] != 0,   "Regime GELB",  "Regime-Wechsel kündigt sich an (GELB) – {{ticker}}")
+alertcondition(exitL or exitS,               "Exit-Signal",  "EXIT-Signal – {{ticker}}")
+
+// ───────── Tabelle ─────────
+var table tb = table.new(position.top_left, 4, 5, bgcolor = color.new(color.navy, tblBgTr), frame_color = color.new(color.white, tblFrameTr), frame_width = 1, border_color = color.new(color.white, tblBordTr), border_width = 1)
+f_pct(int n) =>
+    int tot = nG + nR + nY
+    tot > 0 ? str.tostring(100.0 * n / tot, "#.##") + "%" : "–"
+if showTable and barstate.islast
+    string stName = disp == 1 ? "GREEN" : disp == -1 ? "RED" : "YELLOW"
+    tb.cell(0, 0, "Regime Kalman", text_color = color.white, text_size = size.small)
+    tb.cell(2, 0, "STATE", text_color = color.white, text_size = size.small)
+    tb.cell(3, 0, stName + " (" + str.tostring(stBars) + " bars)", text_color = color.white, bgcolor = color.new(stCol, 60), text_size = size.small)
+    tb.cell(0, 1, "Time Share", text_color = color.white, text_size = size.small)
+    tb.cell(1, 1, "Green: " + f_pct(nG), text_color = color.white, text_size = size.small)
+    tb.cell(2, 1, "Red: " + f_pct(nR), text_color = color.white, text_size = size.small)
+    tb.cell(3, 1, "Yellow: " + f_pct(nY), text_color = color.white, text_size = size.small)
+    tb.cell(0, 2, "Regime", text_color = color.white, text_size = size.small)
+    tb.cell(1, 2, "KalF%: " + str.tostring(kalf, "#.##"), text_color = color.white, text_size = size.small)
+    tb.cell(2, 2, "Vol%: " + str.tostring(volPct, "#.#"), text_color = color.white, text_size = size.small)
+    tb.cell(3, 2, "Phases G/R/Y: " + str.tostring(pG) + "/" + str.tostring(pR) + "/" + str.tostring(pY), text_color = color.white, text_size = size.small)
