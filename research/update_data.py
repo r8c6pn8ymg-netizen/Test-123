@@ -33,7 +33,10 @@ def fetch_aaii():
     x = x.dropna(subset=["date", "bull", "bear"])
     x["spread"] = x.bull - x.bear
     x[["date", "bull", "neutral", "bear", "spread"]].to_csv(os.path.join(DATA, "aaii.csv"), index=False)
-    x[["date", "spx"]].dropna().to_csv(os.path.join(DATA, "spx_weekly.csv"), index=False)
+    y = pd.read_excel(io.BytesIO(raw), sheet_name="SENTIMENT", header=None, skiprows=5)[[0, 10, 11, 12]]
+    y.columns = ["date", "hi", "lo", "spx"]
+    y["date"] = pd.to_datetime(y.date, errors="coerce")
+    y.dropna().to_csv(os.path.join(DATA, "spx_weekly.csv"), index=False)
     print("AAII bis", x.date.max().date())
 
 
@@ -67,7 +70,8 @@ def weekly_start(s):
 def build_dashboard():
     os.makedirs(DASH, exist_ok=True)
     a = pd.read_csv(os.path.join(DATA, "aaii.csv"), parse_dates=["date"]).set_index("date")["spread"] * 100
-    spx = pd.read_csv(os.path.join(DATA, "spx_weekly.csv"), parse_dates=["date"]).set_index("date")["spx"]
+    spxf = pd.read_csv(os.path.join(DATA, "spx_weekly.csv"), parse_dates=["date"]).set_index("date")
+    spx = spxf["spx"]
     cnn = pd.read_csv(os.path.join(DATA, "cnn.csv"), index_col=0, parse_dates=True)
     cnn_fg = cnn["fear_and_greed_historical"].dropna()
     # S&P-Wochenkurs: AAII-Datei, ab 2020 ergänzt um CNNs täglichen S&P-Schlusskurs (aktueller)
@@ -84,14 +88,19 @@ def build_dashboard():
     w = pd.DataFrame({"spx": spx_w, "aaii": weekly_start(a), "cnn": weekly_start(cnn_fg),
                       "bofa": mon("bofa_sent.csv", "bofa_sent"), "cash": mon("bofa_cash.csv", "bofa_cash")})
     w = w.sort_index()
-    w[["aaii", "bofa", "cash"]] = w[["aaii", "bofa", "cash"]].ffill()
+    a_w = weekly_start(a)
+    w["aaii4"] = a_w.rolling(4).mean().reindex(w.index)
+    w[["aaii", "aaii4", "bofa", "cash"]] = w[["aaii", "aaii4", "bofa", "cash"]].ffill()
     w = w[w.index >= "1999-01-01"].dropna(subset=["spx"])
     # Wochen-Oszillator auf dem S&P (nur Schlusskurse verfügbar → Spanne aus Schlusskursen)
     c = w.spx
-    st = (c - c.rolling(13).min()) / (c.rolling(13).max() - c.rolling(13).min()) * 100
+    hi = weekly_start(spxf["hi"]).reindex(w.index) if "hi" in spxf else None
+    lo = weekly_start(spxf["lo"]).reindex(w.index) if "lo" in spxf else None
+    hi = c if hi is None else hi.fillna(c).clip(lower=c)
+    lo = c if lo is None else lo.fillna(c).clip(upper=c)
+    st = (c - lo.rolling(13).min()) / (hi.rolling(13).max() - lo.rolling(13).min()) * 100
     z = ((c - c.rolling(20).mean()) / c.rolling(20).std() * 20 + 50).clip(0, 100)
     w["osc"] = (rsi(c, 9) + st + z) / 3
-    w["aaii4"] = w.aaii.rolling(4).mean()
     s_aaii = (w.aaii4.clip(-30, 30) + 30) / 60 * 100
     num = 2 * w.osc + s_aaii.fillna(0) + w.cnn.fillna(0)
     den = 2 + s_aaii.notna() + w.cnn.notna()
