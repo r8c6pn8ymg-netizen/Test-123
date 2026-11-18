@@ -1,8 +1,8 @@
 //@version=6
 // COT Commercials Extreme – Base / Quote / Pair
-// Signal (am Original Opt-COTv7.4 kalibriert, 6E1! 1W: 97,7 % identische Marker):
-//   LONG  = Commercials-Index ≥ 75  UND  Kleinspekulanten-Index ≤ 25  UND  Commercials-Index in 5 Wochen nicht > 10 Punkte gefallen
-//   SHORT = Commercials-Index ≤ 25  UND  Kleinspekulanten-Index ≥ 75  UND  Commercials-Index in 5 Wochen nicht > 10 Punkte gestiegen
+// Signal (am Original Opt-COTv7.4 geprüft: 6J1! 433 Wochen und 6E1! 283 Wochen → 100 % identische Marker):
+//   LONG  = Commercials-Index ≥ 75  UND  Kleinspekulanten-Index ≤ 25  UND  Commercials-Netto-Position in 5 Wochen nicht gefallen
+//   SHORT = Commercials-Index ≤ 25  UND  Kleinspekulanten-Index ≥ 75  UND  Commercials-Netto-Position in 5 Wochen nicht gestiegen
 //   Index = (Netto-Position − Min) / (Max − Min) × 100 über die letzten 26 Wochen
 //   Base  = Basiswährung bzw. Root (6E1! / EURUSD → EUR) · Quote = Gegenwährung (USD → US-Dollar-Index 098662)
 //   Pair  = Base und Quote bestätigen sich gegenseitig
@@ -17,9 +17,9 @@ int    lookback    = input.int(26, "Länge der Historie (Wochen)", minval = 4, m
 float  commThr     = input.float(75, "Commercials-Schwelle (Index ≥ / ≤ 100 − Wert)", minval = 50, maxval = 100, group = grpD)
 bool   useSmall    = input.bool(true, "Kleinspekulanten als Gegenbestätigung verwenden", group = grpD, tooltip = "Signal nur, wenn die Kleinspekulanten (Non-Reportables) gleichzeitig extrem auf der Gegenseite stehen")
 float  smallThr    = input.float(25, "Kleinspekulanten-Schwelle (Index ≤ / ≥ 100 − Wert)", minval = 0, maxval = 50, group = grpD)
-bool   useRoc      = input.bool(true, "Veränderungsrate verwenden?", group = grpD, tooltip = "Kein Signal, wenn sich der Commercials-Index in den letzten X Wochen um mehr als Y Punkte gegen das Extrem bewegt hat")
+bool   useRoc      = input.bool(true, "Veränderungsrate verwenden?", group = grpD, tooltip = "Kein Signal, wenn sich die Netto-Position der Commercials in den letzten X Wochen gegen das Extrem bewegt hat (Long: gefallen, Short: gestiegen)")
 int    rocLen      = input.int(5, "Veränderungsrate – Wochen (X)", minval = 1, group = grpD)
-float  rocMax      = input.float(10, "Veränderungsrate – max. Gegenbewegung (Y Punkte)", minval = 0, group = grpD)
+float  rocMax      = input.float(0, "Veränderungsrate – erlaubte Gegenbewegung der Netto-Position (%)", minval = 0, group = grpD, tooltip = "0 = wie Original: Netto-Position darf sich gar nicht gegen das Extrem bewegt haben")
 string baseCodeIn  = input.string("", "CFTC-Code Base (leer = automatisch)", group = grpD)
 bool   useQuote    = input.bool(true, "Quote-Währung auswerten", group = grpD)
 string quoteCodeIn = input.string("", "CFTC-Code Quote (leer = automatisch, USD = 098662)", group = grpD)
@@ -65,30 +65,29 @@ f_net(string code, string metric) =>
     float s = request.security(tS, "1D", close, ignore_invalid_symbol = true)
     l - s
 
-// COT-Index (0–100) über `lookback` Wochen + Veränderung über `rocLen` Wochen.
+// COT-Index (0–100) über `lookback` Wochen + Veränderung der Netto-Position über `rocLen` Wochen (in %).
 // Ein Wert pro Woche; innerhalb der Woche (Tages-/Intraday-Chart) wird der letzte Wert aktualisiert.
 f_cot(float net) =>
     var nets = array.new_float()
-    var idxs = array.new_float()
+    int cap = math.max(lookback, rocLen + 1)
     float idx = na
     float roc = na
     if not na(net)
         if timeframe.change("1W") or nets.size() == 0
             nets.push(net)
-            if nets.size() > lookback
+            if nets.size() > cap
                 nets.shift()
-            idxs.push(na)
-            if idxs.size() > rocLen + 1
-                idxs.shift()
         else
             nets.set(nets.size() - 1, net)
-        if nets.size() == lookback
-            float lo = nets.min()
-            float hi = nets.max()
-            idxs.set(idxs.size() - 1, hi > lo ? (net - lo) / (hi - lo) * 100 : 50)
-        idx := idxs.last()
-        float first = idxs.first()
-        roc := idxs.size() > rocLen and not na(first) and not na(idx) ? idx - first : na
+        int n = nets.size()
+        if n >= lookback
+            array<float> win = nets.slice(n - lookback, n)
+            float lo = win.min()
+            float hi = win.max()
+            idx := hi > lo ? (net - lo) / (hi - lo) * 100 : 50
+        if n > rocLen
+            float old = nets.get(n - 1 - rocLen)
+            roc := old != 0 ? (net - old) / math.abs(old) * 100 : net > old ? 100.0 : net < old ? -100.0 : 0.0
     [idx, roc]
 
 // +1 = Long-Extrem, -1 = Short-Extrem, 0 = neutral
