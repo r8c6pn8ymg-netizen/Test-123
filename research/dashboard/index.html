@@ -23,7 +23,8 @@
   .sc .ranges button:focus-visible, .sc .copybtn:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
   .sc .legend { display: flex; gap: var(--cds-gap-md); flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
   .sc .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
-  .sc .tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 10px; font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+  .sc .tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 10px; font-size: var(--cds-font-size-body); font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 2; }
+  .sc .chartbox svg { touch-action: pan-y; cursor: crosshair; }
   .sc .axis text { fill: var(--cds-text-secondary); font-size: 11px; }
   .sc .axis path, .sc .axis line { stroke: var(--cds-chart-axis); }
   .sc .tablewrap { overflow-x: auto; }
@@ -223,18 +224,20 @@
     const lastR = rows[rows.length - 1];
     svg.append('circle').attr('cx', x(lastR.t)).attr('cy', y(lastR.spx)).attr('r', 3.5).style('fill', 'var(--color-fg)');
     const tip = makeTip(el);
+    const vline = svg.append('line').attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--color-fg-muted)').attr('stroke-dasharray', '3 3').attr('visibility', 'hidden');
     const dot = svg.append('circle').attr('r', 4).style('fill', 'var(--color-fg)').attr('visibility', 'hidden');
     const bis = d3.bisector((r) => r.t).center;
-    svg.on('pointermove', (ev) => {
+    svg.on('pointerdown pointermove', (ev) => {
       const [px] = d3.pointer(ev);
       const r = rows[bis(rows, x.invert(px))];
+      vline.attr('x1', x(r.t)).attr('x2', x(r.t)).attr('visibility', 'visible');
       dot.attr('cx', x(r.t)).attr('cy', y(r.spx)).attr('visibility', 'visible');
       tip.hidden = false;
       tip.textContent = `${fmtDate(r.week)} · S&P ${d3.format(',.0f')(r.spx)} · Score ${r.score == null ? '–' : fmt0(r.score)} (${r.zone})`;
       const bw = tip.offsetWidth;
       tip.style.left = Math.min(Math.max(0, x(r.t) / W * el.clientWidth - bw / 2), el.clientWidth - bw) + 'px';
       tip.style.top = '0px';
-    }).on('pointerleave', () => { tip.hidden = true; dot.attr('visibility', 'hidden'); });
+    }).on('pointerleave', (ev) => { if (ev.pointerType === 'mouse') { tip.hidden = true; dot.attr('visibility', 'hidden'); vline.attr('visibility', 'hidden'); } });
   });
 
   dash.draw('scorechart', (el) => {
@@ -262,16 +265,18 @@
         .attr('d', d3.line().defined((r) => s.f(r) != null).x((r) => x(r.t)).y((r) => y(s.f(r))));
     });
     const tip = makeTip(el);
+    const vline = svg.append('line').attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--color-fg-muted)').attr('stroke-dasharray', '3 3').attr('visibility', 'hidden');
     const bis = d3.bisector((r) => r.t).center;
-    svg.on('pointermove', (ev) => {
+    svg.on('pointerdown pointermove', (ev) => {
       const [px] = d3.pointer(ev);
       const r = rows[bis(rows, x.invert(px))];
+      vline.attr('x1', x(r.t)).attr('x2', x(r.t)).attr('visibility', 'visible');
       tip.hidden = false;
       tip.textContent = `${fmtDate(r.week)} · Score ${r.score == null ? '–' : fmt0(r.score)} · AAII-4W ${r.aaii4 == null ? '–' : fmt1(r.aaii4)} · CNN ${r.cnn == null ? '–' : fmt0(r.cnn)}`;
       const bw = tip.offsetWidth;
       tip.style.left = Math.min(Math.max(0, x(r.t) / W * el.clientWidth - bw / 2), el.clientWidth - bw) + 'px';
       tip.style.top = '0px';
-    }).on('pointerleave', () => { tip.hidden = true; });
+    }).on('pointerleave', (ev) => { if (ev.pointerType === 'mouse') { tip.hidden = true; vline.attr('visibility', 'hidden'); } });
   });
   ['lg0', 'lg1', 'lg2'].forEach((n, i) => dash.draw(n, (el) => { el.style.background = dash.colors[i]; }));
 
