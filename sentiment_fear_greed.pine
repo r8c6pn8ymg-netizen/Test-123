@@ -1,119 +1,173 @@
 //@version=6
-// Sentiment Fear & Greed v2 – schneller Stimmungs-Oszillator (0 = Panik, 100 = Euphorie).
-// Bausteine: RSI, Lage in der Kursspanne (Stochastik), Abstand zum Durchschnitt (Z-Score),
-// optional ein Volatilitätsindex (VIX & Co.).
-// Kontra-Modus (Standard): extreme Gier = ROT (Top-Gefahr), extreme Angst = GRÜN (Tief-Chance).
-// Marker erscheinen erst, wenn die Extremstimmung KIPPT – das sind die eigentlichen Signale.
-indicator("Sentiment Fear & Greed v2", "Sentiment v2", overlay = true)
+// ════════════════════════════════════════════════════════════════════════════
+// Sentiment Fear & Greed v3
+// Kombiniert: Kurs-Oszillator (RSI/Stochastik/Z-Score) + AAII-Umfrage + CNN Fear & Greed
+// (+ optional BofA Fund Manager Survey). Datenstand: 18.11.2026 (BofA: 11/2026)
+// Backtest-Sieger (S&P 500, Nasdaq, Dow 2007–2026): Score = (2×Oszillator + AAII + CNN) / 4
+// Kontra-Logik: GRÜN = extreme Angst (Kaufchance) · ROT = extreme Gier (Vorsicht)
+// Optimiert für den WOCHENCHART. Daten werden wöchentlich per neuem Code aktualisiert.
+// ════════════════════════════════════════════════════════════════════════════
+indicator("Sentiment Fear & Greed v3", "Sentiment v3", overlay = true, max_labels_count = 50)
 
-// ───────── Allgemein ─────────
-grpG = "Allgemein"
-string mode     = input.string("Kontra-Signal", "Anzeige", options = ["Kontra-Signal", "Stimmung direkt"], group = grpG, tooltip = "Kontra-Signal: Gier = rot, Angst = grün.\nStimmung direkt: Gier = grün, Angst = rot.")
-int   rsiLen    = input.int(9, "RSI-Länge", minval = 2, group = grpG)
-int   stLen     = input.int(13, "Spannen-Länge (Stochastik)", minval = 2, group = grpG)
-int   zLen      = input.int(20, "Durchschnitt-Länge (Z-Score)", minval = 5, group = grpG)
-int   smoothLen = input.int(1, "Glättung (1 = aus)", minval = 1, group = grpG, tooltip = "Höher = ruhiger, aber später")
+// ───────── Quellen an/aus ─────────
+grpQ = "Quellen (an/aus)"
+bool useOsc  = input.bool(true,  "Kurs-Oszillator (Gewicht 2)", group = grpQ, tooltip = "Im Backtest der stärkste Baustein bei Aktienindizes.")
+bool useAAII = input.bool(true,  "AAII Bullen-minus-Bären (4-Wochen-Schnitt)", group = grpQ, tooltip = "Daten seit 2000. Funktionierte 1987–2006 sehr gut, seitdem schwächer, aber positiv.")
+bool useCNN  = input.bool(true,  "CNN Fear & Greed", group = grpQ, tooltip = "Daten seit Juli 2020.")
+bool useBofA = input.bool(false, "BofA Fund Manager Sentiment", group = grpQ, tooltip = "Im Backtest KEIN Kontra-Vorteil (eher Trendfolge) – standardmäßig aus, Werte stehen trotzdem in der Tabelle.")
+bool autoMetal = input.bool(true, "Bei Gold/Silber/Dollar: AAII & CNN automatisch aus", group = grpQ, tooltip = "AAII und CNN messen US-Aktienstimmung. Für Metalle/Dollar ergab der Backtest keinen Vorteil.")
+bool weeklyOsc = input.bool(true, "Oszillator immer auf Wochenbasis rechnen", group = grpQ, tooltip = "So entspricht der Indikator auch auf dem Tageschart dem Backtest.")
 
 // ───────── Zonen ─────────
 grpZ = "Zonen & Signale"
-float greedLvl  = input.float(80, "Gier-Zone ab", minval = 50, maxval = 100, group = grpZ)
-float extGreed  = input.float(85, "Extreme Gier ab", minval = 50, maxval = 100, group = grpZ)
-float fearLvl   = input.float(20, "Angst-Zone bis", minval = 0, maxval = 50, group = grpZ)
-float extFear   = input.float(15, "Extreme Angst bis", minval = 0, maxval = 50, group = grpZ)
-float topCross  = input.float(70, "Top-Signal, wenn Score darunter fällt", minval = 50, maxval = 100, group = grpZ)
-float lowCross  = input.float(30, "Tief-Signal, wenn Score darüber steigt", minval = 0, maxval = 50, group = grpZ)
-int   sigLook   = input.int(4, "Extrem muss in den letzten X Bars gewesen sein", minval = 1, group = grpZ)
+float extGreed = input.float(80, "Extreme Gier ab", group = grpZ)
+float greedLvl = input.float(75, "Gier ab", group = grpZ)
+float fearLvl  = input.float(25, "Angst bis", group = grpZ)
+float extFear  = input.float(20, "Extreme Angst bis", group = grpZ)
+string mode    = input.string("Kontra-Signal", "Farblogik", options = ["Kontra-Signal", "Stimmung direkt"], group = grpZ, tooltip = "Kontra: Angst = grün, Gier = rot.\nDirekt: Angst = rot, Gier = grün.")
+bool showSig   = input.bool(true, "Marker, wenn Extremstimmung dreht", group = grpZ)
 
 // ───────── Optik ─────────
 grpA = "Anzeige"
-color colRed    = input.color(color.red, "Rot", group = grpA)
-color colGreen  = input.color(color.green, "Grün", group = grpA)
-int   transp    = input.int(85, "Transparenz Zone", minval = 0, maxval = 100, group = grpA)
-int   transpExt = input.int(70, "Transparenz extrem", minval = 0, maxval = 100, group = grpA)
-bool  showZones = input.bool(true, "Hintergrund-Zonen anzeigen", group = grpA)
-bool  showSig   = input.bool(true, "Signal-Marker anzeigen", group = grpA)
-bool  showTable = input.bool(true, "Info-Tabelle anzeigen", group = grpA)
-string tablePos = input.string("Mitte rechts", "Tabellen-Position", options = ["Oben rechts", "Mitte rechts", "Unten rechts", "Oben links", "Unten links"], group = grpA)
+color colRed   = input.color(color.red, "Rot", group = grpA)
+color colGreen = input.color(color.green, "Grün", group = grpA)
+int transp     = input.int(85, "Transparenz Zone", 0, 100, group = grpA)
+int transpExt  = input.int(68, "Transparenz extrem", 0, 100, group = grpA)
+bool showTable = input.bool(true, "Info-Tabelle", group = grpA)
+string tPos    = input.string("Mitte rechts", "Tabellen-Position", options = ["Oben rechts", "Mitte rechts", "Unten rechts", "Oben links", "Unten links"], group = grpA)
 
-// ───────── Optional: Volatilitätsindex ─────────
-grpV = "Volatilitätsindex (optional)"
-bool   useVol  = input.bool(false, "Vola-Index einbeziehen", group = grpV, tooltip = "Hoher VIX = Angst. Wird invertiert und als 4. Baustein gemittelt.")
-int    volLen  = input.int(52, "Vola-Vergleichszeitraum (Bars)", minval = 10, group = grpV)
-string volSym  = input.symbol("CBOE:VIX", "Vola-Symbol", group = grpV, tooltip = "S&P/Dow: CBOE:VIX · Nasdaq: CBOE:VXN · Gold: CBOE:GVZ · Silber: CBOE:VXSLV")
+// ───────── Eingebettete Daten ─────────
+f_parse(string s) =>
+    array<string> parts = str.split(s, ",")
+    array<float> out = array.new_float()
+    for p in parts
+        out.push(str.tonumber(p))
+    out
 
-// ───────── Bausteine (0 = Angst, 100 = Gier) ─────────
-float c_rsi = ta.rsi(close, rsiLen)
+var array<float> aaiiArr = array.new_float()
+var array<float> cnnArr  = array.new_float()
+var array<float> bofaArr = array.new_float()
+var array<float> cashArr = array.new_float()
+if barstate.isfirst
+    aaiiArr.concat(f_parse("62,41,39,33,27,14,3,10,13,42,23,46,-11,25,22,41,47,0,5,-6,-2,4,38,25,-13,-13,40,45,55,23,17,43,41,35,38,54,18,25,47,16,10,24,46,29,54,29,0,44,10,27,-20,8,19,-7,12,23,31,41,9,-12,12,0,-5,-19,10,-4,-11,12,16,42,36,33,45,21,17,8,10,-3,22,-11,35,-9,0,7,-2,3,9,-3,-10,-14,29,22,19,39,38,2,-8,12,33,49,35,47,26,31,27,33,0,4,23,15,29,11,24,38,42,42,28,20,-5,17,13,-6,-11,8,-14,-12,-7,-2,20,-15,-20,-7,-27,-21,3,-2,-3,4,21,-19,1,-9,-23,-13,-26,0,11,24,24,16,29,19,35,17,13,8,-5,-5,0,-18,-22,-3,-16,-37,-21,-6,-17,5,7,-6,8,15,44,23,34,47,3,49,33,21,21,63,6,12,23,21,35,13,27,44,34,46,41,43,35,21,34,47,36,39,41,39,32,40,55,34,41,48,49,49,56,56,42,29,41,35,11,35,8,12,-11,33,39,50,28,29,12,-11,-3,-4,7,39,13,33,41,34,24,12,-2,-3,-1,0,16,13,27,14,24,2,37,16,14,11,34,41,42,23,31,26,33,42,40,4,-6,0,-10,17,21,6,0,12,25,0,-19,-23,-16,-25,4,-5,-16,-6,10,21,29,26,29,28,16,23,44,14,40,22,11,-11,5,-6,10,23,7,-7,23,-9,7,-14,15,36,32,41,29,31,24,13,1,-11,40,24,-3,11,6,4,15,12,10,14,16,5,24,18,-7,6,12,27,-4,-12,-19,-19,-29,-7,-1,-5,-3,-34,-8,-16,-5,-5,2,16,13,10,14,18,-9,11,24,22,7,24,16,0,-7,-3,3,-3,10,20,10,31,6,16,16,16,32,-3,-9,-12,11,17,-8,3,17,1,-26,0,2,-1,-11,-2,-6,9,3,11,14,5,7,6,7,-3,-2,-6,-4,5,8,15,27,29,6,-17,8,-15,-16,-27,-28,1,12,-11,-20,-30,-39,-30,-34,-19,-13,-9,-12,-11,-30,-39,-29,8,-3,8,-18,19,27,28,15,12,-14,5,-22,-13,-21,-28,-33,-33,-8,-1,-7,4,1,-15,-6,-26,-27,-12,-22,-29,1,0,-3,11,-4,-33,-14,-21,-2,4,-15,-31,14,-20,-19,-22,-19,-6,-35,-31,-51,-27,7,-3,6,-9,8,-7,-8,11,9,-12,-8,11,0,-13,-21,-7,-27,-18,-5,16,15,18,-6,-15,0,-7,2,-5,8,-6,14,5,-9,-33,0,11,0,8,7,14,0,26,15,21,5,-2,-14,-5,1,5,10,20,5,-2,10,12,19,4,13,11,0,8,-21,-4,-9,12,2,-17,-36,2,-13,7,-8,10,-12,-29,-11,12,27,20,11,21,20,24,30,18,29,8,23,23,30,23,47,32,38,29,22,8,25,22,21,0,4,4,-12,3,11,15,11,1,7,4,-5,-15,-16,-3,-23,-14,2,8,17,10,9,6,-23,-11,-4,-5,6,-10,-11,-23,-14,-10,3,1,18,11,20,11,-6,-6,4,7,5,10,32,32,24,29,19,31,16,16,18,13,18,15,17,10,-13,-3,-10,7,-17,-22,-8,-14,-18,-2,-3,-16,-1,-5,-20,-15,-4,9,9,16,2,0,3,4,0,1,-8,-16,-14,-5,-1,-20,-5,7,8,13,22,14,3,20,17,28,24,13,14,9,-8,-7,13,6,10,7,-35,-21,-11,-5,13,9,27,6,-9,-2,7,-5,18,31,26,23,11,13,6,-14,3,4,21,15,5,8,8,21,32,23,24,12,5,19,15,16,22,37,14,19,18,14,-1,-9,13,19,19,14,15,11,3,9,-6,-7,8,0,0,11,4,13,17,23,11,16,16,9,4,0,0,-7,13,22,33,21,14,19,14,5,9,9,27,28,38,39,25,31,17,23,12,32,32,13,25,6,22,3,20,29,25,16,6,-4,14,3,5,9,8,9,0,0,0,2,3,-13,-9,14,-12,-1,8,7,-20,-7,-6,-7,-6,1,0,4,3,-12,9,7,11,20,20,11,0,6,8,-1,-16,-5,1,-16,-28,-27,-10,-7,-29,-10,0,3,13,3,10,1,11,3,9,-1,-8,-11,-15,-12,1,0,-12,-13,-5,4,12,9,3,3,5,9,0,-3,1,-8,-13,-13,1,-8,-14,-9,-11,10,20,28,19,17,12,15,20,21,17,4,-2,-1,8,1,6,2,-16,-8,5,-7,-11,-8,-13,6,8,3,-10,3,-5,6,3,4,3,0,-1,10,10,4,1,1,-10,-15,-6,19,13,5,3,13,10,7,16,22,-6,6,4,3,17,25,32,44,24,33,21,16,2,27,22,14,-2,16,5,-3,-5,-17,9,11,-2,8,16,13,9,12,23,13,-12,-11,14,10,5,-3,5,7,11,19,16,-1,0,5,21,-5,-1,-13,3,10,-1,-22,-6,7,-28,-22,-19,-10,9,-3,5,0,17,10,14,22,11,1,14,6,7,20,16,13,18,20,-9,-11,-15,-20,-7,-3,-2,1,6,7,0,14,-27,-22,-13,-16,-11,2,8,-4,-18,-24,3,7,6,16,16,5,3,3,12,24,20,15,3,14,21,-5,-1,15,12,-9,-1,-22,-17,-19,-15,-8,-8,-25,-13,-29,-27,-16,-9,-4,-4,-23,-25,-24,-16,-15,-21,-28,-24,-12,-12,-8,-11,-25,-8,-21,-17,-4,-1,3,0,6,31,18,20,26,21,17,22,19,13,13,8,-1,2,19,22,22,15,26,25,30,23,37,29,32,17,21,10,11,10,24,20,15,17,26,16,9,0,12,4,5,-2,7,10,12,-17,-9,-13,-11,6,19,10,15,24,12,-2,-16,-1,-14,-4,7,-1,-13,-26,-30,-17,-11,-24,-30,-11,-22,-27,-3,4,-17,-33,-25,-43,-26,-25,-24,-34,-5,-26,-39,-41,-24,-33,-20,-13"))
+    aaiiArr.concat(f_parse("-12,-8,-5,-4,-15,-28,-35,-20,-43,-41,-31,-36,-34,-19,-2,-22,-7,-11,-16,-17,-20,-32,-21,-21,-16,-2,-8,-5,12,5,-17,-21,-17,-29,-28,-23,-2,-8,-8,-14,-21,-12,-17,-12,-8,20,22,15,14,22,15,30,21,28,19,6,-4,-1,13,5,-3,-13,-11,4,-1,-14,-26,15,16,22,29,20,32,32,21,25,24,14,13,25,26,15,18,25,30,24,16,28,25,19,4,-2,6,17,18,21,12,7,19,22,16,16,27,29,11,20,3,14,28,24,20,9,24,26,18,28,20,8,9,14,21,8,-2,18,12,9,4,1,-3,-15,14,7,-10,-19,-11,-41,-38,-40,-37,-25,-40,-30,-31,-34,-38,-22,-8,1,-9,-9,3,-8,-5,12,6,0,3,7,-8,-16,-14,-5,-11,-21,-1,3,4,10,-12,-6,7,2,-18,-11,-11,13,14,11,3,15,12,21,10,14,11,0,-2,-7,-2,-14,-22,-18,-18,-7,-11,12,-2,5,3,-12,-6,-1,-17,-3,9,-11,-1,12,-13,-11,-1,-3,-4,-12,2,-1,-25,-15,-12,1,-3,-9,-4,-14,-21"))
+    cnnArr.concat(f_parse("50,50,50,50,50,50,50,4,50,50,50,50,50,50,50,2,50,50,50,50,50,50,50,50,50,50,50,69,41,68,78,56,54,42,54,51,38,46,48,51,48,47,48,36,29,32,42,51,32,42,39,31,27,28,26,32,47,24,47,44,21,18,24,18,25,44,60,65,74,74,63,31,20,42,33,50,63,49,56,27,24,28,28,30,28,18,19,38,49,60,46,40,32,14,12,11,13,30,35,40,17,31,25,31,33,42,52,63,68,64,56,42,44,35,22,16,20,16,44,57,57,64,60,63,68,52,44,40,37,46,61,59,69,76,72,69,61,56,27,27,38,49,55,66,64,59,54,57,65,66,75,77,81,76,79,78,80,81,77,64,65,44,47,55,52,52,33,28,28,26,23,22,36,41,59,67,65,66,69,80,81,76,73,73,74,75,75,73,73,77,70,69,70,69,58,45,28,41,43,46,63,52,48,43,41,39,44,50,54,43,43,41,24,34,52,60,39,49,61,67,71,72,72,59,50,59,51,61,65,52,49,28,34,29,26,36,46,44,38,44,37,21,18,22,23,26,5,8,16,35,38,60,71,64,62,62,60,55,65,78,75,74,75,50,58,64,56,62,59,61,66,51,53,30,22,32,34,20,22,6,22,38,39,44,55,45,54,64,55,59,45,34,42,41,25,17,8,8,18,38,69,65,71,67,63,58,60,42,34,37,25,33,47,37,41,40,65,64,55,54,45,33,28,37,38,44,18,17,26,24,37,26"))
+    bofaArr.concat(f_parse("18,18,23,28,33,39,44,44,38,35,41,51,58,67,69,76,79,68,61,56,42,39,47,52,53,49,41,44,59,61,72,83,83,90,92,92,92,90,84,68,65,55,47,43,39,40,50,52,60,65,62,61,53,56,62,66,64,58,65,66,73,71,68,64,56,51,40,42,42,48,55,57,64,60,60,60,68,72,60,58,45,45,46,41,32,28,25,27,28,25,20,18,15,14,11,14,18,21,31,39,46,57,66,66,75,75,80,84,81,81,79,74,70,53,48,47,56,62,68,79,86,81,80,68,65,55,44,43,24,22,26,33,40,49,52,48,36,33,33,37,46,54,58,72,75,85,80,78,71,72,76,76,76,76,76,77,72,70,65,64,67,70,70,70,59,59,59,66,72,75,76,71,65,61,50,42,42,45,48,43,35,28,28,32,29,27,28,28,31,36,43,48,56,64,64,62,57,56,52,53,57,60,65,68,67,62,50,47,41,40,39,33,32,31,31,30,26,31,34,32,26,22,17,22,26,37,40,55,51,40,40,28,36,40,54,54,64,70,76,85,91,95,92,89,88,84,80,69,62,60,56,53,39,33,20,11,10,5,5,5,5,4,4,8,12,12,11,9,10,13,16,18,18,22,24,30,35,39,50,52,57,51,47,41,45,47,60,60,62,43,36,24,30,34,42,48,53,61,67,73,74,63,57,51,52,67,71,74,72,64,63"))
+    cashArr.concat(f_parse("69,69,69,65,65,58,58,58,63,63,63,60,50,50,50,43,44,48,48,48,52,52,52,46,54,55,55,55,49,49,41,41,41,39,40,40,40,37,38,45,45,45,48,48,48,47,46,46,44,44,42,42,42,43,43,41,42,43,43,43,41,42,42,42,45,45,45,44,44,41,41,41,41,44,44,44,39,39,44,44,44,43,40,40,47,49,83,83,83,83,83,83,52,53,55,55,55,55,52,52,52,48,48,48,48,42,41,40,40,40,40,43,43,44,44,44,44,40,40,38,37,42,42,42,42,42,52,52,52,52,50,50,83,49,83,83,48,54,54,54,49,47,45,44,42,42,38,43,44,44,46,46,46,46,46,46,46,48,48,48,50,50,50,51,51,51,49,50,50,50,47,47,46,50,55,55,55,55,55,52,54,56,57,57,55,57,58,58,58,58,58,58,51,51,51,50,49,50,50,50,50,50,48,48,48,48,47,50,50,50,49,51,52,52,52,52,50,50,50,48,48,56,56,56,53,51,51,50,50,42,51,59,60,60,60,56,50,49,48,48,44,42,40,41,41,41,41,42,42,47,47,51,51,51,53,59,61,61,61,61,61,63,63,63,63,62,60,55,55,56,56,56,53,53,53,53,53,48,48,48,44,44,42,42,43,43,43,44,44,44,40,48,48,48,48,45,43,40,40,39,39,37,34,44,44,44,44,41,41,39,36"))
 
-float lo   = ta.lowest(low, stLen)
-float hi   = ta.highest(high, stLen)
-float c_st = hi > lo ? (close - lo) / (hi - lo) * 100 : 50
+const int WEEK = 7 * 86400000
+int AAII_T0 = timestamp("UTC", 2000, 1, 3)
+int CNN_T0  = timestamp("UTC", 2020, 7, 13)
 
-float sd  = ta.stdev(close, zLen)
-float c_z = sd > 0 ? math.max(0, math.min(100, 50 + 20 * (close - ta.sma(close, zLen)) / sd)) : 50
+// Wert ist ab Donnerstag der Woche bekannt → Index über (Bar-Ende − 3,5 Tage)
+int tRef = na(time_close) ? time : time_close
+f_wIdx(int t0) =>
+    math.floor((tRef - 302400000 - t0) / WEEK)
+// eine Woche Puffer: neue Umfrage erscheint erst donnerstags → letzten Wert weiterverwenden
+f_get(array<float> arr, int i) =>
+    int n = arr.size()
+    i >= 0 and n > 0 and i <= n ? arr.get(math.min(i, n - 1)) : na
 
-float volIdx = request.security(volSym, timeframe.period, close, ignore_invalid_symbol = true)
-float volPr  = ta.percentrank(volIdx, volLen)
-float c_vol  = useVol and not na(volIdx) ? 100 - volPr : na
+int ai = f_wIdx(AAII_T0)
+float aaii  = f_get(aaiiArr, ai)
+float aaii4 = na
+int aj = math.min(ai, aaiiArr.size() - 1)
+if aj >= 3 and ai <= aaiiArr.size()
+    aaii4 := (aaiiArr.get(aj) + aaiiArr.get(aj - 1) + aaiiArr.get(aj - 2) + aaiiArr.get(aj - 3)) / 4
+float cnn = f_get(cnnArr, f_wIdx(CNN_T0))
 
-// ───────── Score ─────────
-array<float> vals = array.from(c_rsi, c_st, c_z, c_vol)
-float sum = 0.0
-int   cnt = 0
-for v in vals
-    if not na(v)
-        sum += v
-        cnt += 1
-float raw   = cnt > 0 ? sum / cnt : na
-float score = smoothLen > 1 ? ta.ema(raw, smoothLen) : raw
+// BofA: Survey erscheint ca. Mitte des Monats → Monat von (Bar-Ende − 19 Tage)
+int tB = tRef - 19 * 86400000
+int bi = (year(tB, "UTC") - 2001) * 12 + month(tB, "UTC") - 1
+float bofa = f_get(bofaArr, bi)
+float cash = f_get(cashArr, bi)
+bool dataEnded = ai > aaiiArr.size()
 
-// ───────── Farben ─────────
-bool  kontra   = mode == "Kontra-Signal"
-color colGreed = kontra ? colRed : colGreen
-color colFear  = kontra ? colGreen : colRed
+// ───────── Kurs-Oszillator ─────────
+f_osc() =>
+    float r  = ta.rsi(close, 9)
+    float lo = ta.lowest(low, 13)
+    float hi = ta.highest(high, 13)
+    float st = hi > lo ? (close - lo) / (hi - lo) * 100 : 50
+    float sd = ta.stdev(close, 20)
+    float z  = sd > 0 ? math.max(0, math.min(100, 50 + 20 * (close - ta.sma(close, 20)) / sd)) : 50
+    (r + st + z) / 3
+float oscW = request.security(syminfo.tickerid, "1W", f_osc())
+float oscC = f_osc()
+float osc = weeklyOsc and timeframe.in_seconds() < timeframe.in_seconds("1W") ? oscW : oscC
 
+// ───────── Asset-Erkennung (nur für Auto-Aus bei Metallen/Dollar) ─────────
+string symRoot = str.upper(syminfo.root)
+string symTick = str.upper(syminfo.ticker)
+bool isMetalFx = symRoot == "GC" or symRoot == "SI" or symRoot == "MGC" or symRoot == "SIL" or symRoot == "DX" or str.contains(symTick, "XAU") or str.contains(symTick, "XAG") or str.contains(symTick, "DXY") or symTick == "GLD" or symTick == "SLV"
+bool aOn = useAAII and not (autoMetal and isMetalFx)
+bool cOn = useCNN and not (autoMetal and isMetalFx)
+
+// ───────── Scores (0 = Angst, 100 = Gier) ─────────
+float sOsc  = osc
+float sAAII = na(aaii4) ? na : (math.max(-30, math.min(30, aaii4)) + 30) / 60 * 100
+float sCNN  = cnn
+float sBofA = na(bofa) ? na : bofa   // bereits ×10 gespeichert → 0–100
+
+float num = 0.0
+float den = 0.0
+if useOsc and not na(sOsc)
+    num += 2 * sOsc
+    den += 2
+if aOn and not na(sAAII) and not dataEnded
+    num += sAAII
+    den += 1
+if cOn and not na(sCNN) and not dataEnded
+    num += sCNN
+    den += 1
+if useBofA and not na(sBofA)
+    num += sBofA
+    den += 1
+float score = den > 0 ? num / den : na
+
+// ───────── Färbung ─────────
+bool kontra = mode == "Kontra-Signal"
+color cGreed = kontra ? colRed : colGreen
+color cFear  = kontra ? colGreen : colRed
 color bg = na
-if showZones and not na(score)
-    if score >= extGreed
-        bg := color.new(colGreed, transpExt)
-    else if score >= greedLvl
-        bg := color.new(colGreed, transp)
-    else if score <= extFear
-        bg := color.new(colFear, transpExt)
-    else if score <= fearLvl
-        bg := color.new(colFear, transp)
+if not na(score)
+    bg := score >= extGreed ? color.new(cGreed, transpExt) : score >= greedLvl ? color.new(cGreed, transp) : score <= extFear ? color.new(cFear, transpExt) : score <= fearLvl ? color.new(cFear, transp) : na
 bgcolor(bg, title = "Sentiment-Hintergrund")
 
-// ───────── Signale: Extremstimmung kippt ─────────
-bool topSig = ta.highest(score, sigLook) >= extGreed and ta.crossunder(score, topCross)
-bool lowSig = ta.lowest(score, sigLook) <= extFear and ta.crossover(score, lowCross)
-plotshape(showSig and topSig, "Top-Signal (Gier kippt)", shape.triangledown, location.abovebar, color.new(colGreed, 0), size = size.small)
-plotshape(showSig and lowSig, "Tief-Signal (Angst dreht)", shape.triangleup, location.belowbar, color.new(colFear, 0), size = size.small)
-plot(score, "Sentiment-Score", display = display.data_window)
+bool lowSig = ta.lowest(score, 4) <= extFear and ta.crossover(score, 30)
+bool topSig = ta.highest(score, 4) >= extGreed and ta.crossunder(score, 70)
+plotshape(showSig and lowSig, "Angst dreht (Kaufsignal)", shape.triangleup, location.belowbar, color.new(cFear, 0), size = size.small)
+plotshape(showSig and topSig, "Gier kippt (Vorsicht)", shape.triangledown, location.abovebar, color.new(cGreed, 0), size = size.small)
+plot(score, "Score", display = display.data_window)
+plot(sOsc, "Oszillator", display = display.data_window)
+plot(aaii, "AAII Spread", display = display.data_window)
+plot(cnn, "CNN F&G", display = display.data_window)
 
-alertcondition(topSig, "Top-Signal", "Sentiment: extreme Gier kippt auf {{ticker}}")
-alertcondition(lowSig, "Tief-Signal", "Sentiment: extreme Angst dreht auf {{ticker}}")
-alertcondition(ta.crossover(score, extGreed), "Extreme Gier erreicht", "Sentiment: EXTREME GIER auf {{ticker}}")
-alertcondition(ta.crossunder(score, extFear), "Extreme Angst erreicht", "Sentiment: EXTREME ANGST auf {{ticker}}")
+alertcondition(ta.crossunder(score, extFear), "Extreme Angst", "Sentiment: EXTREME ANGST auf {{ticker}}")
+alertcondition(ta.crossover(score, extGreed), "Extreme Gier", "Sentiment: EXTREME GIER auf {{ticker}}")
+alertcondition(lowSig, "Angst dreht", "Sentiment: Angst dreht – Kaufsignal auf {{ticker}}")
+alertcondition(topSig, "Gier kippt", "Sentiment: Gier kippt – Vorsicht auf {{ticker}}")
 
-// ───────── Info-Tabelle ─────────
-f_label(float s) =>
+// ───────── Tabelle ─────────
+f_lbl(float s) =>
     na(s) ? "n/a" : s >= extGreed ? "Extreme Gier" : s >= greedLvl ? "Gier" : s <= extFear ? "Extreme Angst" : s <= fearLvl ? "Angst" : "Neutral"
-
-f_cellCol(float s) =>
-    na(s) ? color.new(color.gray, 85) : s >= greedLvl ? color.new(colGreed, 70) : s <= fearLvl ? color.new(colFear, 70) : color.new(color.gray, 85)
-
-string pos = tablePos == "Oben rechts" ? position.top_right : tablePos == "Unten rechts" ? position.bottom_right : tablePos == "Oben links" ? position.top_left : tablePos == "Unten links" ? position.bottom_left : position.middle_right
-var table info = table.new(pos, 2, 6, bgcolor = color.new(color.gray, 85), border_width = 1)
-
-f_row(int row, string name, float v, bool active) =>
-    info.cell(0, row, name, text_size = size.small, text_color = chart.fg_color, text_halign = text.align_left)
-    info.cell(1, row, not active ? "–" : na(v) ? "n/a" : str.tostring(v, "#"), text_size = size.small, text_color = chart.fg_color, bgcolor = active ? f_cellCol(v) : color.new(color.gray, 85))
-
+f_col(float s) =>
+    na(s) ? color.new(color.gray, 85) : s >= greedLvl ? color.new(cGreed, 70) : s <= fearLvl ? color.new(cFear, 70) : color.new(color.gray, 85)
+string pos = tPos == "Oben rechts" ? position.top_right : tPos == "Unten rechts" ? position.bottom_right : tPos == "Oben links" ? position.top_left : tPos == "Unten links" ? position.bottom_left : position.middle_right
+var table tb = table.new(pos, 3, 9, bgcolor = color.new(color.gray, 85), border_width = 1)
+f_row(int row, string name, string raw, float sc, bool on) =>
+    tb.cell(0, row, name, text_size = size.small, text_color = on ? chart.fg_color : color.gray, text_halign = text.align_left)
+    tb.cell(1, row, raw, text_size = size.small, text_color = on ? chart.fg_color : color.gray)
+    tb.cell(2, row, na(sc) ? "–" : str.tostring(sc, "#"), text_size = size.small, text_color = chart.fg_color, bgcolor = on ? f_col(sc) : color.new(color.gray, 85))
 if showTable and barstate.islast
-    info.cell(0, 0, "Sentiment", text_size = size.small, text_color = chart.fg_color, text_halign = text.align_left)
-    info.cell(1, 0, f_label(score), text_size = size.small, text_color = chart.fg_color, bgcolor = f_cellCol(score))
-    f_row(1, "Score (0–100)", score, true)
-    f_row(2, "RSI " + str.tostring(rsiLen), c_rsi, true)
-    f_row(3, "Spanne " + str.tostring(stLen), c_st, true)
-    f_row(4, "Z-Score " + str.tostring(zLen), c_z, true)
-    f_row(5, "Vola-Index", c_vol, useVol)
+    tb.cell(0, 0, "Sentiment v3", text_size = size.small, text_color = chart.fg_color, text_halign = text.align_left)
+    tb.cell(1, 0, "Wert", text_size = size.small, text_color = chart.fg_color)
+    tb.cell(2, 0, "Score", text_size = size.small, text_color = chart.fg_color)
+    f_row(1, "GESAMT: " + f_lbl(score), "", score, true)
+    f_row(2, "Oszillator", "", sOsc, useOsc)
+    f_row(3, "AAII (4W)", na(aaii4) ? "–" : str.tostring(aaii4, "#.#"), sAAII, aOn)
+    f_row(4, "CNN F&G", na(cnn) ? "–" : str.tostring(cnn, "#"), sCNN, cOn)
+    f_row(5, "BofA Sentiment", na(bofa) ? "–" : str.tostring(bofa / 10, "#.#"), sBofA, useBofA)
+    f_row(6, "BofA Cash %", na(cash) ? "–" : str.tostring(cash / 10, "#.0"), na, false)
+    tb.cell(0, 7, "Datenstand 18.11.2026", text_size = size.tiny, text_color = color.gray, text_halign = text.align_left)
+    tb.cell(0, 8, dataEnded ? "⚠ Daten veraltet – neuen Code einfügen" : (isMetalFx and autoMetal ? "Metall/Dollar: nur Oszillator" : ""), text_size = size.tiny, text_color = color.orange, text_halign = text.align_left)
