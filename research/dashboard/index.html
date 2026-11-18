@@ -1,0 +1,338 @@
+<meta name="dash-one-writer">
+<style>
+  .sc { display: flex; flex-direction: column; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+  .sc h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+  .sc h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; text-wrap: balance; }
+  .sc .lead { margin: var(--cds-gap-sm) 0 0; font-size: var(--cds-font-size-body); max-width: 70ch; }
+  .sc .muted { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0; }
+  .sc .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--cds-gap-md); }
+  .sc .tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-xs); min-width: 0; }
+  .sc .tile .lbl { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); letter-spacing: .02em; }
+  .sc .tile .val { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .sc .tile .sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .sc .tile.main { border-width: 2px; }
+  .sc .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); background: var(--color-panel); border: 1px solid var(--color-border-line); }
+  .sc .pill.fear { color: var(--color-ok); border-color: var(--color-ok); }
+  .sc .pill.greed { color: var(--color-bad); border-color: var(--color-bad); }
+  .sc .section { display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+  .sc .chartbox { position: relative; min-height: 300px; width: 100%; }
+  .sc .chartbox.small { min-height: 220px; }
+  .sc .ranges { display: flex; gap: var(--cds-gap-xs); flex-wrap: wrap; }
+  .sc .ranges button, .sc .copybtn { font: inherit; font-size: var(--cds-font-size-caption); padding: 4px 12px; border-radius: 999px; border: 1px solid var(--color-border-line); background: var(--color-panel); color: var(--color-fg); cursor: pointer; }
+  .sc .ranges button.on { background: var(--color-fg); color: var(--color-bg); }
+  .sc .ranges button:focus-visible, .sc .copybtn:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+  .sc .legend { display: flex; gap: var(--cds-gap-md); flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .sc .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+  .sc .tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 10px; font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+  .sc .axis text { fill: var(--cds-text-secondary); font-size: 11px; }
+  .sc .axis path, .sc .axis line { stroke: var(--cds-chart-axis); }
+  .sc .tablewrap { overflow-x: auto; }
+  .sc table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .sc th, .sc td { padding: 6px 8px; border-bottom: 1px solid var(--color-border-line); text-align: right; white-space: nowrap; }
+  .sc th:first-child, .sc td:first-child, .sc th:nth-child(2), .sc td:nth-child(2) { text-align: left; }
+  .sc td.good { color: var(--color-ok); font-weight: var(--cds-font-weight-medium); }
+  .sc td.bad { color: var(--color-bad); font-weight: var(--cds-font-weight-medium); }
+  .sc pre.code { max-height: 260px; overflow: auto; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); font-size: 11px; white-space: pre; margin: 0; }
+  .sc .copyrow { display: flex; gap: var(--cds-gap-md); align-items: center; flex-wrap: wrap; }
+  .sc details summary { cursor: pointer; font-weight: var(--cds-font-weight-medium); }
+  .sc details p, .sc details li { max-width: 70ch; font-size: var(--cds-font-size-body); }
+</style>
+
+<div class="sc" data-read lang="de">
+  <header id="kopf">
+    <h1>Sentiment-Cockpit</h1>
+    <p class="lead">Stimmung am US-Aktienmarkt in der Woche vom <b data-draw="week" data-source="latest" data-field="week" data-row="0">—</b>: Gesamt-Score <b data-draw="score" data-source="latest" data-field="score" data-row="0">—</b> von 100, das ist <b data-draw="zone" data-source="latest" data-field="zone" data-row="0">—</b>.</p>
+    <p class="muted">Score = (2 × Kurs-Oszillator + AAII + CNN Fear &amp; Greed) ÷ 4, auf dem Wochenchart des S&amp;P 500. Kontra-Lesart: grün = Angst (historisch gute Kaufzeitpunkte), rot = Gier (Vorsicht).</p>
+  </header>
+
+  <section class="tiles" id="kacheln">
+    <div class="tile main" id="kachel-score">
+      <span class="lbl">GESAMT-SCORE</span>
+      <span class="val" data-draw="t-score" data-source="latest" data-field="score" data-row="0">—</span>
+      <span class="sub"><span data-draw="t-zone">—</span></span>
+    </div>
+    <div class="tile" id="kachel-osc">
+      <span class="lbl">KURS-OSZILLATOR S&amp;P 500</span>
+      <span class="val" data-draw="t-osc" data-source="latest" data-field="osc" data-row="0">—</span>
+      <span class="sub">RSI 9 · Spanne 13 · Z-Score 20 (Wochen)</span>
+    </div>
+    <div class="tile" id="kachel-aaii">
+      <span class="lbl">AAII BULLEN − BÄREN</span>
+      <span class="val" data-draw="t-aaii" data-source="latest" data-field="aaii" data-row="0">—</span>
+      <span class="sub">4-Wochen-Schnitt <span data-draw="t-aaii4" data-source="latest" data-field="aaii4" data-row="0">—</span> Punkte</span>
+    </div>
+    <div class="tile" id="kachel-cnn">
+      <span class="lbl">CNN FEAR &amp; GREED</span>
+      <span class="val" data-draw="t-cnn" data-source="latest" data-field="cnn" data-row="0">—</span>
+      <span class="sub">0 = extreme Angst · 100 = extreme Gier</span>
+    </div>
+    <div class="tile" id="kachel-bofa">
+      <span class="lbl">BOFA FONDSMANAGER</span>
+      <span class="val" data-draw="t-bofa" data-source="latest" data-field="bofa" data-row="0">—</span>
+      <span class="sub">Sentiment 0–10 · Cash <span data-draw="t-cash" data-source="latest" data-field="cash" data-row="0">—</span> %</span>
+    </div>
+  </section>
+
+  <section class="section" id="chart-spx">
+    <h2>S&amp;P 500 mit Sentiment-Zonen</h2>
+    <div class="ranges" id="zeitraum" role="group" aria-label="Zeitraum">
+      <button type="button" data-range="3">3 J</button>
+      <button type="button" data-range="5" class="on">5 J</button>
+      <button type="button" data-range="10">10 J</button>
+      <button type="button" data-range="99">Alle</button>
+    </div>
+    <div class="chartbox" data-draw="price" data-source="weekly"></div>
+    <div class="legend"><span><i style="background: var(--color-ok)"></i>Extreme Angst (≤ 20)</span><span><i style="background: var(--color-ok); opacity: .45"></i>Angst (≤ 25)</span><span><i style="background: var(--color-bad); opacity: .45"></i>Gier (≥ 75)</span><span><i style="background: var(--color-bad)"></i>Extreme Gier (≥ 80)</span></div>
+  </section>
+
+  <section class="section" id="chart-score">
+    <h2>Gesamt-Score und Einzelquellen</h2>
+    <div class="chartbox small" data-draw="scorechart" data-source="weekly"></div>
+    <div class="legend"><span><i style="background: var(--cds-chart-1, currentColor)" data-draw="lg0"></i>Gesamt-Score</span><span><i data-draw="lg1"></i>AAII (skaliert 0–100)</span><span><i data-draw="lg2"></i>CNN Fear &amp; Greed</span></div>
+  </section>
+
+  <section class="section" id="backtest">
+    <h2>Was hat im Backtest funktioniert?</h2>
+    <p class="muted">Mehrrendite in den 13 Wochen nach einem Signal, verglichen mit dem Durchschnitt aller Wochen im selben Zeitraum (Prozentpunkte). Lernzeitraum bis 2016, Testzeitraum 2017–2026. Bei Gold, Silber und Dollar-Index wurde nur der Oszillator verwendet.</p>
+    <div class="tablewrap">
+      <table data-source="backtest" data-row-key="Asset,Zeitraum">
+        <thead><tr>
+          <th data-field="Asset">Asset</th><th data-field="Zeitraum">Zeitraum</th><th data-field="Basis13W">Ø 13 Wo. %</th>
+          <th data-field="n_Angst">Wochen Angst</th><th data-field="Angst_Edge">Nach Angst</th>
+          <th data-field="n_Gier">Wochen Gier</th><th data-field="Gier_Edge">Nach Gier</th>
+          <th data-field="n_Kauf">Kaufsignale</th><th data-field="Kauf_Trefferquote%">Treffer %</th>
+        </tr></thead>
+        <tbody data-draw="bt"></tbody>
+      </table>
+    </div>
+    <p class="muted">Grün: Angst-Wochen brachten mehr als üblich, Gier-Wochen weniger (Kontra-Lesart bestätigt). Rot: das Gegenteil.</p>
+  </section>
+
+  <section class="section" id="code">
+    <h2>TradingView-Code</h2>
+    <p class="muted">Aktueller Code mit allen Daten bis zum Datenstand oben. Kopieren, im Pine-Editor den alten Code komplett ersetzen, speichern.</p>
+    <div class="copyrow" data-draw="copy" data-source="pinecode"></div>
+    <pre class="code" data-draw="code" data-source="pinecode">—</pre>
+  </section>
+
+  <details id="methode">
+    <summary>So entsteht der Score und was er nicht kann</summary>
+    <ul>
+      <li>Kurs-Oszillator: Mittel aus RSI (9 Wochen), Lage in der 13-Wochen-Spanne und Abstand zum 20-Wochen-Schnitt. Er zählt doppelt, weil er im Test der stärkste Baustein war.</li>
+      <li>AAII: Bullen minus Bären, 4-Wochen-Schnitt, von −30 bis +30 auf 0–100 umgerechnet. Daten seit 1987.</li>
+      <li>CNN Fear &amp; Greed: täglich, hier der Wochenwert. Daten erst ab Juli 2020.</li>
+      <li>BofA Fund Manager Survey wird angezeigt, fließt aber nicht ein: Hohe Angst bei BofA (2001, 2008) lief im Test weiter nach unten.</li>
+      <li>Angst-Signale bei Aktienindizes waren im Testzeitraum deutlich besser als der Durchschnitt, Gier-Signale schwächer als der Durchschnitt. Vor 2017 war der Vorteil viel kleiner. Bei Gold, Silber und Dollar gab es keinen verlässlichen Vorteil.</li>
+      <li>Die Werte werden einmal pro Woche aktualisiert. Die AAII-Umfrage erscheint donnerstags; bis dahin gilt der Wert der Vorwoche.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+  window.scNum = (v) => (v === null || v === undefined || v === '' ? null : +v);
+  window.scRange = 5;
+  window.scZoneColor = (s) => (s == null ? null : s >= 80 ? ['var(--color-bad)', 0.32] : s >= 75 ? ['var(--color-bad)', 0.14] : s <= 20 ? ['var(--color-ok)', 0.32] : s <= 25 ? ['var(--color-ok)', 0.14] : null);
+  window.scRows = () => {
+    const d = dash.data('weekly');
+    if (d.status !== 'ok') return null;
+    return d.data.map((r) => ({ week: r.week, t: d3.utcParse('%Y-%m-%d')(r.week), spx: scNum(r.spx), score: scNum(r.score), aaii4: scNum(r.aaii4), cnn: scNum(r.cnn), zone: r.zone }));
+  };
+
+  dash.calc('latest', {
+    inputs: ['weekly'],
+    title: 'Aktuelle Woche',
+    description: 'Die letzte Zeile der Wochendaten.',
+    fn: (weekly) => (weekly.length ? [weekly[weekly.length - 1]] : []),
+  });
+
+  const fmt1 = d3.format('.1f');
+  const fmt0 = d3.format('.0f');
+  const fmtDate = (s) => d3.utcFormat('%d.%m.%Y')(d3.utcParse('%Y-%m-%d')(s));
+  const latestField = (f) => {
+    const l = dash.data('latest');
+    return l.status === 'ok' && l.data && l.data.length ? l.data[0][f] : null;
+  };
+  const textDraw = (name, f, format) => dash.draw(name, (el) => {
+    const v = latestField(f);
+    el.textContent = v == null || v === '' ? '—' : format(v);
+  });
+  textDraw('week', 'week', fmtDate);
+  textDraw('score', 'score', (v) => fmt0(+v));
+  textDraw('zone', 'zone', (v) => v);
+  textDraw('t-score', 'score', (v) => fmt0(+v));
+  textDraw('t-osc', 'osc', (v) => fmt0(+v));
+  textDraw('t-aaii', 'aaii', (v) => (+v > 0 ? '+' : '') + fmt1(+v));
+  textDraw('t-aaii4', 'aaii4', (v) => (+v > 0 ? '+' : '') + fmt1(+v));
+  textDraw('t-cnn', 'cnn', (v) => fmt0(+v));
+  textDraw('t-bofa', 'bofa', (v) => fmt1(+v));
+  textDraw('t-cash', 'cash', (v) => fmt1(+v));
+  dash.draw('t-zone', (el) => {
+    const z = latestField('zone');
+    el.replaceChildren();
+    if (!z) { el.textContent = '—'; return; }
+    const p = document.createElement('span');
+    p.className = 'pill' + (/Angst/.test(z) ? ' fear' : /Gier/.test(z) ? ' greed' : '');
+    p.textContent = z;
+    el.appendChild(p);
+  });
+
+  // Zeitraum-Buttons: nur Klassen setzen und neu zeichnen
+  document.querySelectorAll('#zeitraum button').forEach((b) => {
+    b.addEventListener('click', () => {
+      window.scRange = +b.dataset.range;
+      document.querySelectorAll('#zeitraum button').forEach((x) => x.classList.toggle('on', x === b));
+      dash.draw('price');
+      dash.draw('scorechart');
+    });
+  });
+
+  const filterRange = (rows) => {
+    const last = rows[rows.length - 1].t;
+    const from = d3.utcYear.offset(last, -window.scRange);
+    return rows.filter((r) => r.t >= from);
+  };
+
+  const makeTip = (el) => {
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.hidden = true;
+    el.appendChild(tip);
+    return tip;
+  };
+
+  dash.draw('price', (el) => {
+    const all = scRows();
+    el.replaceChildren();
+    if (!all) { el.textContent = dash.data('weekly').status === 'error' ? 'Laden fehlgeschlagen' : '—'; return; }
+    const rows = filterRange(all.filter((r) => r.spx != null));
+    const W = el.clientWidth || 600, H = 300, m = { t: 10, r: 12, b: 24, l: 48 };
+    const x = d3.scaleUtc().domain(d3.extent(rows, (r) => r.t)).range([m.l, W - m.r]);
+    const y = d3.scaleLog().domain(d3.extent(rows, (r) => r.spx)).nice().range([H - m.b, m.t]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'S&P 500 Wochenkurs mit farbigen Sentiment-Zonen');
+    const wk = 7 * 864e5;
+    svg.append('g').selectAll('rect').data(rows.filter((r) => scZoneColor(r.score))).join('rect')
+      .attr('x', (r) => x(r.t)).attr('width', (r) => Math.max(1, x(new Date(+r.t + wk)) - x(r.t)))
+      .attr('y', m.t).attr('height', H - m.b - m.t)
+      .style('fill', (r) => scZoneColor(r.score)[0]).style('fill-opacity', (r) => scZoneColor(r.score)[1]);
+    const ticks = y.ticks(5).filter((v, i, a) => a.length <= 6 || i % 2 === 0);
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(ticks).tickFormat(d3.format(',.0f')).tickSizeOuter(0));
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.max(3, Math.floor(W / 110))).tickSizeOuter(0));
+    svg.append('path').datum(rows).attr('fill', 'none').style('stroke', 'var(--color-fg)').attr('stroke-width', 1.4)
+      .attr('d', d3.line().x((r) => x(r.t)).y((r) => y(r.spx)));
+    const lastR = rows[rows.length - 1];
+    svg.append('circle').attr('cx', x(lastR.t)).attr('cy', y(lastR.spx)).attr('r', 3.5).style('fill', 'var(--color-fg)');
+    const tip = makeTip(el);
+    const dot = svg.append('circle').attr('r', 4).style('fill', 'var(--color-fg)').attr('visibility', 'hidden');
+    const bis = d3.bisector((r) => r.t).center;
+    svg.on('pointermove', (ev) => {
+      const [px] = d3.pointer(ev);
+      const r = rows[bis(rows, x.invert(px))];
+      dot.attr('cx', x(r.t)).attr('cy', y(r.spx)).attr('visibility', 'visible');
+      tip.hidden = false;
+      tip.textContent = `${fmtDate(r.week)} · S&P ${d3.format(',.0f')(r.spx)} · Score ${r.score == null ? '–' : fmt0(r.score)} (${r.zone})`;
+      const bw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, x(r.t) / W * el.clientWidth - bw / 2), el.clientWidth - bw) + 'px';
+      tip.style.top = '0px';
+    }).on('pointerleave', () => { tip.hidden = true; dot.attr('visibility', 'hidden'); });
+  });
+
+  dash.draw('scorechart', (el) => {
+    const all = scRows();
+    el.replaceChildren();
+    if (!all) { el.textContent = dash.data('weekly').status === 'error' ? 'Laden fehlgeschlagen' : '—'; return; }
+    const rows = filterRange(all);
+    const W = el.clientWidth || 600, H = 220, m = { t: 10, r: 12, b: 24, l: 34 };
+    const x = d3.scaleUtc().domain(d3.extent(rows, (r) => r.t)).range([m.l, W - m.r]);
+    const y = d3.scaleLinear().domain([0, 100]).range([H - m.b, m.t]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'Gesamt-Score, AAII und CNN Fear and Greed im Zeitverlauf');
+    [[80, 100, 'var(--color-bad)', 0.12], [0, 20, 'var(--color-ok)', 0.12]].forEach(([a, b, c, o]) =>
+      svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('y', y(b)).attr('height', y(a) - y(b)).style('fill', c).style('fill-opacity', o));
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues([0, 20, 50, 80, 100]).tickSizeOuter(0));
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.max(3, Math.floor(W / 110))).tickSizeOuter(0));
+    const aaiiS = (r) => (r.aaii4 == null ? null : (Math.max(-30, Math.min(30, r.aaii4)) + 30) / 60 * 100);
+    const series = [
+      { f: (r) => r.score, c: dash.colors[0], w: 2 },
+      { f: aaiiS, c: dash.colors[1], w: 1 },
+      { f: (r) => r.cnn, c: dash.colors[2], w: 1 },
+    ];
+    series.slice().reverse().forEach((s) => {
+      svg.append('path').datum(rows).attr('fill', 'none').style('stroke', s.c).attr('stroke-width', s.w).attr('stroke-opacity', s.w > 1 ? 1 : 0.7)
+        .attr('d', d3.line().defined((r) => s.f(r) != null).x((r) => x(r.t)).y((r) => y(s.f(r))));
+    });
+    const tip = makeTip(el);
+    const bis = d3.bisector((r) => r.t).center;
+    svg.on('pointermove', (ev) => {
+      const [px] = d3.pointer(ev);
+      const r = rows[bis(rows, x.invert(px))];
+      tip.hidden = false;
+      tip.textContent = `${fmtDate(r.week)} · Score ${r.score == null ? '–' : fmt0(r.score)} · AAII-4W ${r.aaii4 == null ? '–' : fmt1(r.aaii4)} · CNN ${r.cnn == null ? '–' : fmt0(r.cnn)}`;
+      const bw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, x(r.t) / W * el.clientWidth - bw / 2), el.clientWidth - bw) + 'px';
+      tip.style.top = '0px';
+    }).on('pointerleave', () => { tip.hidden = true; });
+  });
+  ['lg0', 'lg1', 'lg2'].forEach((n, i) => dash.draw(n, (el) => { el.style.background = dash.colors[i]; }));
+
+  dash.draw('bt', (tb) => {
+    const d = dash.data('backtest');
+    tb.replaceChildren();
+    if (d.status !== 'ok') return;
+    const cols = ['Asset', 'Zeitraum', 'Basis13W', 'n_Angst', 'Angst_Edge', 'n_Gier', 'Gier_Edge', 'n_Kauf', 'Kauf_Trefferquote%'];
+    d.data.forEach((r) => {
+      const tr = document.createElement('tr');
+      tr.dataset.key = encodeURIComponent(r.Asset) + ',' + encodeURIComponent(r.Zeitraum);
+      cols.forEach((c) => {
+        const td = document.createElement('td');
+        const v = r[c];
+        if (c === 'Angst_Edge' || c === 'Gier_Edge') {
+          const n = +v;
+          td.textContent = v === '' || v == null || isNaN(n) ? '–' : (n > 0 ? '+' : '') + fmt1(n);
+          const good = c === 'Angst_Edge' ? n > 0.5 : n < -0.5;
+          const bad = c === 'Angst_Edge' ? n < -0.5 : n > 0.5;
+          td.className = good ? 'good' : bad ? 'bad' : '';
+        } else {
+          td.textContent = v == null || v === '' ? '–' : v;
+        }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  });
+
+  const pineText = () => {
+    const d = dash.data('pinecode');
+    if (d.status !== 'ok') return null;
+    return typeof d.data === 'string' ? d.data : (d.data && d.data.text) || null;
+  };
+  dash.draw('code', (el) => {
+    const t = pineText();
+    el.textContent = t || '—';
+  });
+  dash.draw('copy', {
+    mount: (el) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'copybtn';
+      btn.textContent = 'Code kopieren';
+      const msg = document.createElement('span');
+      msg.className = 'muted';
+      el.append(btn, msg);
+      btn.addEventListener('click', () => {
+        const t = pineText();
+        if (!t) { msg.textContent = 'Code lädt noch.'; return; }
+        const fallback = () => {
+          const pre = document.querySelector('#code pre.code');
+          if (pre) { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+          msg.textContent = 'Kopieren nicht erlaubt – der Code unten ist markiert, bitte selbst kopieren.';
+        };
+        try {
+          navigator.clipboard.writeText(t).then(() => { msg.textContent = `Kopiert (${t.length.toLocaleString('de-DE')} Zeichen).`; }, fallback);
+        } catch (e) { fallback(); }
+      });
+      return { btn, msg };
+    },
+    update: () => {},
+  });
+</script>
