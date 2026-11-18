@@ -86,7 +86,8 @@ float idxR = f_idx(netR)
 
 string uMetric = bgGroup == "Commercials" ? "Commercial Positions" : bgGroup == "Non-Commercials" ? "Noncommercial Positions" : "Nonreportable Positions"
 bool   useUsd  = (showUsd or pU) and not isUsd
-float  netU    = useUsd ? f_net(USD_CODE, uMetric) : na
+float  netUraw  = f_net(USD_CODE, uMetric)
+float  netU    = useUsd ? netUraw : na
 float  idxU    = f_idx(netU)
 
 float idxSel = bgGroup == "Commercials" ? idxC : bgGroup == "Non-Commercials" ? idxN : idxR
@@ -97,8 +98,8 @@ int   extN   = f_ext(idxN)
 int   extR   = f_ext(idxR)
 
 // ───────── Hintergrund im Chart ─────────
-bgcolor(showBg and extSel == 1  ? color.new(colL, transp) : showBg and extSel == -1 ? color.new(colS, transp) : na, "Hintergrund Währung", force_overlay = true)
-bgcolor(showUsd and useUsd and extU == 1 ? color.new(colUL, transp) : showUsd and useUsd and extU == -1 ? color.new(colUS, transp) : na, "Hintergrund USD", force_overlay = true)
+bgcolor(showBg and extSel == 1  ? color.new(colL, transp) : showBg and extSel == -1 ? color.new(colS, transp) : na, title = "Hintergrund Währung", force_overlay = true)
+bgcolor(showUsd and useUsd and extU == 1 ? color.new(colUL, transp) : showUsd and useUsd and extU == -1 ? color.new(colUS, transp) : na, title = "Hintergrund USD", force_overlay = true)
 
 // ───────── Unteres Fenster ─────────
 bool isNet = paneMode == "Netto-Positionen"
