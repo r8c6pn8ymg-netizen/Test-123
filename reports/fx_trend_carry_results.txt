@@ -1,0 +1,76 @@
+FX Trend + Carry (monatlich)  |  Kosten 0.30 % je Trade  |  Zinsertrag/Swap enthalten  |  Split 2018-01-01
+* Endkapital: Wert, auf den 1.000 im jeweiligen Zeitraum angewachsen wären.
+
+           Paar      Strategie Kosten      Zeitraum      Start       Ende Endkapital* Rendite % p.a. % Max DD % Sharpe Trades Trefferq. % Ø Trade %   Ø Tage
+        EUR/USD    T Trend 12M  0,3 %     In-Sample 2005-01-03 2017-12-29       578.4     -42.2   -4.1    -52.1  -0.30     25        32.0     -2.09   197.16
+        EUR/USD    T Trend 12M  0,3 % Out-of-Sample 2018-01-01 2026-11-19       835.6     -16.4   -2.0    -29.5  -0.24     19        31.6     -0.73   159.63
+        EUR/USD    T Trend 12M   ohne     In-Sample 2005-01-03 2017-12-29       622.5     -37.7   -3.6    -50.6  -0.25     25        32.0     -1.80   197.16
+        EUR/USD    T Trend 12M   ohne Out-of-Sample 2018-01-01 2026-11-19       885.9     -11.4   -1.4    -27.4  -0.15     19        36.8     -0.43   159.63
+        EUR/USD        C Carry  0,3 %     In-Sample 2005-01-03 2017-12-29       845.7     -15.4   -1.3    -33.8  -0.05      3        33.3      0.32  2654.00
+        EUR/USD        C Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,164.6      16.5    1.7    -17.7   0.27      0                               
+        EUR/USD        C Carry   ohne     In-Sample 2005-01-03 2017-12-29       852.1     -14.8   -1.2    -33.6  -0.05      3        33.3      0.62  2654.00
+        EUR/USD        C Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,166.4      16.6    1.7    -17.7   0.27      0                               
+        EUR/USD TC Trend+Carry  0,3 %     In-Sample 2005-01-03 2017-12-29       733.9     -26.6   -2.4    -34.9  -0.25     13        30.8     -2.16   179.85
+        EUR/USD TC Trend+Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19       996.0      -0.4   -0.0    -21.0   0.02     10        40.0     -0.01   172.20
+        EUR/USD TC Trend+Carry   ohne     In-Sample 2005-01-03 2017-12-29       763.1     -23.7   -2.1    -33.7  -0.22     13        30.8     -1.86   179.85
+        EUR/USD TC Trend+Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,026.4       2.6    0.3    -19.3   0.08     10        50.0      0.29   172.20
+        USD/JPY    T Trend 12M  0,3 %     In-Sample 1997-12-01 2017-12-29     1,667.2      66.7    2.6    -28.9   0.27     22        45.5      2.89   341.68
+        USD/JPY    T Trend 12M  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,413.8      41.4    4.0    -19.0   0.48     11        36.4      3.94   275.73
+        USD/JPY    T Trend 12M   ohne     In-Sample 1997-12-01 2017-12-29     1,778.3      77.8    2.9    -28.7   0.30     22        50.0      3.20   341.68
+        USD/JPY    T Trend 12M   ohne Out-of-Sample 2018-01-01 2026-11-19     1,463.5      46.4    4.4    -18.3   0.53     11        45.5      4.25   275.73
+        USD/JPY        C Carry  0,3 %     In-Sample 1997-12-01 2017-12-29     1,277.2      27.7    1.2    -36.2   0.16      1       100.0    127.43 10550.00
+        USD/JPY        C Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,783.7      78.4    6.7    -14.0   0.78      0                               
+        USD/JPY        C Carry   ohne     In-Sample 1997-12-01 2017-12-29     1,279.1      27.9    1.2    -36.2   0.16      1       100.0    128.11 10550.00
+        USD/JPY        C Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,786.4      78.6    6.8    -14.0   0.78      0                               
+        USD/JPY TC Trend+Carry  0,3 %     In-Sample 1997-12-01 2017-12-29     1,586.3      58.6    2.3    -21.4   0.35     11        54.5      5.14   309.36
+        USD/JPY TC Trend+Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,606.9      60.7    5.5    -14.0   0.78      6        50.0      9.30   343.00
+        USD/JPY TC Trend+Carry   ohne     In-Sample 1997-12-01 2017-12-29     1,639.5      64.0    2.5    -21.4   0.38     11        54.5      5.46   309.36
+        USD/JPY TC Trend+Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,636.1      63.6    5.7    -14.0   0.81      6        66.7      9.63   343.00
+        AUD/NZD    T Trend 12M  0,3 %     In-Sample 2005-01-03 2017-12-29       868.6     -13.1   -1.1    -23.1  -0.09     28        35.7     -0.58   171.64
+        AUD/NZD    T Trend 12M  0,3 % Out-of-Sample 2018-01-01 2026-11-19       843.0     -15.7   -1.9    -24.9  -0.35     22        18.2     -0.58   143.45
+        AUD/NZD    T Trend 12M   ohne     In-Sample 2005-01-03 2017-12-29       943.4      -5.7   -0.4    -21.8  -0.01     28        42.9     -0.28   171.64
+        AUD/NZD    T Trend 12M   ohne Out-of-Sample 2018-01-01 2026-11-19       901.9      -9.8   -1.2    -21.1  -0.21     22        27.3     -0.28   143.45
+        AUD/NZD        C Carry  0,3 %     In-Sample 2005-01-03 2017-12-29       887.0     -11.3   -0.9    -18.8  -0.07      5        60.0     -1.57  1004.00
+        AUD/NZD        C Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,152.0      15.2    1.6     -9.4   0.36      4        50.0      2.95   598.75
+        AUD/NZD        C Carry   ohne     In-Sample 2005-01-03 2017-12-29       899.1     -10.1   -0.8    -18.5  -0.06      5        60.0     -1.28  1004.00
+        AUD/NZD        C Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,167.7      16.8    1.8     -9.3   0.39      4        50.0      3.26   598.75
+        AUD/NZD TC Trend+Carry  0,3 %     In-Sample 2005-01-03 2017-12-29       867.8     -13.2   -1.1    -21.0  -0.18     16        37.5     -0.86   139.88
+        AUD/NZD TC Trend+Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,002.0       0.2    0.0    -13.4   0.02     14        28.6      0.07   127.21
+        AUD/NZD TC Trend+Carry   ohne     In-Sample 2005-01-03 2017-12-29       910.5      -9.0   -0.7    -19.3  -0.11     16        43.8     -0.56   139.88
+        AUD/NZD TC Trend+Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,045.0       4.5    0.5    -11.3   0.15     14        35.7      0.38   127.21
+        AUD/CAD    T Trend 12M  0,3 %     In-Sample 2005-01-03 2017-12-29       497.7     -50.2   -5.2    -54.6  -0.44     32        21.9     -2.00   149.25
+        AUD/CAD    T Trend 12M  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,003.9       0.4    0.0    -22.5   0.04     12        33.3     -0.03   265.50
+        AUD/CAD    T Trend 12M   ohne     In-Sample 2005-01-03 2017-12-29       547.0     -45.3   -4.5    -50.6  -0.38     32        25.0     -1.70   149.25
+        AUD/CAD    T Trend 12M   ohne Out-of-Sample 2018-01-01 2026-11-19     1,042.3       4.2    0.5    -19.9   0.10     12        33.3      0.27   265.50
+        AUD/CAD        C Carry  0,3 %     In-Sample 2005-01-03 2017-12-29     1,373.2      37.3    2.5    -22.4   0.28      1       100.0     35.31  4929.00
+        AUD/CAD        C Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,129.0      12.9    1.4    -16.5   0.23      3       100.0      4.70   899.00
+        AUD/CAD        C Carry   ohne     In-Sample 2005-01-03 2017-12-29     1,375.3      37.5    2.5    -22.4   0.28      1       100.0     35.72  4929.00
+        AUD/CAD        C Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,140.9      14.1    1.5    -16.2   0.25      3       100.0      5.01   899.00
+        AUD/CAD TC Trend+Carry  0,3 %     In-Sample 2005-01-03 2017-12-29       868.1     -13.2   -1.1    -20.3  -0.14     16        31.2     -0.65   156.31
+        AUD/CAD TC Trend+Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,078.6       7.9    0.9    -15.7   0.17      7        42.9      0.97   298.57
+        AUD/CAD TC Trend+Carry   ohne     In-Sample 2005-01-03 2017-12-29       909.5      -9.1   -0.7    -17.9  -0.08     16        37.5     -0.36   156.31
+        AUD/CAD TC Trend+Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,103.1      10.3    1.1    -14.7   0.21      7        42.9      1.27   298.57
+        NZD/CAD    T Trend 12M  0,3 %     In-Sample 2005-01-03 2017-12-29       524.5     -47.5   -4.8    -51.3  -0.40     27        14.8     -2.30   187.07
+        NZD/CAD    T Trend 12M  0,3 % Out-of-Sample 2018-01-01 2026-11-19       813.4     -18.7   -2.3    -24.3  -0.26     20        30.0     -0.85   145.55
+        NZD/CAD    T Trend 12M   ohne     In-Sample 2005-01-03 2017-12-29       568.0     -43.2   -4.3    -48.8  -0.35     27        18.5     -2.00   187.07
+        NZD/CAD    T Trend 12M   ohne Out-of-Sample 2018-01-01 2026-11-19       865.1     -13.5   -1.6    -19.7  -0.17     20        35.0     -0.55   145.55
+        NZD/CAD        C Carry  0,3 %     In-Sample 2005-01-03 2017-12-29     1,388.9      38.9    2.6    -24.0   0.29      1       100.0     34.32  5021.00
+        NZD/CAD        C Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19       801.4     -19.9   -2.5    -25.4  -0.36      8        37.5     -2.22   230.25
+        NZD/CAD        C Carry   ohne     In-Sample 2005-01-03 2017-12-29     1,390.9      39.1    2.6    -24.0   0.29      1       100.0     34.73  5021.00
+        NZD/CAD        C Carry   ohne Out-of-Sample 2018-01-01 2026-11-19       822.2     -17.8   -2.2    -23.6  -0.31      8        37.5     -1.92   230.25
+        NZD/CAD TC Trend+Carry  0,3 %     In-Sample 2005-01-03 2017-12-29       888.8     -11.1   -0.9    -25.9  -0.08     13        23.1     -0.63   206.31
+        NZD/CAD TC Trend+Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19       920.2      -8.0   -0.9    -16.2  -0.18      8        37.5     -0.98   110.88
+        NZD/CAD TC Trend+Carry   ohne     In-Sample 2005-01-03 2017-12-29       924.1      -7.6   -0.6    -25.1  -0.04     13        30.8     -0.33   206.31
+        NZD/CAD TC Trend+Carry   ohne Out-of-Sample 2018-01-01 2026-11-19       942.6      -5.7   -0.7    -14.9  -0.12      8        37.5     -0.68   110.88
+Portfolio 5x20%    T Trend 12M  0,3 %     In-Sample 2005-01-04 2017-12-29       778.9     -22.1   -1.9    -26.2  -0.31                                      
+Portfolio 5x20%    T Trend 12M  0,3 % Out-of-Sample 2018-01-01 2026-11-19       973.6      -2.6   -0.3    -13.6  -0.05                                      
+Portfolio 5x20%    T Trend 12M   ohne     In-Sample 2005-01-04 2017-12-29       839.0     -16.1   -1.3    -23.1  -0.21                                      
+Portfolio 5x20%    T Trend 12M   ohne Out-of-Sample 2018-01-01 2026-11-19     1,025.4       2.5    0.3    -11.7   0.09                                      
+Portfolio 5x20%        C Carry  0,3 %     In-Sample 2005-01-04 2017-12-29     1,199.7      20.0    1.4    -15.5   0.28                                      
+Portfolio 5x20%        C Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,183.1      18.3    1.9     -7.7   0.53                                      
+Portfolio 5x20%        C Carry   ohne     In-Sample 2005-01-04 2017-12-29     1,205.5      20.6    1.5    -15.4   0.29                                      
+Portfolio 5x20%        C Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,195.6      19.6    2.0     -7.6   0.56                                      
+Portfolio 5x20% TC Trend+Carry  0,3 %     In-Sample 2005-01-04 2017-12-29       971.9      -2.8   -0.2    -12.6  -0.04                                      
+Portfolio 5x20% TC Trend+Carry  0,3 % Out-of-Sample 2018-01-01 2026-11-19     1,105.9      10.6    1.1     -8.9   0.38                                      
+Portfolio 5x20% TC Trend+Carry   ohne     In-Sample 2005-01-04 2017-12-29     1,010.3       1.0    0.1    -11.5   0.04                                      
+Portfolio 5x20% TC Trend+Carry   ohne Out-of-Sample 2018-01-01 2026-11-19     1,136.5      13.6    1.5     -8.2   0.48                                      
