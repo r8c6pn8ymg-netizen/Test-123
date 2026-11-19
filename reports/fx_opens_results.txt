@@ -1,0 +1,64 @@
+FX-Opens-Backtest  |  Kosten 0.30 % je Trade (Round-Trip)  |  Split 2018-01-01
+* Endkapital: Wert, auf den 1.000 im jeweiligen Zeitraum angewachsen wären.
+
+   Paar            Strategie Kosten      Zeitraum      Start       Ende Endkapital* Rendite % p.a. % Max DD % Sharpe  Trades Trefferq. % Ø Trade % Ø Tage
+EUR/USD       V1 Weekly-Bias  0,3 %     In-Sample 2003-12-01 2017-12-29        14.7     -98.5  -25.9    -98.6  -2.27    1143        26.6     -0.36   4.45
+EUR/USD       V1 Weekly-Bias  0,3 % Out-of-Sample 2018-01-01 2026-11-19       109.8     -89.0  -22.0    -89.2  -3.03     732        27.9     -0.30   4.14
+EUR/USD       V1 Weekly-Bias   ohne     In-Sample 2003-12-01 2017-12-29       454.2     -54.6   -5.5    -62.7  -0.42    1143        34.4     -0.06   4.45
+EUR/USD       V1 Weekly-Bias   ohne Out-of-Sample 2018-01-01 2026-11-19       989.0      -1.1   -0.1    -22.4   0.02     732        38.8      0.00   4.14
+EUR/USD    V2 Weekly+Monthly  0,3 %     In-Sample 2003-12-01 2017-12-29        41.5     -95.8  -20.2    -96.0  -2.07     820        26.7     -0.38   4.11
+EUR/USD    V2 Weekly+Monthly  0,3 % Out-of-Sample 2018-01-01 2026-11-19       225.1     -77.5  -15.5    -77.7  -2.56     519        27.7     -0.28   4.07
+EUR/USD    V2 Weekly+Monthly   ohne     In-Sample 2003-12-01 2017-12-29       485.7     -51.4   -5.0    -58.4  -0.47     820        35.4     -0.08   4.11
+EUR/USD    V2 Weekly+Monthly   ohne Out-of-Sample 2018-01-01 2026-11-19     1,069.3       6.9    0.8    -12.1   0.16     519        39.7      0.02   4.07
+EUR/USD V3 Mittwoch->Freitag  0,3 %     In-Sample 2003-12-01 2017-12-29       102.7     -89.7  -14.9    -90.1  -2.12     729        37.2     -0.31   2.00
+EUR/USD V3 Mittwoch->Freitag  0,3 % Out-of-Sample 2018-01-01 2026-11-19       250.1     -75.0  -14.4    -75.0  -3.04     461        27.5     -0.30   2.00
+EUR/USD V3 Mittwoch->Freitag   ohne     In-Sample 2003-12-01 2017-12-29       916.1      -8.4   -0.6    -30.2  -0.05     729        52.0     -0.01   2.00
+EUR/USD V3 Mittwoch->Freitag   ohne Out-of-Sample 2018-01-01 2026-11-19       998.2      -0.2   -0.0    -19.6   0.02     461        49.9      0.00   2.00
+USD/JPY       V1 Weekly-Bias  0,3 %     In-Sample 1996-10-30 2017-12-29        13.9     -98.6  -18.3    -98.7  -1.50    1559        29.7     -0.27   4.93
+USD/JPY       V1 Weekly-Bias  0,3 % Out-of-Sample 2018-01-01 2026-11-19        71.0     -92.9  -25.8    -92.9  -3.03     756        25.7     -0.34   4.04
+USD/JPY       V1 Weekly-Bias   ohne     In-Sample 1996-10-30 2017-12-29     1,492.3      49.2    1.9    -47.8   0.22    1559        36.8      0.03   4.93
+USD/JPY       V1 Weekly-Bias   ohne Out-of-Sample 2018-01-01 2026-11-19       687.7     -31.2   -4.1    -42.6  -0.45     756        35.8     -0.05   4.04
+USD/JPY    V2 Weekly+Monthly  0,3 %     In-Sample 1996-10-30 2017-12-29        38.8     -96.1  -14.2    -96.2  -1.41    1118        28.7     -0.28   4.58
+USD/JPY    V2 Weekly+Monthly  0,3 % Out-of-Sample 2018-01-01 2026-11-19       158.0     -84.2  -18.8    -84.3  -2.74     547        25.4     -0.33   3.79
+USD/JPY    V2 Weekly+Monthly   ohne     In-Sample 1996-10-30 2017-12-29     1,111.9      11.2    0.5    -43.5   0.10    1118        36.9      0.02   4.58
+USD/JPY    V2 Weekly+Monthly   ohne Out-of-Sample 2018-01-01 2026-11-19       815.1     -18.5   -2.3    -23.5  -0.31     547        36.0     -0.03   3.79
+USD/JPY V3 Mittwoch->Freitag  0,3 %     In-Sample 1996-10-30 2017-12-29        64.0     -93.6  -12.2    -93.6  -1.68    1093        37.7     -0.25   2.00
+USD/JPY V3 Mittwoch->Freitag  0,3 % Out-of-Sample 2018-01-01 2026-11-19       238.8     -76.1  -14.9    -76.5  -2.66     462        32.5     -0.31   2.00
+USD/JPY V3 Mittwoch->Freitag   ohne     In-Sample 1996-10-30 2017-12-29     1,699.9      70.0    2.5    -21.1   0.37    1093        54.4      0.05   2.00
+USD/JPY V3 Mittwoch->Freitag   ohne Out-of-Sample 2018-01-01 2026-11-19       956.0      -4.4   -0.5    -16.8  -0.06     462        48.7     -0.01   2.00
+AUD/NZD       V1 Weekly-Bias  0,3 %     In-Sample 2003-12-01 2017-12-29        46.4     -95.4  -19.6    -95.4  -2.25    1073        26.4     -0.28   4.77
+AUD/NZD       V1 Weekly-Bias  0,3 % Out-of-Sample 2018-01-01 2026-11-19       102.8     -89.7  -22.6    -89.9  -4.11     739        22.1     -0.31   4.15
+AUD/NZD       V1 Weekly-Bias   ohne     In-Sample 2003-12-01 2017-12-29     1,160.4      16.0    1.1    -17.6   0.17    1073        35.7      0.02   4.77
+AUD/NZD       V1 Weekly-Bias   ohne Out-of-Sample 2018-01-01 2026-11-19       945.6      -5.4   -0.6    -21.0  -0.10     739        39.1     -0.01   4.15
+AUD/NZD    V2 Weekly+Monthly  0,3 %     In-Sample 2003-12-01 2017-12-29       138.1     -86.2  -13.1    -86.4  -1.80     754        28.6     -0.26   4.66
+AUD/NZD    V2 Weekly+Monthly  0,3 % Out-of-Sample 2018-01-01 2026-11-19       211.7     -78.8  -16.0    -79.3  -3.77     519        21.2     -0.30   4.06
+AUD/NZD    V2 Weekly+Monthly   ohne     In-Sample 2003-12-01 2017-12-29     1,324.7      32.5    2.0    -13.0   0.32     754        38.7      0.04   4.66
+AUD/NZD    V2 Weekly+Monthly   ohne Out-of-Sample 2018-01-01 2026-11-19     1,005.7       0.6    0.1    -14.9   0.04     519        42.6      0.00   4.06
+AUD/NZD V3 Mittwoch->Freitag  0,3 %     In-Sample 2003-12-01 2017-12-29       115.4     -88.5  -14.2    -88.5  -2.83     733        32.3     -0.29   2.00
+AUD/NZD V3 Mittwoch->Freitag  0,3 % Out-of-Sample 2018-01-01 2026-11-19       229.6     -77.0  -15.3    -77.4  -4.47     462        23.6     -0.32   2.00
+AUD/NZD V3 Mittwoch->Freitag   ohne     In-Sample 2003-12-01 2017-12-29     1,042.4       4.2    0.3    -14.4   0.08     733        49.4      0.01   2.00
+AUD/NZD V3 Mittwoch->Freitag   ohne Out-of-Sample 2018-01-01 2026-11-19       918.9      -8.1   -0.9    -12.9  -0.26     462        50.0     -0.02   2.00
+AUD/CAD       V1 Weekly-Bias  0,3 %     In-Sample 2003-12-01 2017-12-29        19.1     -98.1  -24.5    -98.1  -2.28    1097        25.9     -0.36   4.65
+AUD/CAD       V1 Weekly-Bias  0,3 % Out-of-Sample 2018-01-01 2026-11-19        74.0     -92.6  -25.4    -92.7  -3.50     765        25.6     -0.34   4.00
+AUD/CAD       V1 Weekly-Bias   ohne     In-Sample 2003-12-01 2017-12-29       513.6     -48.6   -4.6    -57.4  -0.38    1097        33.4     -0.06   4.65
+AUD/CAD       V1 Weekly-Bias   ohne Out-of-Sample 2018-01-01 2026-11-19       736.5     -26.4   -3.4    -31.0  -0.45     765        35.6     -0.04   4.00
+AUD/CAD    V2 Weekly+Monthly  0,3 %     In-Sample 2003-12-01 2017-12-29        66.8     -93.3  -17.5    -93.6  -1.86     803        25.8     -0.33   4.42
+AUD/CAD    V2 Weekly+Monthly  0,3 % Out-of-Sample 2018-01-01 2026-11-19       132.7     -86.7  -20.3    -86.9  -3.50     558        24.2     -0.36   3.67
+AUD/CAD    V2 Weekly+Monthly   ohne     In-Sample 2003-12-01 2017-12-29       743.1     -25.7   -2.1    -36.0  -0.18     803        34.5     -0.03   4.42
+AUD/CAD    V2 Weekly+Monthly   ohne Out-of-Sample 2018-01-01 2026-11-19       707.7     -29.2   -3.8    -30.9  -0.65     558        34.9     -0.06   3.67
+AUD/CAD V3 Mittwoch->Freitag  0,3 %     In-Sample 2003-12-01 2017-12-29        81.6     -91.8  -16.3    -91.9  -2.65     733        30.3     -0.34   2.00
+AUD/CAD V3 Mittwoch->Freitag  0,3 % Out-of-Sample 2018-01-01 2026-11-19       195.5     -80.4  -16.8    -80.6  -3.80     462        27.5     -0.35   2.00
+AUD/CAD V3 Mittwoch->Freitag   ohne     In-Sample 2003-12-01 2017-12-29       736.7     -26.3   -2.1    -29.9  -0.30     733        49.4     -0.04   2.00
+AUD/CAD V3 Mittwoch->Freitag   ohne Out-of-Sample 2018-01-01 2026-11-19       782.6     -21.7   -2.7    -25.6  -0.57     462        44.6     -0.05   2.00
+NZD/CAD       V1 Weekly-Bias  0,3 %     In-Sample 2003-12-01 2017-12-29        32.4     -96.8  -21.6    -96.8  -1.93    1063        28.0     -0.32   4.77
+NZD/CAD       V1 Weekly-Bias  0,3 % Out-of-Sample 2018-01-01 2026-11-19        89.1     -91.1  -23.8    -91.1  -2.95     760        26.7     -0.31   4.25
+NZD/CAD       V1 Weekly-Bias   ohne     In-Sample 2003-12-01 2017-12-29       786.4     -21.4   -1.7    -41.2  -0.10    1063        35.7     -0.02   4.77
+NZD/CAD       V1 Weekly-Bias   ohne Out-of-Sample 2018-01-01 2026-11-19       872.6     -12.7   -1.5    -22.9  -0.16     760        35.7     -0.01   4.25
+NZD/CAD    V2 Weekly+Monthly  0,3 %     In-Sample 2003-12-01 2017-12-29       119.5     -88.1  -14.0    -88.8  -1.47     738        29.5     -0.28   4.79
+NZD/CAD    V2 Weekly+Monthly  0,3 % Out-of-Sample 2018-01-01 2026-11-19       152.4     -84.8  -19.1    -84.8  -2.92     542        25.5     -0.34   4.01
+NZD/CAD    V2 Weekly+Monthly   ohne     In-Sample 2003-12-01 2017-12-29     1,093.6       9.4    0.6    -28.6   0.11     738        38.5      0.02   4.79
+NZD/CAD    V2 Weekly+Monthly   ohne Out-of-Sample 2018-01-01 2026-11-19       775.6     -22.4   -2.8    -30.0  -0.42     542        34.7     -0.04   4.01
+NZD/CAD V3 Mittwoch->Freitag  0,3 %     In-Sample 2003-12-01 2017-12-29        92.7     -90.7  -15.5    -90.8  -2.32     731        35.6     -0.32   2.00
+NZD/CAD V3 Mittwoch->Freitag  0,3 % Out-of-Sample 2018-01-01 2026-11-19       210.0     -79.0  -16.1    -79.1  -3.27     462        28.8     -0.33   2.00
+NZD/CAD V3 Mittwoch->Freitag   ohne     In-Sample 2003-12-01 2017-12-29       832.5     -16.8   -1.3    -27.5  -0.15     731        50.8     -0.02   2.00
+NZD/CAD V3 Mittwoch->Freitag   ohne Out-of-Sample 2018-01-01 2026-11-19       840.6     -15.9   -1.9    -20.6  -0.35     462        48.1     -0.04   2.00
