@@ -516,6 +516,14 @@ def main(refresh: bool = True):
     except Exception as e:  # darf das Makro-Cockpit nicht blockieren
         failed.append("Faktor-Portfolio")
         print(f"  ! Faktor-Portfolio fehlgeschlagen (factors.json ist NICHT aktualisiert): {e}", file=sys.stderr)
+    # 52-Wochen-Hoch/-Tief (vorab registrierter Test, research/hoch_tief_52w.py): Stand heute + Historie
+    try:
+        sys.path.insert(0, str(Path(__file__).parent / "research"))
+        import hoch_tief_52w
+        hoch_tief_52w.main()
+    except Exception as e:
+        failed.append("52-Wochen")
+        print(f"  ! 52-Wochen-Auswertung fehlgeschlagen (research_52w.json ist NICHT aktualisiert): {e}", file=sys.stderr)
     # Termine der Woche (US-Daten aus dem FRED-Kalender, Zinsentscheide der 8 Notenbanken)
     try:
         import termine

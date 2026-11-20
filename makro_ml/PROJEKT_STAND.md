@@ -16,6 +16,7 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `factors.py` | Faktor-Portfolio Carry/Value/Momentum seit 1977, alle 7 Faktor-Auswahlen, Robustheit |
 | `consensus.py` | Konsens-Test (Makro + Faktor + CFTC, gegen USD und relativ) – nur Forschung, nicht im Cockpit |
 | `research/trend_volcarry.py` | Trendfolge + Carry mit Bremse, Test nach `research/VORAB_REGISTRIERUNG_trend_carry.md` – verworfen |
+| `research/hoch_tief_52w.py` | 52-Wochen-Hoch/-Tief nach `research/VORAB_REGISTRIERUNG_52w.md`; läuft täglich in der Pipeline |
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
 | `termine.py` | Termine der Woche: US-Termine von Census, BEA, Fed (G.17) und FRED-Kalender (BLS), offizielle Uhrzeiten, ISM-PMI nach Regel, letzte Werte aus FRED; Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `pruefe_termine.py` | Unabhängige Gegenprüfung: lädt die offiziellen Seiten selbst und vergleicht jeden Notenbank- und US-Termin (Exit-Code 1 bei Abweichung); läuft täglich nach der Pipeline |
@@ -24,7 +25,7 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `../tests/test_makro_ml.py` | Selbsttests (Lecks, Fristen, Euro ab 1999, Kosten, Phantom-Monat) |
 
 Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min., Exit-Code 1 = ein Teil ist fehlgeschlagen und zeigt den alten Stand).
-Danach `cockpit.html` veröffentlichen mit `files` = {`data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`} jeweils aus `output/`.
+Danach `cockpit.html` veröffentlichen mit `files` = {`data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`, `research_52w.json`} jeweils aus `output/`.
 Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pipeline-Lauf, sonst werden sie mangels Cache übersprungen („skipped“ heißt nicht bestanden).
 
 ## Ergebnisse (nach allen Korrekturen)
@@ -54,6 +55,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
 - **Trendfolge & Carry mit Bremse (20.11., vorab registriert, `research/`):** Trendfolge 1977– Sharpe 0,55 (hoch signifikant),
   aber seit 2000 0,21 und Forward-Test 2022+ −0,16 → nach Regel nicht übernommen. Carry mit Volatilitäts-Bremse schlechter als
   Carry (Alpha negativ, Hebel bis 10,7×) → verworfen. Nicht erneut mit anderen Einstellungen versuchen (wäre Überoptimierung).
+- **52-Wochen-Hoch/-Tief (20.11., vorab registriert):** Nach einem 52W-Tief fällt die Währung kurzfristig eher weiter
+  (1 Woche Ø 0,22 %, 56 % statt 50 %; nahe Tief 1 Monat Ø 0,28 %), Holm-korrigiert signifikant, alle Zeiträume gleiche
+  Richtung – aber seit 2015 fast null. Hochs: nichts belegt. Als Hinweis im Faktor-Reiter (`research_52w.json`, täglich).
 - **Wendepunkte:** mit keinem Signal vorhersagbar (Vorhersage 49–52 %). Gute Treffer an Wenden (CFTC, umgedrehtes Momentum) sind Rückblick-Effekte.
   Optimieren auf einen Wendepunkt: 100 % dort, 51 % anderswo → Überoptimierung.
 

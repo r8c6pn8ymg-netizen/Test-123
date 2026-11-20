@@ -9,6 +9,6 @@ python3 pipeline.py --cache  # dasselbe ohne Neudownload
 python3 termine.py           # nur die Termine neu
 ```
 
-Ergebnis in `output/`: `data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`.
-`cockpit.html` ist die Oberfläche und wird als Claude-Artifact veröffentlicht. Die vier JSON-Dateien
+Ergebnis in `output/`: `data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`, `research_52w.json`.
+`cockpit.html` ist die Oberfläche und wird als Claude-Artifact veröffentlicht. Die fünf JSON-Dateien
 liegen dort unter genau diesen Namen neben der Seite (`files`: `data_fred.json` → `output/data_fred.json` usw.).

@@ -384,6 +384,14 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <div class="note" style="max-width:none"><b>Carry</b> = Leitzins minus US-Leitzins. <b>Value</b> = Abweichung des realen effektiven Wechselkurses vom 10-Jahres-Schnitt (negativ = billig, wegen Veröffentlichung 2 Monate alt). <b>Momentum</b> = Kursentwicklung gegen USD. Die Zahl in Klammern ist der Faktor-Score: positiv heißt kaufen, negativ verkaufen. <b>L/S je Faktor</b> zeigt, ob die Währung bei diesem Faktor unter den 3 stärksten (Long) oder 3 schwächsten (Short) ist. <b>Hist.</b> = wo der heutige Wert im Vergleich zur eigenen Historie seit 1977 liegt (100 = höchster Wert je, beim USD für Carry und Momentum nicht sinnvoll). Leitzinsen sind tagesaktuell (BIS), das Datum in Klammern zeigt den Stand. Die Rangliste nutzt die aktuellsten Kurse, das Portfolio wird jeweils zum Monatsende umgeschichtet.</div></div>
     </section>
 
+    <section class="panel" id="w52Panel" hidden>
+      <div class="ph"><span>52-Wochen-Hoch und -Tief · Hinweis</span><span class="eyebrow" id="w52Stamp"></span></div>
+      <div class="pb">
+        <div class="scroll-x"><table class="rc" id="w52"></table></div>
+        <div class="note" style="max-width:none;display:grid;gap:6px" id="w52Note"></div>
+      </div>
+    </section>
+
     <section class="panel">
       <div class="ph"><span>Rang-Verlauf · letzte 24 Monate</span><span class="eyebrow">1 = stärkste, 8 = schwächste</span></div>
       <div class="pb"><div class="scroll-x"><table class="rc" id="fHist"></table></div></div>
@@ -636,6 +644,32 @@ window.renderFactors = async function () {
   $('#fSel').addEventListener('click', e => { if (e.target.id === 'fSelStd') { fsel = 'CVM'; drawFactorSel(); } });
 
   drawFactorSel();
+
+  // 52-Wochen-Hoch/-Tief (vorab registrierter Test, nur belegte Effekte als Hinweis)
+  try {
+    const W = await (await fetch('research_52w.json', { cache: 'no-store' })).json();
+    const R = W.results, NAME = { new_low: 'neues 52W-Tief', near_low: 'nahe 52W-Tief (≤ 2 %)', new_high: 'neues 52W-Hoch', near_high: 'nahe 52W-Hoch (≤ 2 %)' };
+    const HOR = { 5: '1 Woche', 20: '1 Monat', 65: '3 Monaten' };
+    const passed = Object.entries(R).filter(([, r]) => r.pass).map(([k]) => k);
+    const status = v => v.to_low < 0 ? 'new_low' : v.to_high > 0 ? 'new_high' : v.to_low <= 2 ? 'near_low' : v.to_high >= -2 ? 'near_high' : null;
+    const hint = st => {
+      if (!st) return '<span class="dim">weder nahe Hoch noch nahe Tief</span>';
+      const k = passed.find(x => x.startsWith(st + '_'));
+      if (!k) return `<span class="dim">${NAME[st]}: kein belegter Effekt</span>`;
+      const r = R[k], h = k.split('_').pop(), dn = st.includes('low');
+      return `<b>${NAME[st]}</b>: danach historisch eher ${dn ? 'weiter gefallen' : 'weiter gestiegen'} (in ${HOR[h]} Ø ${fmt(Math.abs(r.mean), 2)} %, in ${fmt(r.hit, 0)} % der Fälle statt normal ${fmt(r.base, 0)} %). Seit 2015 nur noch Ø ${fmt(Math.abs(r.periods['2015–heute']), 2)} %.`;
+    };
+    let h = '<thead><tr><th>Währung</th><th>Abstand Hoch</th><th>Abstand Tief</th><th style="text-align:left">Status und belegter Effekt</th></tr></thead><tbody>';
+    for (const c of ['EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'JPY']) {
+      const v = W.now[c]; if (!v) continue;
+      h += `<tr><td><b>${c}</b></td><td>${sgn(v.to_high, 1)} %</td><td>${sgn(v.to_low, 1)} %</td><td style="text-align:left;white-space:normal;font-family:var(--sans)">${hint(status(v))}</td></tr>`;
+    }
+    $('#w52').innerHTML = h + '</tbody>';
+    $('#w52Stamp').textContent = W.now.EUR ? `Kurse bis ${W.now.EUR.date.split('-').reverse().join('.')}` : '';
+    $('#w52Note').innerHTML = `<div>Kurs der Währung in US-Dollar. <b>Tief</b> heißt: Die Währung ist so schwach gegen den Dollar wie seit einem Jahr nicht. Abstand = wie weit der letzte Kurs vom Hoch bzw. Tief der 52 Wochen davor entfernt ist (negativ beim Tief = darunter, also neues Tief).</div>
+      <div><b>So getestet:</b> Regeln vorab festgelegt, alle 7 Währungen seit 1971, rund 570 bis 1.360 Ereignisse je Test, 12 Tests mit Mehrfachtest-Korrektur, Placebo und Timing-Kontrolle. Belegt ist nur: <b>Nach einem 52-Wochen-Tief fällt die Währung kurzfristig eher weiter</b>, sie dreht nicht nach oben. Für 52-Wochen-Hochs gibt es keinen belegten Effekt. Der Effekt ist klein und seit 2015 fast verschwunden, deshalb nur ein Hinweis, kein Signal.</div>`;
+    $('#w52Panel').hidden = false;
+  } catch (e) { console.warn('52-Wochen-Daten nicht geladen', e); }
 
   // Rang-Verlauf
   const HR = F.hist_rank;

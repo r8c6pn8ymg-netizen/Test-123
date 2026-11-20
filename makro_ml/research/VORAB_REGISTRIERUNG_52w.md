@@ -39,4 +39,29 @@ Ein Ergebnis kommt als **Hinweis ins Cockpit**, wenn:
 Sonst: als „getestet“ dokumentiert, nicht im Cockpit.
 
 ## Protokoll nach Sichtung der Ergebnisse
-(wird nach dem Lauf ergänzt)
+Lauf am 20.11.2026, Regeln unverändert. Einzige Änderung am Code vor dem Lauf: eine überflüssige, sofort
+überschriebene Zeile in der p-Wert-Funktion entfernt (keine Auswirkung). Über-Bewegung in % in Ereignis-Richtung
+(positiv = Weiterlauf):
+
+| Test | n | Ø % | Treffer / normal | p (Holm) | 1971–99 / 2000–14 / 2015– | Währungen gleich | Regel |
+|---|---|---|---|---|---|---|---|
+| new_high_5 | 579 | +0.116 | 52.2 % / 49.8 % | 0.808 | +0.201 / +0.158 / -0.233 | 4/7 | nein |
+| new_high_20 | 579 | +0.220 | 52.2 % / 50.0 % | 0.808 | +0.437 / +0.301 / -0.617 | 5/7 | nein |
+| new_high_65 | 579 | +0.324 | 53.5 % / 50.6 % | 0.839 | +0.835 / +0.438 / -1.470 | 5/7 | nein |
+| new_low_5 | 571 | +0.222 | 56.4 % / 50.3 % | 0.024 | +0.230 / +0.390 / +0.059 | 6/7 | **ja** |
+| new_low_20 | 571 | +0.428 | 56.4 % / 50.2 % | 0.075 | +0.657 / +0.532 / -0.099 | 7/7 | nein |
+| new_low_65 | 567 | +0.666 | 56.3 % / 50.0 % | 0.808 | +0.843 / +1.351 / -0.296 | 6/7 | nein |
+| near_high_5 | 1363 | +0.028 | 50.8 % / 49.8 % | 0.839 | +0.057 / +0.069 / -0.109 | 4/7 | nein |
+| near_high_20 | 1363 | +0.222 | 52.3 % / 49.9 % | 0.4275 | +0.434 / +0.229 / -0.314 | 7/7 | nein |
+| near_high_65 | 1358 | +0.412 | 52.5 % / 50.3 % | 0.808 | +0.842 / +0.457 / -0.744 | 6/7 | nein |
+| near_low_5 | 1281 | +0.059 | 51.8 % / 50.3 % | 0.808 | +0.103 / +0.042 / -0.007 | 5/7 | nein |
+| near_low_20 | 1279 | +0.278 | 55.1 % / 50.2 % | 0.0385 | +0.517 / +0.077 / +0.003 | 7/7 | **ja** |
+| near_low_65 | 1271 | +0.580 | 55.5 % / 50.2 % | 0.808 | +0.956 / +0.541 / -0.093 | 6/7 | nein |
+
+**Entscheidung nach Regel:** `new_low_5` und `near_low_20` bestehen → als **Hinweis** ins Cockpit (Faktor-Reiter).
+Ehrlich: `near_low_20` besteht nur formal (2015– Ø +0,003 %, praktisch null); `new_low_5` 2015– nur +0,06 %.
+Für 52-Wochen-Hochs nichts belegt.
+
+**Selbstprüfung:** Placebo (zufällige Tage) -0.069 %. Timing-Kontrolle mit absichtlichem Zukunftsblick:
+Scheineffekt -3.79 % / -4.01 % (würde also sofort auffallen).
+Unabhängige Nachrechnung (eigene Schleife): new_low_5 +0,222 % (n 571), near_low_20 +0,278 % (n 1.279) – identisch.

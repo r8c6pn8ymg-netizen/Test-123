@@ -309,3 +309,20 @@ def test_faktor_gleichstand_wird_geteilt():
     # Spaltenreihenfolge darf nichts mehr aendern
     w2 = factors.ls_weights(sc[sc.columns[::-1]]).iloc[0]
     assert (w2.reindex(w.index) - w).abs().max() < 1e-12
+
+
+def test_52w_kein_blick_in_die_zukunft_und_abstand():
+    """52-Wochen-Ereignisse nutzen nur die 260 Tage davor; Haeufungen werden auf 20 Handelstage Abstand reduziert."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml" / "research"))
+    import hoch_tief_52w as W
+    idx = pd.bdate_range("2000-01-03", periods=400)
+    s = pd.Series(np.r_[np.linspace(1.0, 1.1, 300), np.linspace(1.1, 0.9, 100)], index=idx)
+    ev = W.events(s)
+    # Steigender Kurs: ab Tag 260 jeden Tag neues Hoch, gezaehlt nur alle 20 Tage
+    nh = ev["new_high"]
+    assert len(nh) > 0 and all((b - a).days >= 20 for a, b in zip(nh[:-1], nh[1:]))
+    assert nh[0] >= idx[260]                       # vorher keine 260 Tage Historie
+    # Zukunftswerte duerfen ein Ereignis nicht veraendern
+    s2 = s.copy(); s2.iloc[-50:] = 5.0
+    cut = idx[340]
+    assert list(W.events(s)["new_high"][W.events(s)["new_high"] <= cut]) == list(W.events(s2)["new_high"][W.events(s2)["new_high"] <= cut])
