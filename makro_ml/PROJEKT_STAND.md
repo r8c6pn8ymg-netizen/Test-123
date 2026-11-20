@@ -17,6 +17,7 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `consensus.py` | Konsens-Test (Makro + Faktor + CFTC, gegen USD und relativ) – nur Forschung, nicht im Cockpit |
 | `research/trend_volcarry.py` | Trendfolge + Carry mit Bremse, Test nach `research/VORAB_REGISTRIERUNG_trend_carry.md` – verworfen |
 | `research/hoch_tief_52w.py` | 52-Wochen-Hoch/-Tief nach `research/VORAB_REGISTRIERUNG_52w.md`; läuft täglich in der Pipeline |
+| `research/nachbau_stichprobe.py` | Unabhängiger Nachbau einer Stichprobe angezeigter Makro-Modelle (Vergleich DA und Roh-Ausgabe) |
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
 | `termine.py` | Termine der Woche: US-Termine von Census, BEA, Fed (G.17) und FRED-Kalender (BLS), offizielle Uhrzeiten, ISM-PMI nach Regel, letzte Werte aus FRED; Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `pruefe_termine.py` | Unabhängige Gegenprüfung: lädt die offiziellen Seiten selbst und vergleicht jeden Notenbank- und US-Termin (Exit-Code 1 bei Abweichung); läuft täglich nach der Pipeline |
@@ -51,6 +52,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Kern-PCE (Ø DA 51,5 %, ähnlich gut wie Kern-CPI und weitgehend dieselbe Information), realer Einzelhandel und Erzeugerpreise
   (≈ 49 %, kein Vorteil, werden vom Filter fast nie ausgewählt). Gesamtbild unverändert, nach FDR weiterhin kein Einzelmodell.
   PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
+- **Unabhängiger Nachbau Makro ML (20.11., `research/nachbau_stichprobe.py`):** 24 angezeigte Modelle (je Währung 3, FRED,
+  US-Reihen + CPI-Diff, Horizonte 30–240 Tage) mit eigenem Code und scikit-learn nachgebaut: Trefferquote und heutige
+  Roh-Ausgabe bei allen 24 identisch. Nicht nachgebaut: ALFRED-Variante, Profi-Faktoren (CFTC, REER, Momentum), übrige Länder-Differenzen.
 - **Gesamtprüfung 20.11.:** Unabhängige Nachrechnung Carry (eigener Code): Sharpe 0,51 vs. Cockpit 0,51, seit 2000 0,32 vs. 0,33; Newey-West mit
   statsmodels t = 3,71 vs. 3,71. Gefunden: Bei gleichen Werten an der Grenze entschied die Spaltenreihenfolge zufällig
   (z. B. Mai 2016 CAD statt GBP vor dem Brexit); jetzt teilen sich gleichauf liegende Währungen den Platz. Behoben: Absturz am Monatsletzten (ALFRED-Datenstand doppelt), laufender Monat zählte im Faktor-Backtest als voller
