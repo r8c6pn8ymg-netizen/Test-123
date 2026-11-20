@@ -197,6 +197,10 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     live_mom = 0.5 * (live_spot / spot.iloc[-4] - 1) + 0.5 * (live_spot / spot.iloc[-13] - 1)
     live_carry = carry.iloc[-1]
     live_value = value.iloc[-1]
+
+    def pct_hist(hist, v):
+        h = hist[hist.index >= "1977-01-01"].dropna()
+        return round(float((h < v).mean() * 100)) if len(h) > 24 and pd.notna(v) else None
     zl = {"carry": zrank(live_carry.to_frame().T).iloc[0], "value": zrank(live_value.to_frame().T).iloc[0],
           "momentum": zrank(live_mom.to_frame().T).iloc[0]}
     zl["kombi"] = (zl["carry"] + zl["value"] + zl["momentum"]) / 3
@@ -207,7 +211,11 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
                             carry=round(float(live_carry[c]), 2), value_gap=round(float(-live_value[c]), 1),
                             mom3=round(float(live_spot[c] / spot[c].iloc[-4] - 1) * 100, 1),
                             mom12=round(float(live_spot[c] / spot[c].iloc[-13] - 1) * 100, 1),
-                            rate=round(float(rate[c].iloc[-1]), 2)))
+                            rate=round(float(rate[c].iloc[-1]), 2),
+                            # Einordnung gegen die eigene Historie seit 1977 (Perzentil, 100 = staerkster Wert je)
+                            p_carry=None if c == "USD" else pct_hist(carry[c], live_carry[c]),
+                            p_value=pct_hist(value[c], live_value[c]),
+                            p_mom=None if c == "USD" else pct_hist(mom[c], live_mom[c])))
     ranking.sort(key=lambda r: -r["kombi"])
     longs = [r["cur"] for r in ranking[:N_LS]]
     shorts = [r["cur"] for r in ranking[-N_LS:]]
@@ -261,13 +269,30 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     robust["no_top12"] = shp(base.drop(base.nlargest(12).index))
     robust["loo"] = {c: shp(variant(drop=c)) for c in CUR}
 
+    # ---- Alle 7 Faktor-Auswahlen (fuer die Auswahl im Cockpit) -------------------------
+    # C/V/M = Carry/Value/Momentum. Nur CVM (Standard) und die Einzelfaktoren sind vorab festgelegt;
+    # Zweier-Kombinationen sind eine nachtraegliche Auswahl des Nutzers.
+    combos = {}
+    zmap = {"C": z["carry"], "V": z["value"], "M": z["momentum"]}
+    for key in ("CVM", "C", "V", "M", "CV", "CM", "VM"):
+        sc = sum(zmap[ch] for ch in key) / len(key)
+        _, rr = run(sc)
+        n_ = pd.Series(rr["net"].values, index=rr["net"].index + pd.offsets.MonthEnd(1))
+        pf = perf(n_) or {}
+        per = {lab: (perf(n_[(n_.index >= a) & (n_.index < b)]) or {}).get("sharpe")
+               for lab, a, b in (("1977–1999", "1977-01-01", "2000-01-01"), ("2000–2014", "2000-01-01", "2015-01-01"),
+                                 ("2015–heute", "2015-01-01", "2100-01-01"))}
+        eqc = (1 + n_.reindex(base_idx).fillna(0)).cumprod()
+        combos[key] = dict(sharpe=pf.get("sharpe"), p=pf.get("p"), ret=pf.get("ret"), dd=pf.get("dd"), periods=per,
+                           equity=[round(float(v), 4) for v in eqc.values])
+
     corr = pd.DataFrame({k: res[k]["net"] for k in ("carry", "value", "momentum")}).corr().round(2)
     out = dict(generated=pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%MZ"), asof=str(last.date()),
                live_fx=str(min(px[c].dropna().index[-1] for c in CUR if c != "USD").date()),
                ranking=ranking, longs=longs, shorts=shorts,
                pairs=[dict(long=a, short=b, diff=round(float(d), 2)) for a, b, d in pairs],
                stats=stats, periods=periods, perm=perm, equity=eq, hist_rank=hist_rank,
-               rolling=rolling, factor_weights=factor_weights, robust=robust,
+               rolling=rolling, factor_weights=factor_weights, robust=robust, combos=combos,
                corr={k: corr[k].to_dict() for k in corr.columns}, cost_bp=COST * 1e4, n_ls=N_LS)
     (OUT / "factors.json").write_text(json.dumps(out, ensure_ascii=False))
     return out

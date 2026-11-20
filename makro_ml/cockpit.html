@@ -342,9 +342,20 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     </section>
 
     <section class="panel">
-      <div class="ph"><span>Rangliste heute</span><span class="eyebrow">Score = Mittel der drei Faktor-Ränge</span></div>
+      <div class="ph"><span>Faktoren auswählen</span><span class="eyebrow">Standard: alle drei</span></div>
+      <div class="pb">
+        <div class="cats" id="fSel"></div>
+        <div class="grid2b">
+          <div id="fSelInfo" style="display:grid;gap:8px;align-content:start"></div>
+          <div class="chartbox"><svg id="fSelEq" viewBox="0 0 600 170" role="img" aria-label="Simulation der gewählten Faktor-Auswahl seit 1977 im Vergleich zur Standard-Kombi"></svg></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><span>Rangliste heute</span><span class="eyebrow" id="fRankEyebrow">Score = Mittel der gewählten Faktor-Ränge</span></div>
       <div class="pb"><div class="scroll-x"><table class="rc" id="fRank"></table></div>
-        <div class="note" style="max-width:none"><b>Carry</b> = Leitzins minus US-Leitzins. <b>Value</b> = Abweichung des realen effektiven Wechselkurses vom 10-Jahres-Schnitt (negativ = billig, wegen Veröffentlichung 2 Monate alt). <b>Momentum</b> = Kursentwicklung gegen USD. Die Zahl in Klammern ist der Faktor-Score: positiv heißt kaufen, negativ verkaufen. Die Rangliste nutzt die aktuellsten Kurse, das Portfolio wird jeweils zum Monatsende umgeschichtet.</div></div>
+        <div class="note" style="max-width:none"><b>Carry</b> = Leitzins minus US-Leitzins. <b>Value</b> = Abweichung des realen effektiven Wechselkurses vom 10-Jahres-Schnitt (negativ = billig, wegen Veröffentlichung 2 Monate alt). <b>Momentum</b> = Kursentwicklung gegen USD. Die Zahl in Klammern ist der Faktor-Score: positiv heißt kaufen, negativ verkaufen. <b>L/S je Faktor</b> zeigt, ob die Währung bei diesem Faktor unter den 3 stärksten (Long) oder 3 schwächsten (Short) ist. <b>Hist.</b> = wo der heutige Wert im Vergleich zur eigenen Historie seit 1977 liegt (100 = höchster Wert je, beim USD für Carry und Momentum nicht sinnvoll). Die Rangliste nutzt die aktuellsten Kurse, das Portfolio wird jeweils zum Monatsende umgeschichtet.</div></div>
     </section>
 
     <section class="panel">
@@ -424,23 +435,92 @@ window.renderFactors = async function () {
   $('#fStamp').textContent = `Long ${F.longs.join(', ')} · Short ${F.shorts.join(', ')}`;
   $('#fCost').textContent = `Kosten ${fmt(F.cost_bp, 0)} Bp je Umschichtung`;
 
-  // Paar-Vorschlaege
-  $('#fPairs').innerHTML = F.pairs.slice(0, 6).map(p => {
-    const a = p.long, b = p.short, aFirst = PRI.indexOf(a) < PRI.indexOf(b);
-    const name = aFirst ? `${a}/${b}` : `${b}/${a}`, dir = aFirst ? 'KAUFEN' : 'VERKAUFEN';
-    return `<div class="fcard"><span class="pn">${name}</span><span class="pd ${aFirst ? 'bull' : 'bear'}">${dir}</span><span class="ps">Long ${a}, Short ${b} · Score-Abstand ${fmt(p.diff, 2)}</span></div>`;
-  }).join('');
-
-  // Rangliste
-  const zb = v => { const w = Math.min(Math.abs(v) / 1.6, 1) * 50; return `<span class="zbar"><i style="${v >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${v >= 0 ? 'var(--bull)' : 'var(--bear)'}"></i></span>`; };
-  const zc = v => `<span class="${v > 0.3 ? 'pos' : v < -0.3 ? 'negv' : 'dim'}">(${sgn(v, 1)})</span>`;
-  let h = '<thead><tr><th>Rang</th><th style="text-align:left">Währung</th><th style="text-align:left">Gesamt-Score</th><th>Carry: Zinsdiff.</th><th>Value: ggü. Schnitt</th><th>Momentum 3M / 12M</th><th>Position</th></tr></thead><tbody>';
-  F.ranking.forEach((r, i) => {
-    const pos = F.longs.includes(r.cur) ? '<span class="q hi">LONG</span>' : F.shorts.includes(r.cur) ? '<span class="q lo">SHORT</span>' : '<span class="dim">–</span>';
-    h += `<tr><td>${i + 1}</td><td style="text-align:left"><b>${r.cur}</b> <span class="dim">· Leitzins ${fmt(r.rate, 2)}%</span></td><td style="text-align:left">${zb(r.kombi)} <span style="margin-left:6px" class="${r.kombi >= 0 ? 'pos' : 'negv'}">${sgn(r.kombi, 2)}</span></td>
-      <td>${sgn(r.carry, 2)} Pkt. ${zc(r.z_carry)}</td><td>${sgn(r.value_gap)}% ${zc(r.z_value)}</td><td>${sgn(r.mom3)}% / ${sgn(r.mom12)}% ${zc(r.z_mom)}</td><td>${pos}</td></tr>`;
+  const pv = p => p == null ? '–' : `<span class="${p < 0.05 ? 'pos' : 'dim'}" style="${p < 0.05 ? 'font-weight:600' : ''}">${p < 0.001 ? '&lt;0,001' : fmt(p, 3)}</span>`;
+  const sh = v => v == null ? '–' : `<span class="${v > 0.2 ? 'pos' : v < -0.2 ? 'negv' : ''}">${fmt(v, 2)}</span>`;
+  // ---------------- Faktor-Auswahl (Carry / Value / Momentum) ----------------
+  const FK = [['C', 'Carry', 'z_carry', 'p_carry'], ['V', 'Value', 'z_value', 'p_value'], ['M', 'Momentum', 'z_mom', 'p_mom']];
+  let fsel = 'CVM';
+  try { const v = localStorage.getItem('mlc_fsel'); if (v && F.combos && F.combos[v]) fsel = v; } catch (e) {}
+  const TESTED = {
+    CVM: ['hi', 'Standard-Kombi: vorab festgelegt, getestet seit 1977'],
+    C: ['hi', 'Einzelfaktor aus der Fachliteratur: vorab festgelegt, getestet seit 1977'],
+    V: ['mid', 'Einzelfaktor aus der Fachliteratur: getestet seit 1977, schwach'],
+    M: ['mid', 'Einzelfaktor aus der Fachliteratur: getestet seit 1977, schwach'],
+    CV: ['lo', 'Eigene Filterung: nicht vorab festgelegt. Die Zahlen sind ein Rückblick'],
+    CM: ['lo', 'Eigene Filterung: nicht vorab festgelegt. Die Zahlen sind ein Rückblick'],
+    VM: ['lo', 'Eigene Filterung: nicht vorab festgelegt. Die Zahlen sind ein Rückblick'],
+  };
+  const NAMEOF = k => k === 'CVM' ? 'Carry + Value + Momentum' : k.split('').map(ch => FK.find(f => f[0] === ch)[1]).join(' + ');
+  function selScore(r) { const ks = FK.filter(f => fsel.includes(f[0])); return ks.reduce((a, f) => a + r[f[2]], 0) / ks.length; }
+  function factorRank(key) {  // L/S je Einzelfaktor
+    const srt = [...F.ranking].sort((a, b) => b[key] - a[key]);
+    const out = {}; srt.forEach((r, i) => { out[r.cur] = i < F.n_ls ? 'L' : i >= srt.length - F.n_ls ? 'S' : '–'; }); return out;
+  }
+  const FR = Object.fromEntries(FK.map(f => [f[0], factorRank(f[2])]));
+  function drawFactorSel() {
+    try { localStorage.setItem('mlc_fsel', fsel); } catch (e) {}
+    $('#fSel').innerHTML = FK.map(f => `<label class="cat${fsel.includes(f[0]) ? ' on' : ''}"><input type="checkbox" value="${f[0]}"${fsel.includes(f[0]) ? ' checked' : ''}>${f[1]}</label>`).join('') +
+      `<button type="button" class="linkbtn" id="fSelStd"${fsel === 'CVM' ? ' hidden' : ''}>Zurück zum Standard</button>`;
+    const C = (F.combos || {})[fsel] || {}, std = (F.combos || {}).CVM || {}, t = TESTED[fsel];
+    const per = C.periods || {};
+    $('#fSelInfo').innerHTML = `<div><span class="q ${t[0]}" style="white-space:normal;display:inline-block">${t[1]}</span></div>
+      <div style="font:600 15px var(--sans)">${NAMEOF(fsel)}</div>
+      <table class="rc" style="min-width:0"><thead><tr><th style="text-align:left">Simulation seit 1977 (nach Kosten)</th><th>Deine Auswahl</th><th>Standard</th></tr></thead><tbody>
+        <tr><td style="text-align:left">Sharpe gesamt</td><td>${sh(C.sharpe)}</td><td class="dim">${fmt(std.sharpe, 2)}</td></tr>
+        ${Object.keys(per).map(p => `<tr><td style="text-align:left">Sharpe ${p}</td><td>${sh(per[p])}</td><td class="dim">${fmt((std.periods || {})[p], 2)}</td></tr>`).join('')}
+        <tr><td style="text-align:left">Newey-West p (Ertrag &gt; 0)</td><td>${pv(C.p)}</td><td class="dim">${pv(std.p)}</td></tr>
+        <tr><td style="text-align:left">Max. Drawdown</td><td class="negv">${fmt(C.dd)}%</td><td class="dim">${fmt(std.dd)}%</td></tr></tbody></table>
+      <div class="note">Wer eine Auswahl trifft, <b>nachdem</b> er diese Zahlen gesehen hat, sieht automatisch die Gewinner der Vergangenheit. Der Standard und die Einzelfaktoren waren vorab festgelegt, ihre Zahlen sind deshalb belastbarer.</div>`;
+    // Mini-Kurve: Auswahl vs. Standard (log)
+    const E = F.equity.d, a = C.equity || [], b = std.equity || [], n = Math.min(a.length, b.length, E.length);
+    if (n > 2) {
+      const W = 600, H = 170, L = 44, R = 8, T = 10, B = 22, all = a.slice(0, n).concat(b.slice(0, n)).map(Math.log);
+      const mn = Math.min(...all), mx = Math.max(...all), xs = i => L + i / (n - 1) * (W - L - R), ys = v => T + (mx - Math.log(v)) / (mx - mn || 1) * (H - T - B);
+      let g = '';
+      for (const m of [0.5, 1, 2, 4, 8]) { if (Math.log(m) < mn || Math.log(m) > mx) continue; g += `<line x1="${L}" x2="${W - R}" y1="${ys(m)}" y2="${ys(m)}" stroke="var(--line)"/><text x="${L - 6}" y="${ys(m) + 4}" text-anchor="end" font-size="10" font-family="var(--mono)" fill="var(--muted)">${sgn((m - 1) * 100, 0)}%</text>`; }
+      let ly = ''; E.slice(0, n).forEach((d, i) => { const y = d.slice(0, 4); if (y !== ly) { ly = y; if (+y % 10 === 0) g += `<text x="${xs(i)}" y="${H - 6}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--fg-2)">${y}</text>`; } });
+      g += `<polyline points="${b.slice(0, n).map((v, i) => `${xs(i)},${ys(v)}`).join(' ')}" fill="none" stroke="var(--fg-2)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+      g += `<polyline points="${a.slice(0, n).map((v, i) => `${xs(i)},${ys(v)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>`;
+      g += `<text x="${L + 6}" y="${T + 12}" font-size="11" fill="var(--accent)" font-weight="600">Deine Auswahl ${sgn((a[n - 1] - 1) * 100, 0)}%</text><text x="${L + 6}" y="${T + 26}" font-size="11" fill="var(--fg-2)">Standard ${sgn((b[n - 1] - 1) * 100, 0)}%</text>`;
+      $('#fSelEq').innerHTML = g;
+    }
+    // Rangliste + Positionen nach Auswahl
+    const ranked = [...F.ranking].map(r => ({ ...r, sc: selScore(r) })).sort((x, y) => y.sc - x.sc);
+    const longs = ranked.slice(0, F.n_ls).map(r => r.cur), shorts = ranked.slice(-F.n_ls).map(r => r.cur);
+    $('#fStamp').textContent = `Long ${longs.join(', ')} · Short ${shorts.join(', ')}`;
+    $('#fRankEyebrow').textContent = `Score = Mittel von ${NAMEOF(fsel)}`;
+    const zb = v => { const w = Math.min(Math.abs(v) / 1.6, 1) * 50; return `<span class="zbar"><i style="${v >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${v >= 0 ? 'var(--bull)' : 'var(--bear)'}"></i></span>`; };
+    const zc = v => `<span class="${v > 0.3 ? 'pos' : v < -0.3 ? 'negv' : 'dim'}">(${sgn(v, 1)})</span>`;
+    const ls = (ch, cur) => { const v = FR[ch][cur]; const on = fsel.includes(ch); return `<span class="tier" style="${!on ? 'opacity:.4;' : ''}${v === 'L' ? 'color:var(--bull);border-color:var(--bull)' : v === 'S' ? 'color:var(--bear);border-color:var(--bear)' : ''}">${v === 'L' ? 'LONG' : v === 'S' ? 'SHORT' : '–'}</span>`; };
+    const ph = p => p == null ? '<span class="dim">–</span>' : `<span class="dim">Hist. ${p}</span>`;
+    let h = '<thead><tr><th>Rang</th><th style="text-align:left">Währung</th><th style="text-align:left">Score (Auswahl)</th><th>Carry: Zinsdiff.</th><th>Value: ggü. Schnitt</th><th>Momentum 3M / 12M</th><th>Position</th></tr></thead><tbody>';
+    ranked.forEach((r, i) => {
+      const pos = longs.includes(r.cur) ? '<span class="q hi">LONG</span>' : shorts.includes(r.cur) ? '<span class="q lo">SHORT</span>' : '<span class="dim">–</span>';
+      h += `<tr><td>${i + 1}</td><td style="text-align:left"><b>${r.cur}</b> <span class="dim">· Leitzins ${fmt(r.rate, 2)}%</span></td><td style="text-align:left">${zb(r.sc)} <span style="margin-left:6px" class="${r.sc >= 0 ? 'pos' : 'negv'}">${sgn(r.sc, 2)}</span></td>
+        <td>${sgn(r.carry, 2)} Pkt. ${zc(r.z_carry)}<div style="margin-top:4px">${ls('C', r.cur)} ${ph(r.p_carry)}</div></td>
+        <td>${sgn(r.value_gap)}% ${zc(r.z_value)}<div style="margin-top:4px">${ls('V', r.cur)} ${ph(r.p_value)}</div></td>
+        <td>${sgn(r.mom3)}% / ${sgn(r.mom12)}% ${zc(r.z_mom)}<div style="margin-top:4px">${ls('M', r.cur)} ${ph(r.p_mom)}</div></td><td>${pos}</td></tr>`;
+    });
+    $('#fRank').innerHTML = h + '</tbody>';
+    // Paar-Vorschlaege: staerkste gegen schwaechste, mit Faktor-Bestaetigung
+    const byCur = Object.fromEntries(ranked.map(r => [r.cur, r]));
+    const pairs = longs.flatMap(a => shorts.map(b => ({ a, b, d: byCur[a].sc - byCur[b].sc }))).sort((x, y) => y.d - x.d).slice(0, 6);
+    $('#fPairs').innerHTML = pairs.map(p => {
+      const aFirst = PRI.indexOf(p.a) < PRI.indexOf(p.b), name = aFirst ? `${p.a}/${p.b}` : `${p.b}/${p.a}`, dir = aFirst ? 'KAUFEN' : 'VERKAUFEN';
+      const conf = FK.map(f => { const ok = byCur[p.a][f[2]] > byCur[p.b][f[2]]; return `<span style="${fsel.includes(f[0]) ? '' : 'opacity:.45'}" class="${ok ? 'pos' : 'negv'}">${f[1]} ${ok ? '✓' : '✗'}</span>`; }).join(' · ');
+      return `<div class="fcard"><span class="pn">${name}</span><span class="pd ${aFirst ? 'bull' : 'bear'}">${dir}</span><span class="ps">Long ${p.a}, Short ${p.b} · Abstand ${fmt(p.d, 2)}</span><span class="ps" style="font-size:11.5px">${conf}</span></div>`;
+    }).join('');
+  }
+  $('#fSel').addEventListener('change', e => {
+    const ch = e.target.value; let set = new Set(fsel.split(''));
+    if (e.target.checked) set.add(ch); else set.delete(ch);
+    if (!set.size) { e.target.checked = true; return; }  // mindestens ein Faktor
+    fsel = ['C', 'V', 'M'].filter(x => set.has(x)).join('');
+    drawFactorSel();
   });
-  $('#fRank').innerHTML = h + '</tbody>';
+  $('#fSel').addEventListener('click', e => { if (e.target.id === 'fSelStd') { fsel = 'CVM'; drawFactorSel(); } });
+
+  drawFactorSel();
 
   // Rang-Verlauf
   const HR = F.hist_rank;
@@ -479,8 +559,6 @@ window.renderFactors = async function () {
   svg.addEventListener('pointerleave', () => { $('#fEqTip').hidden = true; $('#fHi').innerHTML = ''; });
 
   // Kennzahlen
-  const pv = p => p == null ? '–' : `<span class="${p < 0.05 ? 'pos' : 'dim'}" style="${p < 0.05 ? 'font-weight:600' : ''}">${p < 0.001 ? '&lt;0,001' : fmt(p, 3)}</span>`;
-  const sh = v => v == null ? '–' : `<span class="${v > 0.2 ? 'pos' : v < -0.2 ? 'negv' : ''}">${fmt(v, 2)}</span>`;
   let st = '<thead><tr><th style="text-align:left">Strategie</th><th>Rendite p.a.</th><th>Vola</th><th>Sharpe</th><th>Max. Drawdown</th><th>Monate im Plus</th><th>Newey-West p</th><th>Zufalls-p</th><th>Sharpe 1977–99</th><th>Sharpe 2000–</th><th>Sharpe 2022–</th><th>Urteil</th></tr></thead><tbody>';
   for (const k of ['kombi', 'adaptiv', 'carry', 'value', 'momentum']) {
     const s = F.stats[k].net, ho = F.stats[k].holdout || {}, pm = F.perm[k], pre = F.stats[k].pre2000 || {}, post = F.stats[k].post2000 || {};
