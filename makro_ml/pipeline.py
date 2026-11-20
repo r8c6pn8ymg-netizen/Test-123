@@ -41,6 +41,16 @@ OUT.mkdir(exist_ok=True)
 
 HORIZONS = list(range(10, 101, 5)) + [120, 150, 180, 240, 300]
 OOS_START = pd.Timestamp("2008-01-04")
+HOLDOUT_START = pd.Timestamp("2022-01-01")  # ab hier: unberuehrter Schlusstest
+PERIODS = [("2008–2012", "2008-01-01", "2013-01-01"), ("2013–2017", "2013-01-01", "2018-01-01"),
+           ("2018–2021", "2018-01-01", "2022-01-01"), ("2022–heute", "2022-01-01", "2100-01-01")]
+COT_CODES = {"DXY": "098662", "EUR": "099741", "JPY": "097741", "GBP": "096742",
+             "CHF": "092741", "CAD": "090741", "AUD": "232741", "NZD": "112741"}
+COMMODITIES = {  # Rohstoffe, die fuer Rohstoffwaehrungen zaehlen (FRED/IMF)
+    "CAD": [("OIL-WTI", "Ölpreis WTI YoY", "DCOILWTICO", 3)],
+    "AUD": [("IRONORE", "Eisenerzpreis YoY", "PIORECRUSDM", 45), ("COPPER", "Kupferpreis YoY", "PCOPPUSDM", 45)],
+    "NZD": [("FOOD-IDX", "Nahrungsmittel-Preisindex YoY (u. a. Milch)", "PFOODINDEXM", 45)],
+}
 REFIT_WEEKS = 26
 MIN_TRAIN = 260  # Wochen
 TOP_N = 50
@@ -113,6 +123,78 @@ def pricing(refresh: bool) -> dict[str, pd.Series]:
     return out
 
 
+def pro_bases(asset: str, px: pd.Series, cot_cc: str, refresh: bool) -> list[Basis]:
+    """Momentum, Bewertung (REER), CFTC-Positionierung und Rohstoffe."""
+    res = []
+    pm = px.resample("MS").last().dropna()
+    res.append(Basis("MOM-12M", "Momentum: eigene Kursentwicklung 12 Monate", yoy(pm), 1, "Momentum"))
+    res.append(Basis("MOM-3M", "Momentum: eigene Kursentwicklung 3 Monate", yoy(pm, 3), 1, "Momentum"))
+    try:
+        reer = ds.bis("WS_EER", f"M.R.B.{cot_cc}", refresh)
+        gap = (100 * (reer / reer.rolling(120, min_periods=60).mean() - 1)).dropna()
+        res.append(Basis("REER-GAP", "Bewertung: realer effektiver Wechselkurs vs. 10J-Schnitt (BIS)", gap, 45, "Bewertung"))
+    except Exception as e:
+        print(f"  ! {asset} REER: {str(e)[:60]}", file=sys.stderr)
+    try:
+        cot = ds.cftc_net(COT_CODES[asset], refresh)
+        res.append(Basis("COT-NET", "CFTC: Netto-Position Spekulanten in % Open Interest",
+                         monthly(cot["net_pct"]), 3, "Positionierung"))
+    except Exception as e:
+        print(f"  ! {asset} COT: {str(e)[:60]}", file=sys.stderr)
+    for bid, lab, sid, lag in COMMODITIES.get(asset, []):
+        try:
+            res.append(Basis(bid, lab, yoy(monthly(ds.fred(sid, refresh))), lag, "Rohstoffe"))
+        except Exception as e:
+            print(f"  ! {asset} {bid}: {str(e)[:60]}", file=sys.stderr)
+    return res
+
+
+def ensemble_backtest(entries: list[tuple[str, pd.Series]], price: pd.Series) -> dict | None:
+    """Woechentlich umgeschichtete Strategie: Long/Short nach Mehrheit der Basen.
+
+    Jede Basis zaehlt einmal (Mittel ihrer Modelle), damit fast identische Modelle
+    (z. B. FEDFUNDS 60/61/62 Tage) nicht mehrfach abstimmen.
+    """
+    if not entries:
+        return None
+    votes = pd.concat({i: np.sign(hst - 0.5) for i, (_, hst) in enumerate(entries)}, axis=1)
+    groups = pd.Series([b for b, _ in entries])
+    by_basis = votes.T.groupby(groups.values).mean().T
+    score = by_basis.mean(axis=1)
+    idx = score.index
+    p = price.reindex(idx, method="ffill")
+    ret = (p.shift(-1) / p - 1)
+    pos = np.sign(score).where(score.abs() >= 0.1, 0.0)
+    strat = (pos * ret).dropna()
+    bh = ret.reindex(strat.index)
+
+    def stats(r, pos_):
+        if len(r) < 20:
+            return None
+        ann, vol = r.mean() * 52, r.std() * np.sqrt(52)
+        eq = (1 + r).cumprod()
+        dd = float((eq / eq.cummax() - 1).min())
+        act = pos_.reindex(r.index) != 0
+        hit = float((np.sign(ret.reindex(r.index)[act]) == pos_.reindex(r.index)[act]).mean()) if act.any() else None
+        return dict(ret=round(ann * 100, 1), vol=round(vol * 100, 1),
+                    sharpe=round(ann / vol, 2) if vol > 0 else None, dd=round(dd * 100, 1),
+                    hit=None if hit is None else round(hit * 100, 1), active=round(float(act.mean()) * 100))
+
+    out = {"periods": {}, "bh": {}}
+    for name, a, b in PERIODS + [("Auswahl 2008–2021", "2008-01-01", "2022-01-01"),
+                                 ("Schlusstest 2022–heute", "2022-01-01", "2100-01-01")]:
+        m = (strat.index >= a) & (strat.index < b)
+        out["periods"][name] = stats(strat[m], pos)
+        out["bh"][name] = stats(bh[m], pd.Series(1.0, index=bh.index))
+    eq = (1 + strat).cumprod()
+    eqb = (1 + bh).cumprod()
+    pick = eq.index[::2]
+    out["equity"] = dict(d=[str(x.date()) for x in pick], s=[round(float(v), 4) for v in eq[pick]],
+                         b=[round(float(v), 4) for v in eqb[pick]])
+    out["score_now"] = round(float(score.iloc[-1]), 2) if len(score) else None
+    return out
+
+
 def us_bases(refresh: bool) -> list[Basis]:
     f = lambda i: ds.fred(i, refresh)
     return [
@@ -128,6 +210,8 @@ def us_bases(refresh: bool) -> list[Basis]:
         Basis("OPHNFB", "US Produktivität je Stunde YoY", yoy(quarterly_to_monthly(f("OPHNFB")), 12), 130, "Wachstum"),
         Basis("UMCSENT", "US Verbraucherstimmung (Michigan)", monthly(f("UMCSENT")), 30, "Stimmung"),
         Basis("BOPGSTB", "US Handelsbilanz (Mrd USD)", monthly(f("BOPGSTB")) / 1000, 65, "Handel"),
+        Basis("VIX", "Volatilitätsindex VIX (Risikostimmung)", monthly(f("VIXCLS")), 3, "Risiko"),
+        Basis("CREDIT", "Kreditspread Baa-Anleihen minus 10J-Treasury", monthly(f("BAA10Y")), 3, "Risiko"),
         Basis("FF-PRICED-1Y", "US Zinseinpreisung 12M: 1J-Rendite minus Fed Funds (OIS-Proxy)",
               (monthly(f("DGS1")) - monthly(f("DFF"))).dropna(), 3, "Zinseinpreisung"),
         Basis("FF-PRICED-2Y", "US Zinseinpreisung 24M: 2J-Rendite minus Fed Funds (OIS-Proxy)",
@@ -266,26 +350,35 @@ def run_model(X: pd.DataFrame, price: pd.Series, h: int, today: pd.Timestamp):
         probs[te] = _fit_predict(Xv[tr], y[tr], Xv[te])
         naive[te] = float(y[tr].mean() > 0.5)
     ev = ~np.isnan(probs) & ~np.isnan(ret)
-    n = int(ev.sum())
-    if n < 150:
+    if int(ev.sum()) < 150:
         return None
-    hit = ((probs[ev] > 0.5) == (y[ev] == 1))
-    nhit = (naive[ev] == y[ev])
-    half = n // 2
-    da, da1, da2 = hit.mean(), hit[:half].mean(), hit[half:].mean()
-    n_eff = max(int(n * 7 / max(h, 7)), 10)
-    pval = binomtest(int(round(da * n_eff)), n_eff, 0.5, alternative="greater").pvalue
+    hit = ((probs > 0.5) == (y == 1))
+    nhit = (naive == y)
+    full = _metrics(hit[ev], nhit[ev], h)
+    # Auswahl-Zeitraum (bis Ende 2021) und unberuehrter Schlusstest (ab 2022)
+    pre_m = ev & (dates < HOLDOUT_START)
+    post_m = ev & (dates >= HOLDOUT_START)
+    pre = _metrics(hit[pre_m], nhit[pre_m], h) if pre_m.sum() >= 100 else None
+    post_da = float(hit[post_m].mean()) if post_m.sum() >= 20 else None
 
     # Aktuelle Prognose: auf allen abgeschlossenen Beispielen trainieren
     tr = ok & ~np.isnan(ret)
     last = np.where(X.notna().all(axis=1).values)[0]
     prob_now = float(_fit_predict(Xv[tr], y[tr], Xv[last[-1:]])[0]) if len(last) else np.nan
 
-    # OOS-Prognosen fuer den Ensemble-Rueckblick (monatlich ausgeduennt)
     hist = pd.Series(probs, index=dates).dropna()
-    return dict(da=float(da), da1=float(da1), da2=float(da2), naive=float(nhit.mean()),
-                p=float(pval), n=n, n_eff=n_eff, prob=prob_now,
-                oos_from=str(dates[ev][0].date()), hist=hist)
+    return dict(**full, prob=prob_now, oos_from=str(dates[ev][0].date()), hist=hist,
+                pre=pre, post_da=post_da, n_post=int(post_m.sum()))
+
+
+def _metrics(hit: np.ndarray, nhit: np.ndarray, h: int) -> dict:
+    n = len(hit)
+    half = n // 2
+    da = hit.mean()
+    n_eff = max(int(n * 7 / max(h, 7)), 10)
+    pval = binomtest(int(round(da * n_eff)), n_eff, 0.5, alternative="greater").pvalue
+    return dict(da=float(da), da1=float(hit[:half].mean()), da2=float(hit[half:].mean()),
+                naive=float(nhit.mean()), p=float(pval), n=n, n_eff=n_eff)
 
 
 def tier(r) -> str | None:
@@ -334,6 +427,9 @@ def main(refresh: bool = True):
         cc = country_series(cb, co, sn, sipri, refresh)
         bases_by_asset[code] = list(ub) + diff_bases(cc, us_cc)
     pr = pricing(refresh)
+    bis_cc = {"DXY": "US", **{k: v[0] for k, v in ASSETS.items()}}
+    for a in ASSET_ORDER:
+        bases_by_asset[a] += pro_bases(a, px[a], bis_cc[a], refresh)
     bases_by_asset["EUR"].append(Basis(
         "ECB-PRICED-Diff", "Zinseinpreisung EZB minus Fed (1J-Rendite minus Leitzins, Differenz)",
         (monthly(pr["EZ1"]) - monthly(pr["US1"])).dropna(), 3, "Zinseinpreisung"))
@@ -364,9 +460,15 @@ def main(refresh: bool = True):
     models = []
     cand = {a: dict(n=0, A=0, B=0, da=[], noise_n=0, noise_A=0, noise_B=0, noise_da=[])
             for a in ASSET_ORDER}
+    pre_pool = {a: {"real": [], "noise": []} for a in ASSET_ORDER}
     for (asset, b, h, _, _), r in zip(tasks, results):
         if r is None:
             continue
+        if r["pre"] is not None:
+            tp = tier(r["pre"])
+            if tp:
+                pre_pool[asset]["noise" if b.group == "Zufall" else "real"].append(
+                    dict(basis=b.id, h=h, tier=tp, da_pre=r["pre"]["da"], post=r["post_da"], hist=r["hist"]))
         c, t = cand[asset], tier(r)
         if b.group == "Zufall":
             c["noise_n"] += 1
@@ -407,6 +509,35 @@ def main(refresh: bool = True):
     for m in sel:
         m.pop("_hist")
 
+    # Schlusstest: Auswahl NUR mit 2008–2021, Bewertung 2022–heute (+ Zufalls-Vergleich)
+    validation = {}
+    for a in ASSET_ORDER:
+        v = {}
+        for kind in ("real", "noise"):
+            pool = sorted(pre_pool[a][kind], key=lambda m: (m["tier"], -m["da_pre"]))[:TOP_N]
+            posts = [m["post"] for m in pool if m["post"] is not None]
+            v[kind] = dict(n=len(pool), da_pre=round(float(np.mean([m["da_pre"] for m in pool])) * 100, 1) if pool else None,
+                           da_post=round(float(np.mean(posts)) * 100, 1) if posts else None)
+            bt = ensemble_backtest([(m["basis"], m["hist"]) for m in pool], px[a].dropna())
+            if kind == "real":
+                v["backtest"] = bt
+            else:
+                v["noise_holdout"] = bt["periods"].get("Schlusstest 2022–heute") if bt else None
+        validation[a] = v
+
+    # CFTC-Positionierung fuer die Anzeige
+    cot_view = {}
+    for a in ASSET_ORDER:
+        try:
+            c = ds.cftc_net(COT_CODES[a], False)["net_pct"].dropna()
+            last3 = c[c.index >= c.index[-1] - pd.Timedelta(days=3 * 365)]
+            pct = float((last3 < c.iloc[-1]).mean() * 100)
+            w = c[c.index >= c.index[-1] - pd.Timedelta(days=365)]
+            cot_view[a] = dict(net=round(float(c.iloc[-1]), 1), chg4=round(float(c.iloc[-1] - c.iloc[-5]), 1),
+                               pct3y=round(pct), d=str(c.index[-1].date()), spark=[round(float(x), 1) for x in w.values])
+        except Exception as e:
+            print(f"  ! COT-Anzeige {a}: {e}", file=sys.stderr)
+
     priced = {}
     for k, lab in [("US1", "Fed · 12 Monate"), ("US2", "Fed · 24 Monate"), ("EZ1", "EZB · 12 Monate"), ("EZ2", "EZB · 24 Monate")]:
         s = pr[k].dropna()
@@ -430,7 +561,7 @@ def main(refresh: bool = True):
                fx_through=str(min(p.index[-1] for p in px.values()).date()),
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,
                bases=meta_bases, latest=latest, milex=milex, history=history,
-               priced=priced, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
+               priced=priced, validation=validation, cot=cot_view, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
     (OUT / "data.json").write_text(json.dumps(out, ensure_ascii=False))
     print("Kandidaten je Waehrung (A=signifikant, B=robust):")
     for a in ASSET_ORDER:
@@ -439,6 +570,12 @@ def main(refresh: bool = True):
         bull = sum(m["pred"] == "Bullish" for m in k)
         print(f"  {a}: echt {c['n']:4d} A={c['A']:3d} B={c['B']:3d} | Zufall {c['noise_n']:3d} "
               f"A={c['noise_A']:2d} B={c['noise_B']:3d} | angezeigt {len(k):3d} bullish {bull}")
+    print("Schlusstest 2022–heute (Auswahl nur mit 2008–2021):")
+    for a in ASSET_ORDER:
+        v = validation[a]
+        bt = (v.get("backtest") or {}).get("periods", {}).get("Schlusstest 2022–heute") or {}
+        print(f"  {a}: echt DA vorher {v['real']['da_pre']} -> Schlusstest {v['real']['da_post']} | "
+              f"Zufall {v['noise']['da_pre']} -> {v['noise']['da_post']} | Ensemble Sharpe {bt.get('sharpe')} Treffer {bt.get('hit')}")
     return out
 
 

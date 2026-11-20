@@ -103,3 +103,24 @@ def sipri_share_of_gdp(refresh: bool = False) -> pd.DataFrame:
     df.columns = [int(str(c).split(".")[0]) for c in years]
     df = df.apply(pd.to_numeric, errors="coerce")
     return df.T  # index = Jahr
+
+
+def cftc_net(code: str, refresh: bool = False) -> pd.DataFrame:
+    """CFTC Commitments of Traders (Legacy, Futures only) fuer einen Kontrakt.
+
+    Rueckgabe (woechentlich, Index = Stichtag Dienstag): long, short, oi, net_pct
+    (Netto-Position der Spekulanten / Open Interest in %).
+    """
+    url = ("https://publicreporting.cftc.gov/resource/6dca-aqww.csv?"
+           "$select=report_date_as_yyyy_mm_dd,noncomm_positions_long_all,"
+           "noncomm_positions_short_all,open_interest_all"
+           f"&$where=cftc_contract_market_code=%27{code}%27"
+           "&$order=report_date_as_yyyy_mm_dd&$limit=50000")
+    raw = _cached(f"cftc_{code}.csv", url, refresh)
+    df = pd.read_csv(io.BytesIO(raw))
+    df.columns = ["date", "long", "short", "oi"]
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.set_index("date").sort_index().apply(pd.to_numeric, errors="coerce").dropna()
+    df = df[~df.index.duplicated(keep="last")]
+    df["net_pct"] = 100 * (df["long"] - df["short"]) / df["oi"]
+    return df

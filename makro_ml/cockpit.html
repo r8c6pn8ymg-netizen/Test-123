@@ -144,6 +144,15 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
 .tile .k { font: 600 11px var(--mono); color: var(--fg-2); }
 .tile .v { font: 600 19px var(--mono); margin-top: 2px; }
 .tile .d { font-size: 11px; color: var(--muted); }
+.cats { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+label.cat { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 11px 4px 8px; font: 500 12px var(--sans); color: var(--fg-2); cursor: pointer; user-select: none; }
+label.cat input { accent-color: var(--accent); margin: 0; }
+label.cat small { font: 500 11px var(--mono); color: var(--muted); }
+label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--accent-bg); }
+.linkbtn { background: none; border: 0; color: var(--accent); font: 500 12px var(--sans); cursor: pointer; padding: 4px 6px; }
+.pctbar { position: relative; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--bear-bg-2), var(--panel-2) 50%, var(--bull-bg-2)); width: 120px; display: inline-block; vertical-align: middle; }
+.pctbar i { position: absolute; top: -3px; width: 3px; height: 14px; border-radius: 2px; background: var(--fg); }
+.pos { color: var(--bull); } .negv { color: var(--bear); }
 .err { padding: 40px; text-align: center; color: var(--bear); }
 @media (prefers-reduced-motion: no-preference) { .lbi, .seg button, .tabs button { transition: border-color .15s, background .15s, color .15s; } }
 </style>
@@ -156,6 +165,12 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
     </div>
     <div class="stamp" id="stamp"><span class="pill">Lade Daten …</span></div>
   </header>
+
+  <section class="panel">
+    <div class="ph"><span>Modell-Kategorien · ankreuzen, was in Heatmap, Scatter, Leaderboard und Tabelle zählt</span>
+      <span><button type="button" class="linkbtn" id="catAll">Alle</button><button type="button" class="linkbtn" id="catMacro">Nur Makro</button><button type="button" class="linkbtn" id="catPro">Nur Profi-Faktoren</button></span></div>
+    <div class="pb"><div class="cats" id="cats"></div></div>
+  </section>
 
   <section class="panel">
     <div class="ph"><span>Makro ML Charts · Heatmap (Long Ratio je Asset &amp; Horizont)</span>
@@ -202,6 +217,26 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
         <th data-k="da2">DA 1./2. Hälfte</th><th data-k="naive">Naiv</th><th data-k="tier">Güte</th><th data-k="prob">P(steigt)</th><th data-k="pred">Prediction</th><th data-k="date">Datum</th>
       </tr></thead><tbody></tbody></table></div>
       <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung, rein out-of-sample seit 2008. <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><span>CFTC-Positionierung · Spekulanten in Währungs-Futures</span><span class="eyebrow" id="cotDate">Commitments of Traders</span></div>
+    <div class="pb">
+      <div class="scroll-x"><table class="rc" id="cot"></table></div>
+      <div class="note"><b>Netto % OI</b> = (Long minus Short der großen Spekulanten) geteilt durch alle offenen Kontrakte, also die Wette auf die Währung gegen den USD. <b>3J-Perzentil</b> = wo der heutige Wert im Vergleich zu den letzten 3 Jahren liegt. Über 90 oder unter 10 gilt als Extrem. Dann sind viele schon positioniert, und der Kurs dreht oft in die Gegenrichtung. Die Daten erscheinen freitags mit Stand Dienstag. Als Modell-Basis heißt dieser Faktor <b>COT-NET</b> (Kategorie Positionierung).</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><span>Schlusstest &amp; Backtest · funktioniert das auch live?</span>
+      <div class="fld" style="grid-auto-flow:column;align-items:center;gap:8px"><label for="vAsset">Equity-Kurve</label><select id="vAsset"></select></div></div>
+    <div class="pb">
+      <div class="note" style="max-width:none">So geprüft: Die Modelle werden <b>nur mit 2008–2021</b> ausgewählt (je Währung die 50 besten). Danach wird gemessen, wie sie <b>2022–heute</b> abgeschnitten haben, also auf Daten, die bei der Auswahl tabu waren. Dieselbe Prozedur läuft mit Zufallsmodellen. Der Backtest handelt jede Woche Long oder Short nach der Mehrheit der Basen, wobei jede Basis eine Stimme hat. Kosten sind nicht eingerechnet.</div>
+      <div class="scroll-x"><table class="rc" id="val"></table></div>
+      <div class="scroll-x"><table class="rc" id="periods"></table></div>
+      <div class="chartbox" id="eqBox"><svg id="eq" viewBox="0 0 1200 300" role="img" aria-label="Equity-Kurve der Ensemble-Strategie und Buy-and-Hold"></svg><div class="tip" id="eqTip" hidden></div></div>
+      <div class="chips"><span class="chip"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="var(--accent)" stroke-width="2.5"/></svg> Ensemble-Strategie</span><span class="chip"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="var(--fg-2)" stroke-width="1.5" stroke-dasharray="4 3"/></svg> Buy &amp; Hold (Währung long)</span><span class="dim" style="font-size:12px">Senkrechte Linie = Beginn Schlusstest 2022</span></div>
     </div>
   </section>
 
@@ -271,7 +306,13 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
   const COL = a => css.getPropertyValue('--c-' + a).trim();
   const SHAPES = { DXY: 'circle', EUR: 'square', JPY: 'diamond', NZD: 'tri', CAD: 'tridown', AUD: 'plus', CHF: 'hex', GBP: 'x' };
   const ASSETS = D.assets;
-  const M = D.models;
+  const ALL = D.models;
+  const GROUP = id => (D.bases[id] || {}).group || 'Sonstige';
+  const PRO = ['Momentum', 'Bewertung', 'Positionierung', 'Risiko', 'Rohstoffe'];
+  const groupsAll = [...new Set(Object.values(D.bases).map(b => b.group))].filter(g => g !== 'Zufall');
+  let activeG = new Set(store_get_groups());
+  function store_get_groups() { try { const v = JSON.parse(localStorage.getItem('mlc_groups')); if (Array.isArray(v) && v.length) return v.filter(g => groupsAll.includes(g)); } catch (e) {} return groupsAll; }
+  let M = ALL.filter(m => activeG.has(GROUP(m.basis)));
   const fmt = (v, d = 1) => Number(v).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const PRED = { Bullish: 'bull', Bearish: 'bear', Neutral: 'neu' };
@@ -335,7 +376,7 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
   $('#assetChks').addEventListener('change', e => { if (e.target.checked) sel.add(e.target.value); else sel.delete(e.target.value); store.set('scSel', [...sel]); drawScatter(); });
 
   const SW = 640, SH = 420, ML = 52, MR = 14, MT = 14, MB = 40;
-  const ext = Math.max(0.06, ...M.map(m => Math.abs(m.prob - 0.5))) * 1.12;
+  const ext = Math.max(0.06, ...ALL.map(m => Math.abs(m.prob - 0.5))) * 1.12;
   const LX0 = Math.log(8), LX1 = Math.log(340);
   const sx = h => ML + (Math.log(h) - LX0) / (LX1 - LX0) * (SW - ML - MR);
   const sy = p => MT + (0.5 + ext - p) / (2 * ext) * (SH - MT - MB);
@@ -415,8 +456,11 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
       const cls = dir === 'BULLISH' ? 'bull' : dir === 'BEARISH' ? 'bear' : 'neu';
       const domList = list.filter(m => (dir === 'BULLISH' ? m.pred === 'Bullish' : dir === 'BEARISH' ? m.pred === 'Bearish' : true));
       const nA = list.filter(m => m.tier === 'A').length;
+      const byB = {}; list.forEach(m => { if (m.pred === 'Neutral') return; (byB[m.basis] = byB[m.basis] || []).push(m.pred === 'Bullish' ? 1 : 0); });
+      const bv = Object.values(byB).map(v => v.reduce((x, y) => x + y, 0) / v.length);
+      const wlr = bv.length ? bv.reduce((x, y) => x + y, 0) / bv.length * 100 : null;
       h += `<button type="button" class="lbi" data-a="${a}"><div><div class="cur">${swatch(a)}${a}</div><div class="dir ${cls}">${dir}</div><span class="hz">${dominantH(domList) || '–'}d</span></div>
-        <div class="mid">Bias aus ${s.n} Modell(en)<small>${s.bull} bullish · ${s.bear} bearish · ${s.neu} neutral${nA ? ` · ${nA} signifikant` : ''}</small></div>
+        <div class="mid">Bias aus ${s.n} Modell(en)<small>${s.bull} bullish · ${s.bear} bearish · ${s.neu} neutral${nA ? ` · ${nA} signifikant` : ''}</small><small>Je Basis 1 Stimme (${bv.length} Basen): ${wlr == null ? '–' : Math.round(wlr) + '% Long'}</small></div>
         <div class="ratio ${cls}">${dir === 'NEUTRAL' ? 'Neutral' : dir === 'BULLISH' ? 'Bullish' : 'Bearish'} · ${s.lr == null ? '–' : Math.round(s.lr)}% Long Ratio<div class="bar" aria-hidden="true"><i style="width:${s.lr ?? 50}%"></i></div></div></button>`;
     }
     $('#leader').innerHTML = h;
@@ -564,9 +608,102 @@ table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px sol
     <div><b>Modelle.</b> Ein Modell ist die Kombination aus Basis-Indikator, Währung und Horizont . Horizonte: 10–100 Tage in 5er-Schritten sowie 120, 150, 180, 240 und 300 Tage. Es ist jeweils eine logistische Regression auf drei Merkmale der Basis: Niveau, Veränderung über 3 Monate und Veränderung über 12 Monate. Bei Länder-Basen („…-Diff“) wird die Differenz zwischen dem Land und den USA verwendet. Insgesamt laufen ${Object.values(D.candidates).reduce((s, c) => s + c.n, 0)} Kandidaten durch die Tests, angezeigt werden maximal 50 je Währung.</div>
     <div><b>Ohne Blick in die Zukunft.</b> Makrodaten fließen erst ab ihrem geschätzten Veröffentlichungstag ein. Die Modelle werden alle 26 Wochen neu trainiert, und zwar nur mit Fällen, deren Ergebnis zu diesem Zeitpunkt schon feststand. Die DA ist komplett out-of-sample (ab 2008, wöchentliche Stichproben).</div>
     <div><b>Gegen Glückstreffer.</b> <span class="tier A">SIGNIF.</span> heißt: DA ≥ 53 %, in beiden Zeithälften ≥ 51 %, mindestens 2 Punkte besser als die naive Regel und p &lt; 0,05 im Binomialtest. Die Stichprobe wird dabei um überlappende Zeitfenster bereinigt. <span class="tier">ROBUST</span> heißt: DA ≥ 52 %, in beiden Hälften ≥ 50,5 % und mindestens 1 Punkt besser als naiv. Zusätzlich vergleicht der Realitäts-Check jede Währung mit Zufallsmodellen.</div>
-    <div><b>Daten.</b> FRED (Fed St. Louis, inkl. OECD-Reihen), BIS (Leitzinsen, Inflation), EZB (Euro-Renditen, Euribor, Arbeitslosigkeit) und SIPRI (Militärausgaben). Die Wechselkurse stammen aus dem H.10-Bericht der Fed und erscheinen mit rund einer Woche Verzug. Der DXY wird aus diesen Kursen mit der offiziellen ICE-Formel berechnet. Die Zinseinpreisung (Marktrendite 1J/2J minus Leitzins) ersetzt OIS-Kurven, FedWatch und ECB-Watch. Sie hat lange Historie und lässt sich deshalb testen.</div>
+    <div><b>Profi-Faktoren.</b> Momentum (eigener Kurstrend 3 und 12 Monate), Bewertung (realer effektiver Wechselkurs der BIS im Vergleich zum 10-Jahres-Schnitt), CFTC-Positionierung (Netto-Position der Spekulanten), Risikostimmung (VIX, Kreditspreads) und Rohstoffe (Öl für CAD, Eisenerz und Kupfer für AUD, Nahrungsmittelindex für NZD). Optionsdaten wie Risk Reversals sind nicht frei verfügbar und deshalb nicht enthalten.</div>
+    <div><b>Schlusstest.</b> Auswahl nur mit 2008–2021, Bewertung auf 2022–heute. Zusätzlich gibt es einen Backtest je Zeitraum (2008–12, 2013–17, 2018–21, 2022–heute). Die Live-Auswahl oben nutzt danach den gesamten Zeitraum, damit die neuesten Daten einfließen.</div>
+    <div><b>Daten.</b> FRED (Fed St. Louis, inkl. OECD- und IMF-Reihen), CFTC (Commitments of Traders), BIS (Leitzinsen, Inflation, effektive Wechselkurse), EZB (Euro-Renditen, Euribor, Arbeitslosigkeit) und SIPRI (Militärausgaben). Die Wechselkurse stammen aus dem H.10-Bericht der Fed und erscheinen mit rund einer Woche Verzug. Der DXY wird aus diesen Kursen mit der offiziellen ICE-Formel berechnet. Die Zinseinpreisung (Marktrendite 1J/2J minus Leitzins) ersetzt OIS-Kurven, FedWatch und ECB-Watch. Sie hat lange Historie und lässt sich deshalb testen.</div>
     <div><b>Einordnung.</b> Makrodaten erklären Wechselkurse nur zu einem kleinen Teil. Im Schnitt liegen alle Kandidaten nahe 50 %. Der Nutzen entsteht durch die Bündelung vieler kleiner Vorteile zu einem übergeordneten Bias. Keine Anlageberatung.</div>`;
 
-  drawHeatmap(); drawScatter(); drawLeader(); drawTable(); drawPair(); drawRC(); drawHist();
+  // ----------------------------------------------------- Kategorien
+  function drawCats() {
+    const cnt = g => ALL.filter(m => GROUP(m.basis) === g).length;
+    $('#cats').innerHTML = groupsAll.sort((a, b) => cnt(b) - cnt(a)).map(g => `<label class="cat${activeG.has(g) ? ' on' : ''}"><input type="checkbox" value="${esc(g)}"${activeG.has(g) ? ' checked' : ''}>${esc(g)} <small>${cnt(g)}</small></label>`).join('');
+  }
+  function applyCats() {
+    try { localStorage.setItem('mlc_groups', JSON.stringify([...activeG])); } catch (e) {}
+    M = ALL.filter(m => activeG.has(GROUP(m.basis)));
+    $('#stamp').lastElementChild.textContent = `${M.length} aktive Modelle`;
+    drawCats(); drawHeatmap(); drawScatter(); drawLeader(); drawTable(); drawPair();
+  }
+  $('#cats').addEventListener('change', e => { const g = e.target.value; if (e.target.checked) activeG.add(g); else activeG.delete(g); applyCats(); });
+  $('#catAll').addEventListener('click', () => { activeG = new Set(groupsAll); applyCats(); });
+  $('#catMacro').addEventListener('click', () => { activeG = new Set(groupsAll.filter(g => !PRO.includes(g))); applyCats(); });
+  $('#catPro').addEventListener('click', () => { activeG = new Set(groupsAll.filter(g => PRO.includes(g))); applyCats(); });
+
+  // ------------------------------------------------------------ CFTC
+  function drawCOT() {
+    const C = D.cot || {}; let d0 = '';
+    let h = '<thead><tr><th>Asset</th><th>Netto % OI</th><th>4 Wochen</th><th>3J-Perzentil</th><th>Einordnung</th><th>Verlauf 1 Jahr</th></tr></thead><tbody>';
+    for (const a of ASSETS) {
+      const c = C[a]; if (!c) continue; d0 = c.d;
+      const lab = c.pct3y >= 90 ? ['lo', 'Extrem long, Gegenbewegung möglich'] : c.pct3y <= 10 ? ['lo', 'Extrem short, Gegenbewegung möglich'] : c.net > 0 ? ['hi', 'Spekulanten long'] : ['mid', 'Spekulanten short'];
+      h += `<tr><td>${swatch(a)} ${a === 'DXY' ? 'USD-Index' : a}</td><td class="${c.net >= 0 ? 'pos' : 'negv'}">${c.net > 0 ? '+' : ''}${fmt(c.net)}%</td><td>${c.chg4 > 0 ? '+' : ''}${fmt(c.chg4)}</td>
+        <td><span class="pctbar" title="${c.pct3y}. Perzentil"><i style="left:calc(${c.pct3y}% - 1px)"></i></span> <span style="margin-left:6px">${c.pct3y}</span></td><td><span class="q ${lab[0]}">${lab[1]}</span></td><td style="width:190px">${spark(c.spark, c.net >= 0 ? 'var(--bull)' : 'var(--bear)')}</td></tr>`;
+    }
+    $('#cot').innerHTML = h + '</tbody>';
+    $('#cotDate').textContent = 'Stand ' + d0;
+  }
+
+  // ------------------------------------------------- Schlusstest/Backtest
+  const sh = v => v == null ? '<span class="dim">–</span>' : `<span class="${v > 0.2 ? 'pos' : v < -0.2 ? 'negv' : ''}">${fmt(v, 2)}</span>`;
+  const pc = v => v == null ? '<span class="dim">–</span>' : fmt(v) + '%';
+  function drawVal() {
+    const V = D.validation || {};
+    let h = '<thead><tr><th>Asset</th><th>DA Auswahl 08–21</th><th>DA Schlusstest 22–</th><th>Zufall: Auswahl → Test</th><th>Vorsprung ggü. Zufall</th><th>Sharpe Test (Ensemble)</th><th>Sharpe Test (Zufall)</th><th>Trefferquote Test</th><th>Fazit</th></tr></thead><tbody>';
+    for (const a of ASSETS) {
+      const v = V[a]; if (!v) continue;
+      const t = ((v.backtest || {}).periods || {})['Schlusstest 2022–heute'] || {}, nz = v.noise_holdout || {};
+      const edge = v.real.da_post != null && v.noise.da_post != null ? v.real.da_post - v.noise.da_post : null;
+      const ok = v.real.da_post >= 52 && edge > 1 && (t.sharpe ?? -1) > 0;
+      const weak = v.real.da_post >= 51 && edge > 0;
+      const f = ok ? ['hi', 'hält im Test'] : weak ? ['mid', 'schwach, aber positiv'] : ['lo', 'hält nicht'];
+      h += `<tr><td>${swatch(a)} ${a}</td><td>${pc(v.real.da_pre)}</td><td><b>${pc(v.real.da_post)}</b></td><td class="dim">${pc(v.noise.da_pre)} → ${pc(v.noise.da_post)}</td>
+        <td class="${edge > 0 ? 'pos' : 'negv'}">${edge == null ? '–' : (edge > 0 ? '+' : '') + fmt(edge) + ' Pkt.'}</td><td>${sh(t.sharpe)}</td><td class="dim">${sh(nz.sharpe)}</td><td>${pc(t.hit)}</td><td><span class="q ${f[0]}">${f[1]}</span></td></tr>`;
+    }
+    $('#val').innerHTML = h + '</tbody>';
+    const P = ['2008–2012', '2013–2017', '2018–2021', '2022–heute'];
+    let p = '<thead><tr><th>Sharpe je Zeitraum</th>' + P.map(x => `<th>${x}</th>`).join('') + '<th>Rendite p.a. 22–</th><th>Max. Drawdown 22–</th><th>Buy &amp; Hold Sharpe 22–</th></tr></thead><tbody>';
+    for (const a of ASSETS) {
+      const b = (V[a] || {}).backtest; if (!b) continue;
+      const t = b.periods['2022–heute'] || {}, bh = b.bh['2022–heute'] || {};
+      p += `<tr><td>${swatch(a)} ${a}</td>${P.map(x => `<td>${sh((b.periods[x] || {}).sharpe)}</td>`).join('')}<td>${t.ret == null ? '–' : (t.ret > 0 ? '+' : '') + fmt(t.ret) + '%'}</td><td class="negv">${t.dd == null ? '–' : fmt(t.dd) + '%'}</td><td class="dim">${sh(bh.sharpe)}</td></tr>`;
+    }
+    $('#periods').innerHTML = p + '</tbody>';
+  }
+  const vAssets = ASSETS.filter(a => ((D.validation || {})[a] || {}).backtest);
+  $('#vAsset').innerHTML = vAssets.map(a => `<option>${a}</option>`).join('');
+  $('#vAsset').value = store.get('vAsset', vAssets.includes('AUD') ? 'AUD' : vAssets[0]);
+  const EW = 1200, EH = 300, EL = 56, ER = 16, ET = 14, EB = 30;
+  let eqState = null;
+  function drawEq() {
+    const a = $('#vAsset').value; store.set('vAsset', a);
+    const E = (((D.validation || {})[a] || {}).backtest || {}).equity; if (!E) { $('#eq').innerHTML = ''; return; }
+    const n = E.d.length, xs = i => EL + i / (n - 1) * (EW - EL - ER);
+    const all = E.s.concat(E.b), mn = Math.min(...all), mx = Math.max(...all), pad = (mx - mn) * .06;
+    const ys = v => ET + (mx + pad - v) / (mx - mn + 2 * pad) * (EH - ET - EB);
+    let g = '';
+    for (let i = 0; i <= 4; i++) { const v = mn + (mx - mn) * i / 4; g += `<line x1="${EL}" x2="${EW - ER}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${EL - 8}" y="${ys(v) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${v >= 1 ? '+' : ''}${fmt((v - 1) * 100, 0)}%</text>`; }
+    g += `<line x1="${EL}" x2="${EW - ER}" y1="${ys(1)}" y2="${ys(1)}" stroke="var(--line-2)" stroke-dasharray="4 4"/>`;
+    const hi = E.d.findIndex(d => d >= '2022-01-01');
+    if (hi > 0) g += `<rect x="${xs(hi)}" y="${ET}" width="${EW - ER - xs(hi)}" height="${EH - ET - EB}" fill="var(--accent-bg)" opacity=".5"/><line x1="${xs(hi)}" x2="${xs(hi)}" y1="${ET}" y2="${EH - EB}" stroke="var(--accent)" stroke-dasharray="3 3"/><text x="${xs(hi) + 6}" y="${ET + 13}" font-size="11" fill="var(--accent)" font-weight="600">Schlusstest</text>`;
+    g += `<polyline points="${E.b.map((v, i) => `${xs(i)},${ys(v)}`).join(' ')}" fill="none" stroke="var(--fg-2)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+    g += `<polyline points="${E.s.map((v, i) => `${xs(i)},${ys(v)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round"/>`;
+    let ly = '';
+    E.d.forEach((d, i) => { const y = d.slice(0, 4); if (y !== ly) { ly = y; if (+y % 2 === 0) g += `<text x="${xs(i)}" y="${EH - 8}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">${y}</text>`; } });
+    g += '<g id="eqHi"></g>';
+    $('#eq').innerHTML = g; eqState = { E, xs, ys, n };
+  }
+  function eqHover(ev) {
+    if (!eqState) return; const r = $('#eq').getBoundingClientRect(), k = EW / r.width, x = (ev.clientX - r.left) * k; const { E, xs, ys, n } = eqState;
+    if (x < EL || x > EW - ER) { $('#eqTip').hidden = true; $('#eqHi').innerHTML = ''; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - EL) / (EW - EL - ER) * (n - 1))));
+    $('#eqHi').innerHTML = `<line x1="${xs(i)}" x2="${xs(i)}" y1="${ET}" y2="${EH - EB}" stroke="var(--fg-2)"/><circle cx="${xs(i)}" cy="${ys(E.s[i])}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/><circle cx="${xs(i)}" cy="${ys(E.b[i])}" r="4" fill="var(--fg-2)" stroke="var(--panel)" stroke-width="2"/>`;
+    const t = $('#eqTip'); t.innerHTML = `<div class="t">${E.d[i]}</div><div class="r"><span>Ensemble</span><b>${fmt((E.s[i] - 1) * 100)}%</b></div><div class="r"><span>Buy &amp; Hold</span><b>${fmt((E.b[i] - 1) * 100)}%</b></div>`;
+    placeTip(t, $('#eqBox'), xs(i) / k, ys(E.s[i]) / k);
+  }
+  $('#eq').addEventListener('pointermove', eqHover); $('#eq').addEventListener('pointerdown', eqHover);
+  $('#eq').addEventListener('pointerleave', () => { $('#eqTip').hidden = true; const h = $('#eqHi'); if (h) h.innerHTML = ''; });
+  $('#vAsset').addEventListener('input', drawEq);
+
+  drawCats(); drawHeatmap(); drawScatter(); drawLeader(); drawTable(); drawPair(); drawRC(); drawHist(); drawCOT(); drawVal(); drawEq();
 })();
 </script>
