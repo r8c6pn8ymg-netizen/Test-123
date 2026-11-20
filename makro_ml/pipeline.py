@@ -723,7 +723,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         macro_score[a] = dict(d=[str(x.date()) for x in sc_.index], v=[round(float(x), 3) for x in sc_.values])
     (OUT / f"macro_score_{mode}.json").write_text(json.dumps(macro_score))
 
-    out = dict(generated=str(pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")),
+    out = dict(generated=pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%MZ"),
                fx_through=str(min(p.index[-1] for p in px.values()).date()),
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,
                bases=meta_bases, latest=latest, milex=milex, history=history,

@@ -394,6 +394,24 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 </div>
 
 <script>
+// Aktualitaets-Anzeige: taegliche Aktualisierung laeuft Mo–Fr um 07:47 Uhr (deutsche Zeit)
+window.freshPill = function (gen) {
+  if (!gen) return '';
+  const g = new Date(/Z$/.test(gen) ? gen : gen.replace(' ', 'T') + 'Z');  // aeltere Dateien: UTC ohne Kennzeichen
+  if (isNaN(g)) return '';
+  const now = new Date();
+  // letzter planmaessiger Lauf (Werktag 07:47 Ortszeit), danach bis zu 2 Std. Rechenzeit
+  const due = new Date(now); due.setHours(7, 47, 0, 0);
+  if (now < due || [0, 6].includes(due.getDay())) { do { due.setDate(due.getDate() - 1); } while ([0, 6].includes(due.getDay())); }
+  const fresh = g >= new Date(due.getTime() - 2 * 3600e3);
+  const late = !fresh && (due - g) < 3 * 86400e3;
+  const cls = fresh ? 'hi' : late ? 'mid' : 'lo';
+  const txt = fresh ? 'Aktuell' : late ? 'Update überfällig' : 'Veraltet';
+  const d = g.toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const tip = 'Automatische Aktualisierung Mo–Fr 07:47 Uhr. Die Wechselkurse der Fed erscheinen wöchentlich mit rund einer Woche Verzug, das ist normal.';
+  return `<span class="q ${cls}" style="font-size:12px;padding:5px 11px" title="${tip}">● ${txt} · aktualisiert ${d}</span>`;
+};
+
 window.renderFactors = async function () {
   const $ = s => document.querySelector(s);
   const F = await (await fetch('factors.json', { cache: 'no-store' })).json();
@@ -402,7 +420,7 @@ window.renderFactors = async function () {
   const PRI = ['EUR', 'GBP', 'AUD', 'NZD', 'USD', 'CAD', 'CHF', 'JPY'];
   const LBL = { kombi: 'Kombi (alle drei)', adaptiv: 'Adaptiv (Walk-Forward)', carry: 'Carry', value: 'Value', momentum: 'Momentum' };
   const COLS = { kombi: 'var(--fg)', adaptiv: '#c98500', carry: '#3987e5', value: '#d95926', momentum: '#199e70' };
-  $('#stamp').innerHTML = `<span class="pill">Berechnet ${F.generated}</span><span class="pill">Kurse bis ${F.live_fx}</span><span class="pill">Portfolio-Stand ${F.asof.slice(0, 7)}</span>`;
+  $('#stamp').innerHTML = `${window.freshPill(F.generated)}<span class="pill">Kurse bis ${F.live_fx}</span><span class="pill">Portfolio-Stand ${F.asof.slice(0, 7)}</span>`;
   $('#fStamp').textContent = `Long ${F.longs.join(', ')} · Short ${F.shorts.join(', ')}`;
   $('#fCost').textContent = `Kosten ${fmt(F.cost_bp, 0)} Bp je Umschichtung`;
 
@@ -590,7 +608,7 @@ window.renderFactors = async function () {
   const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
 
   // ------------------------------------------------------------- Kopf
-  $('#stamp').innerHTML = `<span class="pill">Berechnet ${esc(D.generated)}</span><span class="pill">FX-Kurse bis ${esc(D.fx_through)}</span><span class="pill">${M.length} aktive Modelle</span>`;
+  $('#stamp').innerHTML = `${window.freshPill(D.generated)}<span class="pill">FX-Kurse bis ${esc(D.fx_through)}</span><span class="pill">${M.length} aktive Modelle</span>`;
 
   // ---------------------------------------------------------- Heatmap
   let bucket = store.get('bucket', 'high');

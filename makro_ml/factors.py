@@ -262,7 +262,7 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     robust["loo"] = {c: shp(variant(drop=c)) for c in CUR}
 
     corr = pd.DataFrame({k: res[k]["net"] for k in ("carry", "value", "momentum")}).corr().round(2)
-    out = dict(generated=str(pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")), asof=str(last.date()),
+    out = dict(generated=pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%MZ"), asof=str(last.date()),
                live_fx=str(min(px[c].dropna().index[-1] for c in CUR if c != "USD").date()),
                ranking=ranking, longs=longs, shorts=shorts,
                pairs=[dict(long=a, short=b, diff=round(float(d), 2)) for a, b, d in pairs],
