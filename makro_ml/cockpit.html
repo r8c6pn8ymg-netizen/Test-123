@@ -660,12 +660,12 @@ window.renderFactors = async function () {
       const k = TEST[st], d = (R[k].detail || {})[c === 'USD' ? 'DXY' : c], up = st.includes('high');
       if (!d || !d.n) return `<b>${NAME[st]}</b>`;
       const same = d.move > 0, h = k.split('_').pop();
-      return `<b>${NAME[st]}.</b> ${c === 'USD' ? 'Beim Dollar (DX)' : 'Bei ' + c} nach früheren ${up ? 'Hochs' : 'Tiefs'} (${d.n} Fälle seit ${d.since}): ${WAS[h]} in <b>${fmt(d.hit, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}</b> (an einem beliebigen Tag: ${fmt(d.base, 0)} von 100), im Schnitt ${same ? 'um weitere' : 'eher zurück um'} ${fmt(Math.abs(d.move), 2)} %.`;
+      return `<b>${NAME[st]}.</b> Bei ${c} nach früheren ${up ? 'Hochs' : 'Tiefs'} (${d.n} Fälle seit ${d.since}): ${WAS[h]} in <b>${fmt(d.hit, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}</b> (an einem beliebigen Tag: ${fmt(d.base, 0)} von 100), im Schnitt ${same ? 'um weitere' : 'eher zurück um'} ${fmt(Math.abs(d.move), 2)} %.`;
     };
     let h = '<thead><tr><th>Währung</th><th>Abstand Hoch</th><th>Abstand Tief</th><th style="text-align:left">Status und was bei dieser Währung früher danach passierte</th></tr></thead><tbody>';
     for (const c of ['USD', 'EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'JPY']) {
       const v = W.now[c === 'USD' ? 'DXY' : c]; if (!v) continue;
-      h += `<tr><td><b>${c}</b>${c === 'USD' ? '<br><span class="dim" style="font-size:11px">Dollar-Future DX</span>' : ''}</td><td>${sgn(v.to_high, 1)} %</td><td>${sgn(v.to_low, 1)} %</td><td style="text-align:left;white-space:normal;font-family:var(--sans)">${hint(status(v), c)}</td></tr>`;
+      h += `<tr><td><b>${c}</b></td><td>${sgn(v.to_high, 1)} %</td><td>${sgn(v.to_low, 1)} %</td><td style="text-align:left;white-space:normal;font-family:var(--sans)">${hint(status(v), c)}</td></tr>`;
     }
     $('#w52').innerHTML = h + '</tbody>';
     $('#w52Stamp').textContent = W.now.EUR ? `Kurse bis ${W.now.EUR.date.split('-').reverse().join('.')}` : '';
