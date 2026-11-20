@@ -34,6 +34,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   erreichen echte Modelle Ø 57,1 %, reine Zufallsmodelle aber auch 54,9 %; im Schlusstest 2022+ bleiben 53,5 % (Zufall 49,5 %).
   Die DA in der Tabelle ist also geschönt, das steht jetzt im Cockpit. Signifikant im Schlusstest nur **AUD** (t-Test p ≈ 0,004,
   nach Bonferroni für 8 Währungen ≈ 0,03). Ensemble JPY nicht mehr signifikant (p ≈ 0,11, vorher 0,04). Nach FDR kein Einzelmodell.
+- **Kalibrierung (20.11.):** Die Modell-Wahrscheinlichkeiten (P(steigt)) sind stark überzeichnet: Bei „20 %“ stieg die Währung
+  in ~50 von 100 Fällen, bei „81 %“ in ~53 (6,3 Mio. OOS-Prognosen, beide Ansichten). Die L2-Regularisierung (lam=2) dämpft
+  praktisch nicht (Vergleich in `research/kalibrierung.py`). Aussagekräftig ist nur die Richtung; steht so im Cockpit (täglich neu).
 - **ALFRED vs. FRED:** PAYEMS und Handelsbilanz sahen mit korrigierten Daten geschönt aus; Kernaussagen gleich. Standardansicht = ALFRED.
 - **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten, Gleichstände geteilt):** Kombi Sharpe 0,53 (p < 0,001), Carry 0,51, Value 0,18,
   Momentum 0,10. Vor 2000 Kombi 0,83, seit 2000 0,25, ab 2022 −0,39. Seit 2015: Kombi −0,14, Carry +0,17.
