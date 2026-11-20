@@ -323,8 +323,8 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 (async function () {
   const $ = s => document.querySelector(s);
   let D;
-  let MODE = 'fred';
-  try { MODE = localStorage.getItem('mlc_mode') || 'fred'; } catch (e) {}
+  let MODE = 'alfred';  // Standard: strengere Echtzeit-Variante
+  try { MODE = localStorage.getItem('mlc_mode') || 'alfred'; } catch (e) {}
   if (location.hash === '#alfred' || location.hash === '#fred') MODE = location.hash.slice(1);
   document.querySelectorAll('#modeSeg button').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.m === MODE);
