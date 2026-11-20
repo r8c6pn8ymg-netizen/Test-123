@@ -35,8 +35,8 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Die DA in der Tabelle ist also geschönt, das steht jetzt im Cockpit. Signifikant im Schlusstest nur **AUD** (t-Test p ≈ 0,004,
   nach Bonferroni für 8 Währungen ≈ 0,03). Ensemble JPY nicht mehr signifikant (p ≈ 0,11, vorher 0,04). Nach FDR kein Einzelmodell.
 - **ALFRED vs. FRED:** PAYEMS und Handelsbilanz sahen mit korrigierten Daten geschönt aus; Kernaussagen gleich. Standardansicht = ALFRED.
-- **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten, Gleichstände geteilt):** Kombi Sharpe 0,54 (p < 0,001), Carry 0,51, Value 0,18,
-  Momentum 0,10. Vor 2000 Kombi 0,84, seit 2000 0,25, ab 2022 −0,39. Seit 2015: Kombi −0,14, Carry +0,17.
+- **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten, Gleichstände geteilt):** Kombi Sharpe 0,53 (p < 0,001), Carry 0,51, Value 0,18,
+  Momentum 0,10. Vor 2000 Kombi 0,83, seit 2000 0,25, ab 2022 −0,39. Seit 2015: Kombi −0,14, Carry +0,17.
   Realistische Erwartung: Median aller Einstellungen seit 2000 ≈ 0,19.
   Ab ~20 Bp Kosten ist der Vorteil seit 2000 weg. Walk-Forward-Umgewichtung („Adaptiv“) ist schlechter als fest.
 - **CFTC:** als Gegensignal nicht belegt (1990–2014 Verlust), nur als Warnhinweis bei Extremen.
@@ -53,7 +53,7 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   (Industrieproduktion/Baubeginne 24./25.11.), deshalb offizielle Kalender. Marktwerte gegen PDF: US-Renditen, VIX, SOFR, HY-OAS
   identisch; Öl (er: Futures, FRED: Spot) und EUR/USD (andere Fixing-Uhrzeit) weichen leicht ab. Leitzinsen identisch.
 - **Trendfolge & Carry mit Bremse (20.11., vorab registriert, `research/`):** Trendfolge 1977– Sharpe 0,55 (hoch signifikant),
-  aber seit 2000 0,21 und Forward-Test 2022+ −0,16 → nach Regel nicht übernommen. Carry mit Volatilitäts-Bremse schlechter als
+  aber seit 2000 0,21 und Forward-Test 2022+ −0,10 → nach Regel nicht übernommen. Carry mit Volatilitäts-Bremse schlechter als
   Carry (Alpha negativ, Hebel bis 10,7×) → verworfen. Nicht erneut mit anderen Einstellungen versuchen (wäre Überoptimierung).
 - **52-Wochen-Hoch/-Tief (20.11., vorab registriert):** Nach einem 52W-Tief fällt die Währung kurzfristig eher weiter
   (1 Woche Ø 0,22 %, 56 % statt 50 %; nahe Tief 1 Monat Ø 0,28 %), Holm-korrigiert signifikant, alle Zeiträume gleiche
