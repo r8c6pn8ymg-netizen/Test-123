@@ -90,6 +90,7 @@ class Basis:
     series: pd.Series  # monatlich, Index = Beobachtungsmonat
     lag: int         # Tage bis Veroeffentlichung (konservativ)
     group: str       # Zinsen / Inflation / Arbeitsmarkt / ...
+    rt: pd.DataFrame | None = None  # Echtzeit-Features aus ALFRED (Index = Datenstand)
 
 
 # ------------------------------------------------------------ Datenaufbau
@@ -137,8 +138,10 @@ def pro_bases(asset: str, px: pd.Series, cot_cc: str, refresh: bool) -> list[Bas
         print(f"  ! {asset} REER: {str(e)[:60]}", file=sys.stderr)
     try:
         cot = ds.cftc_net(COT_CODES[asset], refresh)
-        res.append(Basis("COT-NET", "CFTC: Netto-Position Spekulanten in % Open Interest",
+        res.append(Basis("COT-NET", "CFTC: Netto-Position Spekulanten (Non-Commercials) in % Open Interest",
                          monthly(cot["net_pct"]), 3, "Positionierung"))
+        res.append(Basis("COT-COMM", "CFTC: Netto-Position Commercials (Absicherer) in % Open Interest",
+                         monthly(cot["comm_pct"]), 3, "Positionierung"))
     except Exception as e:
         print(f"  ! {asset} COT: {str(e)[:60]}", file=sys.stderr)
     for bid, lab, sid, lag in COMMODITIES.get(asset, []):
@@ -295,6 +298,9 @@ def diff_bases(cc: dict, us: dict) -> list[Basis]:
 
 # --------------------------------------------------------------- Modelle
 def features(b: Basis, dates: pd.DatetimeIndex) -> pd.DataFrame:
+    if b.rt is not None:  # ALFRED: Features exakt so, wie sie am jeweiligen Tag bekannt waren
+        f = b.rt.sort_index()
+        return f.reindex(dates, method="ffill")
     s = b.series.sort_index()
     f = pd.DataFrame({"lvl": s, "d3": s - s.shift(3), "d12": s - s.shift(12)}).dropna()
     # Monatswert gilt ab Monatsende + Veroeffentlichungs-Lag
@@ -411,13 +417,81 @@ def label(prob: float) -> str:
 
 
 # ------------------------------------------------------------------ Main
+# US-Reihen, die nachtraeglich revidiert werden -> Echtzeit-Variante aus ALFRED
+ALFRED_SERIES = {  # Basis-ID: (FRED-ID, Transformation)
+    "PAYEMS": ("PAYEMS", "diff3"), "UNRATE": ("UNRATE", "level"), "CPIAUCSL": ("CPIAUCSL", "yoy"),
+    "CPILFESL": ("CPILFESL", "yoy"), "INDPRO": ("INDPRO", "yoy"), "OPHNFB": ("OPHNFB", "yoy_q"),
+    "BOPGSTB": ("BOPGSTB", "k"),
+}
+
+
+def realtime_features(sid: str, how: str, today: pd.Timestamp, refresh: bool) -> pd.DataFrame:
+    vint = list(pd.date_range("1998-01-31", today, freq="ME")) + [today]
+    V = ds.alfred_vintages(sid, vint, refresh)
+    rows = {}
+    for v in V.columns:
+        s = V[v].dropna()
+        if len(s) < 30:
+            continue
+        s.index = pd.to_datetime(s.index)
+        if how == "yoy_q":
+            x = yoy(quarterly_to_monthly(s))
+        elif how == "yoy":
+            x = yoy(monthly(s))
+        elif how == "diff3":
+            x = monthly(s).diff(3).dropna()
+        elif how == "k":
+            x = monthly(s) / 1000
+        else:
+            x = monthly(s)
+        if len(x) < 15:
+            continue
+        t = x.index[-1]
+        lv = float(x.iloc[-1])
+        d3 = x.get(t - pd.DateOffset(months=3))
+        d12 = x.get(t - pd.DateOffset(months=12))
+        if d3 is None or d12 is None:
+            continue
+        rows[pd.Timestamp(v)] = (lv, lv - float(d3), lv - float(d12))
+    return pd.DataFrame.from_dict(rows, orient="index", columns=["lvl", "d3", "d12"]).sort_index()
+
+
 def main(refresh: bool = True):
     today = pd.Timestamp(date.today())
+    outs, stats = {}, {}
+    for mode in ("fred", "alfred"):
+        print(f"===== Variante {mode.upper()} =====")
+        outs[mode], stats[mode] = run_mode(mode, refresh, today)
+    # Vergleich FRED (revidiert) vs. ALFRED (Echtzeit) fuer die betroffenen Basen
+    comp = []
+    for bid in ALFRED_SERIES:
+        f, a = stats["fred"].get(bid), stats["alfred"].get(bid)
+        if not f or not a:
+            continue
+        comp.append(dict(basis=bid, label=outs["fred"]["bases"].get(bid, {}).get("label", bid),
+                         **{f"{k}_{m}": v for m, d in (("fred", f), ("alfred", a)) for k, v in d.items()}))
+    for mode, out in outs.items():
+        out["mode"] = mode
+        out["comparison"] = comp
+        (OUT / f"data_{mode}.json").write_text(json.dumps(out, ensure_ascii=False))
+    print("Vergleich FRED vs. ALFRED (Ø DA aller Kandidaten | bestanden | Ø DA Schlusstest):")
+    for c in comp:
+        print(f"  {c['basis']:9s} FRED {c['da_fred']:5.1f} | {c['pass_fred']:3d} | {c['post_fred']}   "
+              f"ALFRED {c['da_alfred']:5.1f} | {c['pass_alfred']:3d} | {c['post_alfred']}")
+
+
+def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     print("Lade Daten ...")
     px = load_fx(refresh)
     sipri = ds.sipri_share_of_gdp(refresh)
     us_cc = country_series("US", "US", "United States of America", sipri, refresh)
     ub = us_bases(refresh)
+    if mode == "alfred":
+        for b in ub:
+            if b.id in ALFRED_SERIES:
+                sid, how = ALFRED_SERIES[b.id]
+                b.rt = realtime_features(sid, how, today, refresh)
+                b.label += " [ALFRED Echtzeit]"
 
     bases_by_asset: dict[str, list[Basis]] = {"DXY": list(ub)}
     if "MIL" in us_cc:
@@ -458,6 +532,7 @@ def main(refresh: bool = True):
         delayed(run_model)(X, price, h, today) for (_, _, h, X, price) in tasks)
 
     models = []
+    bstats: dict = {}
     cand = {a: dict(n=0, A=0, B=0, da=[], noise_n=0, noise_A=0, noise_B=0, noise_da=[])
             for a in ASSET_ORDER}
     pre_pool = {a: {"real": [], "noise": []} for a in ASSET_ORDER}
@@ -478,6 +553,10 @@ def main(refresh: bool = True):
             continue
         c["n"] += 1
         c["da"].append(round(r["da"] * 100, 1))
+        bs = bstats.setdefault(b.id, dict(da=[], post=[], pass_=0))
+        bs["da"].append(r["da"]); bs["pass_"] += bool(tier(r))
+        if r["post_da"] is not None:
+            bs["post"].append(r["post_da"])
         if not t:
             continue
         c[t] += 1
@@ -529,12 +608,18 @@ def main(refresh: bool = True):
     cot_view = {}
     for a in ASSET_ORDER:
         try:
-            c = ds.cftc_net(COT_CODES[a], False)["net_pct"].dropna()
-            last3 = c[c.index >= c.index[-1] - pd.Timedelta(days=3 * 365)]
-            pct = float((last3 < c.iloc[-1]).mean() * 100)
-            w = c[c.index >= c.index[-1] - pd.Timedelta(days=365)]
-            cot_view[a] = dict(net=round(float(c.iloc[-1]), 1), chg4=round(float(c.iloc[-1] - c.iloc[-5]), 1),
-                               pct3y=round(pct), d=str(c.index[-1].date()), spark=[round(float(x), 1) for x in w.values])
+            cdf = ds.cftc_net(COT_CODES[a], False)
+            view = {}
+            for key, col in (("spec", "net_pct"), ("comm", "comm_pct"), ("small", "small_pct")):
+                c = cdf[col].dropna()
+                last3 = c[c.index >= c.index[-1] - pd.Timedelta(days=3 * 365)]
+                w = c[c.index >= c.index[-1] - pd.Timedelta(days=365)]
+                view[key] = dict(net=round(float(c.iloc[-1]), 1), chg4=round(float(c.iloc[-1] - c.iloc[-5]), 1),
+                                 pct3y=round(float((last3 < c.iloc[-1]).mean() * 100)),
+                                 spark=[round(float(x), 1) for x in w.values])
+            view["d"] = str(cdf.index[-1].date())
+            view["oi"] = int(cdf["oi"].iloc[-1])
+            cot_view[a] = view
         except Exception as e:
             print(f"  ! COT-Anzeige {a}: {e}", file=sys.stderr)
 
@@ -562,7 +647,10 @@ def main(refresh: bool = True):
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,
                bases=meta_bases, latest=latest, milex=milex, history=history,
                priced=priced, validation=validation, cot=cot_view, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
-    (OUT / "data.json").write_text(json.dumps(out, ensure_ascii=False))
+    basis_stats = {k: dict(da=round(float(np.mean(v["da"])) * 100, 1), pass_=v["pass_"], n=len(v["da"]),
+                           post=round(float(np.mean(v["post"])) * 100, 1) if v["post"] else None)
+                   for k, v in bstats.items()}
+    basis_stats = {k: dict(da=v["da"], pass_=v["pass_"], n=v["n"], post=v["post"]) for k, v in basis_stats.items()}
     print("Kandidaten je Waehrung (A=signifikant, B=robust):")
     for a in ASSET_ORDER:
         c = cand[a]
@@ -576,7 +664,7 @@ def main(refresh: bool = True):
         bt = (v.get("backtest") or {}).get("periods", {}).get("Schlusstest 2022–heute") or {}
         print(f"  {a}: echt DA vorher {v['real']['da_pre']} -> Schlusstest {v['real']['da_post']} | "
               f"Zufall {v['noise']['da_pre']} -> {v['noise']['da_post']} | Ensemble Sharpe {bt.get('sharpe')} Treffer {bt.get('hit')}")
-    return out
+    return out, {k: {"da": v["da"], "pass": v["pass_"], "n": v["n"], "post": v["post"]} for k, v in basis_stats.items()}
 
 
 if __name__ == "__main__":

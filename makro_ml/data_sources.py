@@ -108,19 +108,68 @@ def sipri_share_of_gdp(refresh: bool = False) -> pd.DataFrame:
 def cftc_net(code: str, refresh: bool = False) -> pd.DataFrame:
     """CFTC Commitments of Traders (Legacy, Futures only) fuer einen Kontrakt.
 
-    Rueckgabe (woechentlich, Index = Stichtag Dienstag): long, short, oi, net_pct
-    (Netto-Position der Spekulanten / Open Interest in %).
+    Woechentlich (Index = Stichtag Dienstag). Netto-Positionen in % Open Interest:
+    ``net_pct`` = Non-Commercials (grosse Spekulanten), ``comm_pct`` = Commercials
+    (Absicherer, z. B. Banken/Unternehmen), ``small_pct`` = Non-Reportables (Kleinspekulanten).
     """
+    cols = ["noncomm_positions_long_all", "noncomm_positions_short_all", "comm_positions_long_all",
+            "comm_positions_short_all", "nonrept_positions_long_all", "nonrept_positions_short_all",
+            "open_interest_all"]
     url = ("https://publicreporting.cftc.gov/resource/6dca-aqww.csv?"
-           "$select=report_date_as_yyyy_mm_dd,noncomm_positions_long_all,"
-           "noncomm_positions_short_all,open_interest_all"
+           "$select=report_date_as_yyyy_mm_dd," + ",".join(cols) +
            f"&$where=cftc_contract_market_code=%27{code}%27"
            "&$order=report_date_as_yyyy_mm_dd&$limit=50000")
-    raw = _cached(f"cftc_{code}.csv", url, refresh)
+    raw = _cached(f"cftc3_{code}.csv", url, refresh)
     df = pd.read_csv(io.BytesIO(raw))
-    df.columns = ["date", "long", "short", "oi"]
+    df.columns = ["date", "nc_l", "nc_s", "c_l", "c_s", "nr_l", "nr_s", "oi"]
     df["date"] = pd.to_datetime(df["date"])
     df = df.set_index("date").sort_index().apply(pd.to_numeric, errors="coerce").dropna()
     df = df[~df.index.duplicated(keep="last")]
-    df["net_pct"] = 100 * (df["long"] - df["short"]) / df["oi"]
+    df["net_pct"] = 100 * (df["nc_l"] - df["nc_s"]) / df["oi"]
+    df["comm_pct"] = 100 * (df["c_l"] - df["c_s"]) / df["oi"]
+    df["small_pct"] = 100 * (df["nr_l"] - df["nr_s"]) / df["oi"]
     return df
+
+
+def alfred_vintages(series_id: str, vintage_dates: list[pd.Timestamp], refresh: bool = False) -> pd.DataFrame:
+    """ALFRED-Echtzeitdaten: je Datenstand (Spalte) die damals veroeffentlichte Reihe.
+
+    Abruf ohne API-Key ueber den ALFRED-CSV-Download, 12 Datenstaende je Anfrage.
+    Alte Datenstaende aendern sich nie und werden dauerhaft im Cache gehalten; die
+    letzten zwei werden bei ``refresh`` neu geladen.
+    """
+    path = CACHE / f"alfred_{series_id}.csv"
+    have = pd.read_csv(path, index_col=0, parse_dates=True) if path.exists() else pd.DataFrame()
+    want = [pd.Timestamp(v).strftime("%Y-%m-%d") for v in vintage_dates]
+    missing = [v for v in want if v not in have.columns]
+    if refresh:
+        missing = sorted(set(missing) | set(want[-2:]))
+    for i in range(0, len(missing), 12):
+        chunk = missing[i:i + 12]
+        url = ("https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=" + ",".join([series_id] * len(chunk))
+               + "&vintage_date=" + ",".join(chunk))
+        try:
+            df = pd.read_csv(io.BytesIO(_download(url)))
+        except Exception:
+            # Einzeln versuchen (ein fehlender Datenstand laesst die ganze Anfrage scheitern)
+            parts = []
+            for v in chunk:
+                try:
+                    parts.append(pd.read_csv(io.BytesIO(_download(
+                        f"https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={series_id}&vintage_date={v}"))))
+                except Exception:
+                    pass
+                time.sleep(0.3)
+            if not parts:
+                continue
+            df = parts[0]
+            for p in parts[1:]:
+                df = df.merge(p, on="observation_date", how="outer")
+        df["observation_date"] = pd.to_datetime(df["observation_date"])
+        df = df.set_index("observation_date").apply(pd.to_numeric, errors="coerce")
+        df.columns = [f"{c.split('_')[-1][:4]}-{c.split('_')[-1][4:6]}-{c.split('_')[-1][6:8]}" for c in df.columns]
+        have = df if have.empty else have.drop(columns=[c for c in df.columns if c in have.columns]).join(df, how="outer")
+        time.sleep(0.5)
+    have = have.reindex(sorted(have.columns), axis=1)
+    have.to_csv(path)
+    return have[[c for c in want if c in have.columns]]
