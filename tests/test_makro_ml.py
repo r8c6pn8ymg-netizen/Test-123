@@ -338,3 +338,22 @@ def test_faktor_gleichstand_ueber_beide_grenzen_bleibt_ausgeglichen():
     assert abs(w.sum()) < 1e-12
     assert abs(w[w > 0].sum() + w[w < 0].sum()) < 1e-12
     assert w["AUD"] == w["NZD"] > 0 and w["USD"] == w["JPY"] < 0
+
+
+@pytest.mark.parametrize("mode", ["fred", "alfred"])
+def test_kalibrierung_aendert_richtung_nicht_und_ist_nicht_schlechter(mode):
+    """Kalibrierte P(steigt): gleiche Richtung wie die Roh-Ausgabe (bis auf Rundung bei genau 50 %) und im Test
+    ab 2016 (Umrechnung nur mit Daten vor 2016) kein schlechteres Fehlermass als roh."""
+    import json
+    f = Path(__file__).resolve().parents[1] / "makro_ml" / "output" / f"data_{mode}.json"
+    if not f.exists():
+        pytest.skip("Pipeline-Ausgabe fehlt")
+    d = json.loads(f.read_text())
+    C = d.get("calibration") or {}
+    if "test_brier_cal" not in C:
+        pytest.skip("alte Ausgabe ohne Kalibrierung")
+    assert C["test_brier_cal"] <= C["test_brier_raw"]
+    for m in d["models"]:
+        assert 0 < m["prob"] < 1
+        if abs(m["prob_raw"] - 0.5) > 0.002:
+            assert (m["prob"] > 0.5) == (m["prob_raw"] > 0.5), m
