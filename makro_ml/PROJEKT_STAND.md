@@ -33,6 +33,10 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q`
   Ab ~20 Bp Kosten ist der Vorteil seit 2000 weg. Walk-Forward-Umgewichtung („Adaptiv“) ist schlechter als fest.
 - **CFTC:** als Gegensignal nicht belegt (1990–2014 Verlust), nur als Warnhinweis bei Extremen.
 - **Konsens/Ampel:** bringt keinen belastbaren Zusatznutzen (wenige Trades, nach Mehrfachtest-Korrektur nicht signifikant) → bewusst **nicht** gebaut.
+- **Ergänzt 20.11. (Abgleich Zinscapital-Bericht):** Leitzinsen im Faktor-Ranking tagesaktuell (BIS). Neue Makro-Kandidaten:
+  Kern-PCE (Ø DA 51,5 %, ähnlich gut wie Kern-CPI und weitgehend dieselbe Information), realer Einzelhandel und Erzeugerpreise
+  (≈ 49 %, kein Vorteil, werden vom Filter fast nie ausgewählt). Gesamtbild unverändert, nach FDR weiterhin kein Einzelmodell.
+  PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
 - **Wendepunkte:** mit keinem Signal vorhersagbar (Vorhersage 49–52 %). Gute Treffer an Wenden (CFTC, umgedrehtes Momentum) sind Rückblick-Effekte.
   Optimieren auf einen Wendepunkt: 100 % dort, 51 % anderswo → Überoptimierung.
 
