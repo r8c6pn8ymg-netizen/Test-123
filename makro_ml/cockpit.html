@@ -237,7 +237,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
       <div class="pb">
         <div class="chks" id="assetChks"></div>
         <div class="chartbox" id="scatterBox"><svg id="scatter" viewBox="0 0 640 420" role="img" aria-label="Streudiagramm: jedes Modell als Punkt, x = Horizont in Tagen, y = Wahrscheinlichkeit für steigenden Kurs"></svg><div class="tip" id="scTip" hidden></div></div>
-        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. <b>P(steigt) ist kalibriert:</b> Die Roh-Ausgabe der Modelle war viel zu selbstsicher, deshalb wird sie auf die tatsächlich eingetretene Häufigkeit umgerechnet. Die Richtung (über oder unter 50 %) bleibt dabei gleich, nur die Höhe wird ehrlich. Darum liegen die Punkte nah an 50 %: Mehr geben Makrodaten bei Wechselkursen nicht her. Die Skala ist vergrößert, damit man Unterschiede sieht.<span id="calNote"></span> <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
+        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. <b>P(steigt) ist kalibriert:</b> Die Roh-Ausgabe der Modelle war viel zu selbstsicher, deshalb wird sie auf die tatsächlich eingetretene Häufigkeit umgerechnet. Die Richtung (über oder unter 50 %) bleibt dabei gleich, nur die Höhe wird ehrlich. Darum liegen die Punkte nah an 50 %: Mehr geben Makrodaten bei Wechselkursen nicht her. Die Skala ist vergrößert, damit man Unterschiede sieht. Die schmale Leiste rechts zeigt die ganze Skala von 0 bis 100 %, der farbige Streifen darauf ist der vergrößerte Ausschnitt.<span id="calNote"></span> <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
       </div>
     </section>
     <section class="panel">
@@ -901,7 +901,7 @@ window.renderFactors = async function () {
   $('#assetChks').innerHTML = ASSETS.map(a => `<label class="chk${M.some(m => m.asset === a) ? '' : ' off'}"><input type="checkbox" value="${a}" id="chk-${a}"${sel.has(a) ? ' checked' : ''}>${swatch(a)}${a}</label>`).join('');
   $('#assetChks').addEventListener('change', e => { if (e.target.checked) sel.add(e.target.value); else sel.delete(e.target.value); store.set('scSel', [...sel]); drawScatter(); });
 
-  const SW = 640, SH = 420, ML = 52, MR = 14, MT = 14, MB = 40;
+  const SW = 640, SH = 420, ML = 52, MR = 64, MT = 14, MB = 40;  // rechts Platz fuer die 0–100-%-Leiste
   const ext = Math.max(0.005, ...ALL.map(m => Math.abs(m.prob - 0.5))) * 1.12;  // Skala passt sich an (kalibrierte Werte liegen nah an 50 %)
   const LX0 = Math.log(8), LX1 = Math.log(340);
   const sx = h => ML + (Math.log(h) - LX0) / (LX1 - LX0) * (SW - ML - MR);
@@ -931,6 +931,19 @@ window.renderFactors = async function () {
     }
     g += `<text x="${(ML + SW - MR) / 2}" y="${SH - 4}" text-anchor="middle" font-size="11" fill="var(--muted)">Horizont (Tage, log. Skala)</text>`;
     g += `<text transform="translate(13 ${(MT + SH - MB) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="var(--muted)">P(steigt)</text>`;
+    // Kleine Leiste 0–100 %: zeigt, welcher Ausschnitt oben vergroessert ist
+    {
+      const bx = SW - 44, bw = 9, top = MT, bot = SH - MB, by = v => top + (1 - v) * (bot - top);
+      const b1 = by(0.5 + ext), b2 = by(0.5 - ext);
+      g += `<rect x="${bx}" y="${top}" width="${bw}" height="${(bot - top) / 2}" fill="var(--bull-bg)" stroke="var(--line-2)"/>`;
+      g += `<rect x="${bx}" y="${by(0.5)}" width="${bw}" height="${(bot - top) / 2}" fill="var(--bear-bg)" stroke="var(--line-2)"/>`;
+      g += `<rect x="${bx - 2}" y="${b1}" width="${bw + 4}" height="${Math.max(2, b2 - b1)}" fill="var(--accent)"/>`;
+      g += `<line x1="${SW - MR}" y1="${MT}" x2="${bx - 2}" y2="${b1}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>`;
+      g += `<line x1="${SW - MR}" y1="${SH - MB}" x2="${bx - 2}" y2="${b2}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>`;
+      for (const [v, t] of [[1, '100%'], [0.5, '50%'], [0, '0%']])
+        g += `<text x="${bx + bw + 4}" y="${by(v) + 4}" font-size="10" font-family="var(--mono)" fill="var(--muted)">${t}</text>`;
+      g += `<text x="${bx + bw / 2}" y="${SH - MB + 19}" text-anchor="middle" font-size="10" fill="var(--muted)">0–100</text>`;
+    }
     // Robuste zuerst, signifikante obenauf
     scPts = pts.map(m => ({ m, x: sx(m.h * (1 + jitter(m) / 60)), y: sy(m.prob) })).sort((a, b) => (a.m.tier < b.m.tier) - (a.m.tier > b.m.tier));
     for (const p of scPts) g += shapePath(SHAPES[p.m.asset], p.x, p.y, 4.6, p.m.tier === 'A', COL(p.m.asset));
