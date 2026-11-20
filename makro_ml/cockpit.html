@@ -153,6 +153,17 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 .pctbar { position: relative; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--bear-bg-2), var(--panel-2) 50%, var(--bull-bg-2)); width: 120px; display: inline-block; vertical-align: middle; }
 .pctbar i { position: absolute; top: -3px; width: 3px; height: 14px; border-radius: 2px; background: var(--fg); }
 .pos { color: var(--bull); } .negv { color: var(--bear); }
+.view { display: grid; gap: 14px; min-width: 0; }
+.view[hidden] { display: none !important; }
+.fcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.fcard { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.fcard .pn { font: 700 20px var(--mono); }
+.fcard .pd { font: 700 11px var(--mono); letter-spacing: .08em; }
+.fcard .ps { font-size: 12px; color: var(--muted); }
+.zbar { position: relative; width: 120px; height: 10px; background: var(--panel-2); border-radius: 5px; display: inline-block; vertical-align: middle; }
+.zbar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line-2); }
+.zbar i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.rk { display: inline-block; min-width: 26px; text-align: center; font: 600 12px var(--mono); padding: 4px 0; border-radius: 5px; }
 .err { padding: 40px; text-align: center; color: var(--bear); }
 @media (prefers-reduced-motion: no-preference) { .lbi, .seg button, .tabs button { transition: border-color .15s, background .15s, color .15s; } }
 </style>
@@ -164,14 +175,16 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
       <span class="sub">FX-Bias aus Makrodaten · 10–300 Tage</span>
     </div>
     <div class="stamp" style="align-items:center">
-      <div class="seg" id="modeSeg" role="group" aria-label="Datenvariante">
-        <button type="button" data-m="fred" aria-pressed="false" title="Heutige, korrigierte Makrozahlen">FRED · korrigiert</button>
-        <button type="button" data-m="alfred" aria-pressed="false" title="Makrozahlen so, wie sie am jeweiligen Tag veröffentlicht waren">ALFRED · Echtzeit</button>
+      <div class="seg" id="modeSeg" role="group" aria-label="Ansicht">
+        <button type="button" data-m="fred" aria-pressed="false" title="Makro ML mit heutigen, korrigierten Makrozahlen">Makro ML · FRED</button>
+        <button type="button" data-m="alfred" aria-pressed="false" title="Makro ML mit Makrozahlen, wie sie am jeweiligen Tag veröffentlicht waren">Makro ML · ALFRED</button>
+        <button type="button" data-m="faktoren" aria-pressed="false" title="Carry, Value, Momentum: Rangliste der 8 Währungen">Faktor-Portfolio</button>
       </div>
       <div class="stamp" id="stamp"><span class="pill">Lade Daten …</span></div>
     </div>
   </header>
 
+  <div id="macroView" class="view">
   <section class="panel">
     <div class="ph"><span>Modell-Kategorien · ankreuzen, was in Heatmap, Scatter, Leaderboard und Tabelle zählt</span>
       <span><button type="button" class="linkbtn" id="catAll">Alle</button><button type="button" class="linkbtn" id="catMacro">Nur Makro</button><button type="button" class="linkbtn" id="catPro">Nur Profi-Faktoren</button></span></div>
@@ -317,7 +330,169 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     <div class="ph"><span>Methodik</span></div>
     <div class="pb note" style="max-width:none;display:grid;gap:8px" id="method"></div>
   </section>
+  </div>
+
+  <div id="factorView" class="view" hidden>
+    <section class="panel">
+      <div class="ph"><span>Faktor-Portfolio · welche Währung ist gerade stark, welche schwach?</span><span class="eyebrow" id="fStamp"></span></div>
+      <div class="pb">
+        <div class="note" style="max-width:none">Jeden Monat werden die 8 Währungen (inklusive USD) nach drei Faktoren sortiert, die in der Forschung seit Jahrzehnten belegt sind. <b>Carry</b>: Hochzinswährungen kaufen, Niedrigzinswährungen verkaufen. <b>Value</b>: billige Währungen kaufen, teure verkaufen. <b>Momentum</b>: Gewinner der letzten 3–12 Monate kaufen, Verlierer verkaufen. Das Modell-Portfolio kauft die <b>3 stärksten</b> und verkauft die <b>3 schwächsten</b>. Ob der Dollar insgesamt steigt oder fällt, spielt dabei keine Rolle.</div>
+        <div class="fcards" id="fPairs"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><span>Rangliste heute</span><span class="eyebrow">Score = Mittel der drei Faktor-Ränge</span></div>
+      <div class="pb"><div class="scroll-x"><table class="rc" id="fRank"></table></div>
+        <div class="note" style="max-width:none"><b>Carry</b> = Leitzins minus US-Leitzins. <b>Value</b> = Abweichung des realen effektiven Wechselkurses vom 10-Jahres-Schnitt (negativ = billig, wegen Veröffentlichung 2 Monate alt). <b>Momentum</b> = Kursentwicklung gegen USD. Die Zahl in Klammern ist der Faktor-Score: positiv heißt kaufen, negativ verkaufen. Die Rangliste nutzt die aktuellsten Kurse, das Portfolio wird jeweils zum Monatsende umgeschichtet.</div></div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><span>Rang-Verlauf · letzte 24 Monate</span><span class="eyebrow">1 = stärkste, 8 = schwächste</span></div>
+      <div class="pb"><div class="scroll-x"><table class="rc" id="fHist"></table></div></div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><span>Backtest seit 1977 · nach Kosten · logarithmische Skala</span><span class="eyebrow" id="fCost"></span></div>
+      <div class="pb">
+        <div class="chartbox" id="fEqBox"><svg id="fEq" viewBox="0 0 1200 320" role="img" aria-label="Equity-Kurven der Faktor-Strategien"></svg><div class="tip" id="fEqTip" hidden></div></div>
+        <div class="chips" id="fLegend"></div>
+        <div class="scroll-x"><table class="rc" id="fStats"></table></div>
+        <div class="scroll-x"><table class="rc" id="fPeriods"></table></div>
+        <div class="note" style="max-width:none"><b>Adaptiv (Walk-Forward)</b> gewichtet die drei Faktoren jeden Monat neu, und zwar nach ihrer Sharpe-Ratio der letzten 5 Jahre. Genutzt werden nur Daten bis zum Vormonat. Daran lässt sich prüfen, ob laufendes Nachjustieren besser ist als die feste Gleichgewichtung. <b>Newey-West p</b> prüft die Hypothese „Ertrag = 0“, mit Korrektur für aufeinanderfolgende Monate. <b>Zufalls-p</b> vergleicht mit 2.000 Portfolios, die jeden Monat zufällig 3 Währungen kaufen und 3 verkaufen. Es gibt an, wie oft Zufall mindestens so gut war. Alle Einstellungen (3 long / 3 short, 3+12 Monate, 10 Jahre) stammen aus der Fachliteratur und wurden <b>nicht</b> auf diese Daten optimiert. Darum gibt es hier keine Auswahl-Verzerrung, und jeder Zeitraum ist ein echter Test.</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><span>Stabilität · rollierende Sharpe-Ratio über 5 Jahre</span><span class="eyebrow">über 0 = Strategie hat in den letzten 5 Jahren verdient</span></div>
+      <div class="pb">
+        <div class="chartbox" id="fRollBox"><svg id="fRoll" viewBox="0 0 1200 260" role="img" aria-label="Rollierende 5-Jahres-Sharpe-Ratio"></svg><div class="tip" id="fRollTip" hidden></div></div>
+        <div class="chips" id="fRollLegend"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><span>Einordnung</span></div>
+      <div class="pb note" style="max-width:none;display:grid;gap:8px" id="fVerdict"></div>
+    </section>
+  </div>
 </div>
+
+<script>
+window.renderFactors = async function () {
+  const $ = s => document.querySelector(s);
+  const F = await (await fetch('factors.json', { cache: 'no-store' })).json();
+  const fmt = (v, d = 1) => Number(v).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const sgn = (v, d = 1) => (v > 0 ? '+' : '') + fmt(v, d);
+  const PRI = ['EUR', 'GBP', 'AUD', 'NZD', 'USD', 'CAD', 'CHF', 'JPY'];
+  const LBL = { kombi: 'Kombi (alle drei)', adaptiv: 'Adaptiv (Walk-Forward)', carry: 'Carry', value: 'Value', momentum: 'Momentum' };
+  const COLS = { kombi: 'var(--fg)', adaptiv: '#c98500', carry: '#3987e5', value: '#d95926', momentum: '#199e70' };
+  $('#stamp').innerHTML = `<span class="pill">Berechnet ${F.generated}</span><span class="pill">Kurse bis ${F.live_fx}</span><span class="pill">Portfolio-Stand ${F.asof.slice(0, 7)}</span>`;
+  $('#fStamp').textContent = `Long ${F.longs.join(', ')} · Short ${F.shorts.join(', ')}`;
+  $('#fCost').textContent = `Kosten ${fmt(F.cost_bp, 0)} Bp je Umschichtung`;
+
+  // Paar-Vorschlaege
+  $('#fPairs').innerHTML = F.pairs.slice(0, 6).map(p => {
+    const a = p.long, b = p.short, aFirst = PRI.indexOf(a) < PRI.indexOf(b);
+    const name = aFirst ? `${a}/${b}` : `${b}/${a}`, dir = aFirst ? 'KAUFEN' : 'VERKAUFEN';
+    return `<div class="fcard"><span class="pn">${name}</span><span class="pd ${aFirst ? 'bull' : 'bear'}">${dir}</span><span class="ps">Long ${a}, Short ${b} · Score-Abstand ${fmt(p.diff, 2)}</span></div>`;
+  }).join('');
+
+  // Rangliste
+  const zb = v => { const w = Math.min(Math.abs(v) / 1.6, 1) * 50; return `<span class="zbar"><i style="${v >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${v >= 0 ? 'var(--bull)' : 'var(--bear)'}"></i></span>`; };
+  const zc = v => `<span class="${v > 0.3 ? 'pos' : v < -0.3 ? 'negv' : 'dim'}">(${sgn(v, 1)})</span>`;
+  let h = '<thead><tr><th>Rang</th><th style="text-align:left">Währung</th><th style="text-align:left">Gesamt-Score</th><th>Carry: Zinsdiff.</th><th>Value: ggü. Schnitt</th><th>Momentum 3M / 12M</th><th>Position</th></tr></thead><tbody>';
+  F.ranking.forEach((r, i) => {
+    const pos = F.longs.includes(r.cur) ? '<span class="q hi">LONG</span>' : F.shorts.includes(r.cur) ? '<span class="q lo">SHORT</span>' : '<span class="dim">–</span>';
+    h += `<tr><td>${i + 1}</td><td style="text-align:left"><b>${r.cur}</b> <span class="dim">· Leitzins ${fmt(r.rate, 2)}%</span></td><td style="text-align:left">${zb(r.kombi)} <span style="margin-left:6px" class="${r.kombi >= 0 ? 'pos' : 'negv'}">${sgn(r.kombi, 2)}</span></td>
+      <td>${sgn(r.carry, 2)} Pkt. ${zc(r.z_carry)}</td><td>${sgn(r.value_gap)}% ${zc(r.z_value)}</td><td>${sgn(r.mom3)}% / ${sgn(r.mom12)}% ${zc(r.z_mom)}</td><td>${pos}</td></tr>`;
+  });
+  $('#fRank').innerHTML = h + '</tbody>';
+
+  // Rang-Verlauf
+  const HR = F.hist_rank;
+  const rkCol = k => k <= 3 ? `color-mix(in srgb, var(--bull) ${44 - (k - 1) * 12}%, var(--panel-2))` : k >= 6 ? `color-mix(in srgb, var(--bear) ${44 - (8 - k) * 12}%, var(--panel-2))` : 'var(--panel-2)';
+  let hh = '<thead><tr><th style="text-align:left">Währung</th>' + HR.d.map((d, i) => `<th>${i % 3 === 0 || i === HR.d.length - 1 ? d.slice(2).replace('-', '/') : ''}</th>`).join('') + '</tr></thead><tbody>';
+  for (const c of F.ranking.map(r => r.cur)) {
+    hh += `<tr><td style="text-align:left"><b>${c}</b></td>` + HR.ranks[c].map((k, i) => `<td style="padding:3px 2px"><span class="rk" title="${c} ${HR.d[i]}: Rang ${k}" style="background:${rkCol(k)}">${k || '–'}</span></td>`).join('') + '</tr>';
+  }
+  $('#fHist').innerHTML = hh + '</tbody>';
+
+  // Equity-Kurven
+  const E = F.equity, n = E.d.length, W = 1200, H = 320, L = 56, R = 16, T = 14, B = 30;
+  const keys = ['carry', 'value', 'momentum', 'adaptiv', 'kombi'];
+  const all = keys.flatMap(k => E[k]).map(v => Math.log(v)); const mn = Math.min(...all), mx = Math.max(...all), pad = (mx - mn) * .05;
+  const xs = i => L + i / (n - 1) * (W - L - R), ys = v => T + (mx + pad - Math.log(v)) / (mx - mn + 2 * pad) * (H - T - B);
+  let g = '';
+  for (const m of [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8]) { if (Math.log(m) < mn - pad || Math.log(m) > mx + pad) continue; g += `<line x1="${L}" x2="${W - R}" y1="${ys(m)}" y2="${ys(m)}" stroke="var(--line)"/><text x="${L - 8}" y="${ys(m) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${sgn((m - 1) * 100, 0)}%</text>`; }
+  g += `<line x1="${L}" x2="${W - R}" y1="${ys(1)}" y2="${ys(1)}" stroke="var(--line-2)" stroke-dasharray="4 4"/>`;
+  const hi = E.d.findIndex(d => d >= '2022-01-01');
+  if (hi > 0) g += `<rect x="${xs(hi)}" y="${T}" width="${W - R - xs(hi)}" height="${H - T - B}" fill="var(--accent-bg)" opacity=".45"/><text x="${xs(hi) + 6}" y="${T + 13}" font-size="11" fill="var(--accent)" font-weight="600">2022–heute</text>`;
+  for (const k of keys) g += `<polyline points="${E[k].map((v, i) => `${xs(i)},${ys(v)}`).join(' ')}" fill="none" stroke="${COLS[k]}" stroke-width="${k === 'kombi' ? 2.6 : 1.5}" stroke-linejoin="round" ${k === 'adaptiv' ? 'stroke-dasharray="5 3"' : ''} ${k === 'kombi' ? '' : 'opacity=".85"'}/>`;
+  let ly = ''; E.d.forEach((d, i) => { const y = d.slice(0, 4); if (y !== ly) { ly = y; if (+y % 5 === 0) g += `<text x="${xs(i)}" y="${H - 8}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">${y}</text>`; } });
+  g += '<g id="fHi"></g>';
+  $('#fEq').innerHTML = g;
+  $('#fLegend').innerHTML = keys.map(k => `<span class="chip"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="${COLS[k]}" stroke-width="${k === 'kombi' ? 3 : 2}" ${k === 'adaptiv' ? 'stroke-dasharray="5 3"' : ''}/></svg> ${LBL[k]} <b style="margin-left:4px">${sgn((E[k][n - 1] - 1) * 100, 0)}%</b></span>`).join('') + '<span class="dim" style="font-size:12px">Werte nach Kosten, kumuliert seit 1977</span>';
+  const svg = $('#fEq');
+  const hover = ev => {
+    const r = svg.getBoundingClientRect(), k = W / r.width, x = (ev.clientX - r.left) * k;
+    if (x < L || x > W - R) { $('#fEqTip').hidden = true; $('#fHi').innerHTML = ''; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - L) / (W - L - R) * (n - 1))));
+    $('#fHi').innerHTML = `<line x1="${xs(i)}" x2="${xs(i)}" y1="${T}" y2="${H - B}" stroke="var(--fg-2)"/>` + keys.map(kk => `<circle cx="${xs(i)}" cy="${ys(E[kk][i])}" r="3.5" fill="${COLS[kk]}" stroke="var(--panel)" stroke-width="1.5"/>`).join('');
+    const tip = $('#fEqTip'); tip.innerHTML = `<div class="t">${E.d[i].slice(0, 7)}</div>` + keys.map(kk => `<div class="r"><span>${LBL[kk]}</span><b>${sgn((E[kk][i] - 1) * 100)}%</b></div>`).join('');
+    tip.hidden = false; const bw = $('#fEqBox').clientWidth, w = tip.offsetWidth; let left = xs(i) / k + 14; if (left + w > bw) left = xs(i) / k - w - 14; tip.style.left = Math.max(4, left) + 'px'; tip.style.top = '10px';
+  };
+  svg.addEventListener('pointermove', hover); svg.addEventListener('pointerdown', hover);
+  svg.addEventListener('pointerleave', () => { $('#fEqTip').hidden = true; $('#fHi').innerHTML = ''; });
+
+  // Kennzahlen
+  const pv = p => p == null ? '–' : `<span class="${p < 0.05 ? 'pos' : 'dim'}" style="${p < 0.05 ? 'font-weight:600' : ''}">${p < 0.001 ? '&lt;0,001' : fmt(p, 3)}</span>`;
+  const sh = v => v == null ? '–' : `<span class="${v > 0.2 ? 'pos' : v < -0.2 ? 'negv' : ''}">${fmt(v, 2)}</span>`;
+  let st = '<thead><tr><th style="text-align:left">Strategie</th><th>Rendite p.a.</th><th>Vola</th><th>Sharpe</th><th>Max. Drawdown</th><th>Monate im Plus</th><th>Newey-West p</th><th>Zufalls-p</th><th>Sharpe 1977–99</th><th>Sharpe 2000–</th><th>Sharpe 2022–</th><th>Urteil</th></tr></thead><tbody>';
+  for (const k of ['kombi', 'adaptiv', 'carry', 'value', 'momentum']) {
+    const s = F.stats[k].net, ho = F.stats[k].holdout || {}, pm = F.perm[k], pre = F.stats[k].pre2000 || {}, post = F.stats[k].post2000 || {};
+    const ok = s.p < 0.05 && pm.p < 0.05, half = (s.p < 0.10 || pm.p < 0.10) && s.sharpe > 0;
+    const u = ok ? ['hi', 'belegt'] : half ? ['mid', 'knapp / schwach'] : ['lo', 'nicht belegt'];
+    st += `<tr><td style="text-align:left"><svg width="14" height="8" aria-hidden="true"><line x1="0" x2="14" y1="4" y2="4" stroke="${COLS[k]}" stroke-width="3" ${k === 'adaptiv' ? 'stroke-dasharray="4 2"' : ''}/></svg> <b>${LBL[k]}</b></td><td>${sgn(s.ret)}%</td><td class="dim">${fmt(s.vol)}%</td><td>${sh(s.sharpe)}</td><td class="negv">${fmt(s.dd)}%</td><td>${fmt(s.hit)}%</td><td>${pv(s.p)}</td><td>${pv(pm.p)}</td><td>${sh(pre.sharpe)}</td><td>${sh(post.sharpe)}</td><td>${sh(ho.sharpe)}</td><td><span class="q ${u[0]}">${u[1]}</span></td></tr>`;
+  }
+  $('#fStats').innerHTML = st + '</tbody>';
+  const P = Object.keys(F.periods.kombi);
+  let pt = '<thead><tr><th style="text-align:left">Sharpe je Zeitraum (nach Kosten)</th>' + P.map(p => `<th>${p}</th>`).join('') + '</tr></thead><tbody>';
+  for (const k of ['kombi', 'adaptiv', 'carry', 'value', 'momentum']) pt += `<tr><td style="text-align:left">${LBL[k]}</td>` + P.map(p => `<td>${sh(F.periods[k][p])}</td>`).join('') + '</tr>';
+  $('#fPeriods').innerHTML = pt + '</tbody>';
+
+  // Rollierende 5-Jahres-Sharpe
+  {
+    const RK = ['carry', 'adaptiv', 'kombi'], RL = F.rolling, d = RL.d_kombi, m = d.length;
+    const W2 = 1200, H2 = 260, L2 = 50, R2 = 16, T2 = 12, B2 = 28;
+    const vals = RK.flatMap(k => RL[k]); const lo = Math.min(-1, ...vals), hi2 = Math.max(1, ...vals);
+    const di = Object.fromEntries(RK.map(k => [k, Object.fromEntries(RL['d_' + k].map((x, i) => [x, RL[k][i]]))]));
+    const x2 = i => L2 + i / (m - 1) * (W2 - L2 - R2), y2 = v => T2 + (hi2 - v) / (hi2 - lo) * (H2 - T2 - B2);
+    let gg = `<rect x="${L2}" y="${T2}" width="${W2 - L2 - R2}" height="${y2(0) - T2}" fill="var(--bull-bg)"/><rect x="${L2}" y="${y2(0)}" width="${W2 - L2 - R2}" height="${H2 - B2 - y2(0)}" fill="var(--bear-bg)"/>`;
+    for (let v = Math.ceil(lo * 2) / 2; v <= hi2; v += 0.5) gg += `<line x1="${L2}" x2="${W2 - R2}" y1="${y2(v)}" y2="${y2(v)}" stroke="${v === 0 ? 'var(--line-2)' : 'var(--line)'}" ${v === 0 ? 'stroke-dasharray="4 4"' : ''}/><text x="${L2 - 8}" y="${y2(v) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${fmt(v, 1)}</text>`;
+    for (const k of RK) { const pts = d.map((x, i) => di[k][x] == null ? null : `${x2(i)},${y2(di[k][x])}`).filter(Boolean).join(' '); gg += `<polyline points="${pts}" fill="none" stroke="${COLS[k]}" stroke-width="${k === 'kombi' ? 2.4 : 1.6}" ${k === 'adaptiv' ? 'stroke-dasharray="5 3"' : ''}/>`; }
+    let ly2 = ''; d.forEach((x, i) => { const y = x.slice(0, 4); if (y !== ly2) { ly2 = y; if (+y % 5 === 0) gg += `<text x="${x2(i)}" y="${H2 - 8}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">${y}</text>`; } });
+    gg += '<g id="fRHi"></g>';
+    $('#fRoll').innerHTML = gg;
+    $('#fRollLegend').innerHTML = RK.map(k => `<span class="chip"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="${COLS[k]}" stroke-width="2.5" ${k === 'adaptiv' ? 'stroke-dasharray="5 3"' : ''}/></svg> ${LBL[k]}</span>`).join('');
+    const sv = $('#fRoll');
+    const hv = ev => { const r = sv.getBoundingClientRect(), kk = W2 / r.width, x = (ev.clientX - r.left) * kk; if (x < L2 || x > W2 - R2) { $('#fRollTip').hidden = true; $('#fRHi').innerHTML = ''; return; }
+      const i = Math.max(0, Math.min(m - 1, Math.round((x - L2) / (W2 - L2 - R2) * (m - 1))));
+      $('#fRHi').innerHTML = `<line x1="${x2(i)}" x2="${x2(i)}" y1="${T2}" y2="${H2 - B2}" stroke="var(--fg-2)"/>`;
+      const tip = $('#fRollTip'); tip.innerHTML = `<div class="t">5 Jahre bis ${d[i].slice(0, 7)}</div>` + RK.map(k => `<div class="r"><span>${LBL[k]}</span><b>${di[k][d[i]] == null ? '–' : fmt(di[k][d[i]], 2)}</b></div>`).join('');
+      tip.hidden = false; const bw = $('#fRollBox').clientWidth, w = tip.offsetWidth; let left = x2(i) / kk + 14; if (left + w > bw) left = x2(i) / kk - w - 14; tip.style.left = Math.max(4, left) + 'px'; tip.style.top = '10px'; };
+    sv.addEventListener('pointermove', hv); sv.addEventListener('pointerdown', hv); sv.addEventListener('pointerleave', () => { $('#fRollTip').hidden = true; $('#fRHi').innerHTML = ''; });
+  }
+
+  const s = F.stats, c = F.corr, pm = F.perm;
+  const p3 = p => p < 0.001 ? '&lt; 0,001' : fmt(p, 3);
+  $('#fVerdict').innerHTML = `
+    <div><b>50 Jahre Historie (1977–heute, ${s.kombi.net.months} Monate):</b> Die Kombination aus Carry, Value und Momentum erzielt nach Kosten eine Sharpe-Ratio von ${fmt(s.kombi.net.sharpe, 2)}. Sie ist hoch signifikant (Newey-West p ${p3(s.kombi.net.p)}) und besser als alle 2.000 Zufalls-Portfolios (Zufalls-p ${p3(pm.kombi.p)}). Carry allein: Sharpe ${fmt(s.carry.net.sharpe, 2)}, p ${p3(s.carry.net.p)}.</div>
+    <div><b>Aber der Vorteil schrumpft:</b> Die Sharpe-Ratio der Kombi lag 1977–1999 bei ${fmt(s.kombi.pre2000.sharpe, 2)}, seit 2000 nur noch bei ${fmt(s.kombi.post2000.sharpe, 2)} und seit 2022 bei ${fmt(s.kombi.holdout.sharpe, 2)}. Das ist ein bekanntes Muster: Seit diese Faktoren in der Forschung veröffentlicht und von vielen Fonds gehandelt werden, verdienen sie weniger. Momentum funktioniert bei den großen Währungen seit 2000 gar nicht mehr.</div>
+    <div><b>Walk-Forward (adaptiv) bringt nichts:</b> Das laufende Umgewichten nach den letzten 5 Jahren (Sharpe ${fmt(s.adaptiv.net.sharpe, 2)}, max. Drawdown ${fmt(s.adaptiv.net.dd)}%) ist <b>schlechter</b> als die feste Gleichgewichtung (Sharpe ${fmt(s.kombi.net.sharpe, 2)}, max. Drawdown ${fmt(s.kombi.net.dd)}%). Es läuft den Faktoren immer dann hinterher, wenn sie gerade drehen. Deshalb nutzt das Cockpit die feste Kombi.</div>
+    <div><b>So nutzt du die Seite:</b> Die Rangliste zeigt, welche Währungen nach Zinsen, Bewertung und Trend gerade vorne oder hinten liegen. Über Jahrzehnte war das ein belegter Vorteil, in den letzten Jahren aber kaum noch. Am meisten Gewicht hat Carry. Zeigen Rangliste und Makro-ML-Bias auf dieselbe Währung, ist das ein stärkerer Hinweis. Keine Anlageberatung.</div>`;
+};
+</script>
 
 <script>
 (async function () {
@@ -325,11 +500,18 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
   let D;
   let MODE = 'alfred';  // Standard: strengere Echtzeit-Variante
   try { MODE = localStorage.getItem('mlc_mode') || 'alfred'; } catch (e) {}
-  if (location.hash === '#alfred' || location.hash === '#fred') MODE = location.hash.slice(1);
+  if (['#alfred', '#fred', '#faktoren'].includes(location.hash)) MODE = location.hash.slice(1);
   document.querySelectorAll('#modeSeg button').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.m === MODE);
     b.addEventListener('click', () => { if (b.dataset.m === MODE) return; try { localStorage.setItem('mlc_mode', b.dataset.m); } catch (e) {} location.hash = b.dataset.m; location.reload(); });
   });
+  if (MODE === 'faktoren') {
+    $('#macroView').hidden = true; $('#factorView').hidden = false;
+    document.querySelector('.brand .sub').textContent = 'Carry · Value · Momentum · 8 Währungen';
+    try { await window.renderFactors(); }
+    catch (e) { $('#factorView').innerHTML = '<div class="panel err">Die Daten (factors.json) konnten nicht geladen werden. Bitte die Seite neu laden.</div>'; console.error(e); }
+    return;
+  }
   try { D = await (await fetch(`data_${MODE}.json`, { cache: 'no-store' })).json(); }
   catch (e) { $('#app').innerHTML = '<div class="panel err">Die Daten (data.json) konnten nicht geladen werden. Bitte die Seite neu laden.</div>'; return; }
 
