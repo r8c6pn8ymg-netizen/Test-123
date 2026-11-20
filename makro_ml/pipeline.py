@@ -505,23 +505,29 @@ def main(refresh: bool = True):
         out["mode"] = mode
         out["comparison"] = comp
         (OUT / f"data_{mode}.json").write_text(json.dumps(out, ensure_ascii=False))
+    failed: list[str] = []
     # Faktor-Portfolio (Carry, Value, Momentum) – eigener Reiter im Cockpit
     try:
         import factors
         fo = factors.build(load_fx(False), refresh)
         print("Faktor-Portfolio: Long", fo["longs"], "Short", fo["shorts"])
     except Exception as e:  # darf das Makro-Cockpit nicht blockieren
-        print(f"  ! Faktor-Portfolio fehlgeschlagen: {e}", file=sys.stderr)
+        failed.append("Faktor-Portfolio")
+        print(f"  ! Faktor-Portfolio fehlgeschlagen (factors.json ist NICHT aktualisiert): {e}", file=sys.stderr)
     # Termine der Woche (US-Daten aus dem FRED-Kalender, Zinsentscheide der 8 Notenbanken)
     try:
         import termine
         termine.main()
     except Exception as e:
-        print(f"  ! Termine fehlgeschlagen: {e}", file=sys.stderr)
+        failed.append("Termine")
+        print(f"  ! Termine fehlgeschlagen (termine.json ist NICHT aktualisiert): {e}", file=sys.stderr)
     print("Vergleich FRED vs. ALFRED (Ø DA aller Kandidaten | bestanden | Ø DA Schlusstest):")
     for c in comp:
         print(f"  {c['basis']:9s} FRED {c['da_fred']:5.1f} | {c['pass_fred']:3d} | {c['post_fred']}   "
               f"ALFRED {c['da_alfred']:5.1f} | {c['pass_alfred']:3d} | {c['post_alfred']}")
+    if failed:
+        print(f"FEHLER: {', '.join(failed)} fehlgeschlagen – diese Reiter zeigen den alten Stand.", file=sys.stderr)
+    return failed
 
 
 def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
@@ -761,4 +767,4 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
 
 
 if __name__ == "__main__":
-    main(refresh="--cache" not in sys.argv)
+    sys.exit(1 if main(refresh="--cache" not in sys.argv) else 0)

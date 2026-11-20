@@ -210,10 +210,11 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     live_mom = 0.5 * (live_spot / spot.iloc[-4] - 1) + 0.5 * (live_spot / spot.iloc[-13] - 1)
     # Leitzinsen fuer die Live-Rangliste tagesaktuell (BIS Tageswerte); Backtest bleibt bei Monatsende-Werten
     live_rate = rate.iloc[-1].copy()
-    rate_date = {c: str(rate.index[-1].date())[:7] for c in CUR}
+    # Rueckfall-Datum = Monat des letzten echten BIS-Monatswerts (nicht des aufgefuellten Monatsendes)
+    rate_date = {c: str(ds.bis("WS_CBPOL", f"M.{BIS[c]}", False).index[-1].date())[:7] for c in CUR}
     for c in CUR:
         try:
-            dser = ds.bis_daily_recent("WS_CBPOL", f"D.{BIS[c]}")
+            dser = ds.bis_daily_recent("WS_CBPOL", f"D.{BIS[c]}", refresh=refresh)
             if len(dser):
                 live_rate[c] = float(dser.iloc[-1]); rate_date[c] = str(dser.index[-1].date())
         except Exception as e:  # Rueckfall: Monatswert

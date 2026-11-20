@@ -7,8 +7,8 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 - **Cockpit (privat, angepinnt):** https://claude.ai/artifact/PKmB9UQBGRjhWc9U3tDCH2
 - **Repo / Branch:** `r8c6pn8ymg-netizen/test-123`, Branch `claude/charming-dijkstra-useq92`, Ordner `makro_ml/`
 - **Tägliche Aktualisierung:** geplante Aufgabe „Makro ML Cockpit aktualisieren“, Mo–Fr 07:47 (Europe/Berlin).
-  Sie läuft in der **ursprünglichen Sitzung** und veröffentlicht unter derselben URL.
-  Diese Sitzung nicht löschen, sonst stoppt das Update.
+  Sie läuft in der **ursprünglichen Sitzung** (`session_01Wa5ThyMmVEhU7BLeXRc8r6`, Aufgabe `trig_01WSt8ry3x8iwnqhqJ5fcffR`)
+  und veröffentlicht unter derselben URL. Diese Sitzung nicht löschen oder archivieren, sonst stoppt das Update.
 
 | Datei | Zweck |
 |---|---|
@@ -16,13 +16,14 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `factors.py` | Faktor-Portfolio Carry/Value/Momentum seit 1977, alle 7 Faktor-Auswahlen, Robustheit |
 | `consensus.py` | Konsens-Test (Makro + Faktor + CFTC, gegen USD und relativ) – nur Forschung, nicht im Cockpit |
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
-| `termine.py` | Termine der Woche: US-Datentermine (FRED-Kalender, täglich) + Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
+| `termine.py` | Termine der Woche: US-Termine von Census, BEA, Fed (G.17) und FRED-Kalender (BLS), offizielle Uhrzeiten, ISM-PMI nach Regel, letzte Werte aus FRED; Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `data_sources.py` | Abruf FRED, ALFRED (ohne Key), BIS, EZB, SIPRI, CFTC; Cache in `cache/` |
 | `cockpit.html` | Oberfläche; lädt `data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json` (4. Reiter „Termine“) |
 | `../tests/test_makro_ml.py` | Selbsttests (Lecks, Fristen, Euro ab 1999, Kosten, Phantom-Monat) |
 
-Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min.), danach Cockpit mit den vier JSON-Dateien veröffentlichen.
-Tests: `python3 -m pytest tests/test_makro_ml.py -q`
+Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min., Exit-Code 1 = ein Teil ist fehlgeschlagen und zeigt den alten Stand).
+Danach `cockpit.html` veröffentlichen mit `files` = {`data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`} jeweils aus `output/`.
+Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pipeline-Lauf, sonst werden sie mangels Cache übersprungen („skipped“ heißt nicht bestanden).
 
 ## Ergebnisse (nach allen Korrekturen)
 
@@ -38,6 +39,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q`
   Kern-PCE (Ø DA 51,5 %, ähnlich gut wie Kern-CPI und weitgehend dieselbe Information), realer Einzelhandel und Erzeugerpreise
   (≈ 49 %, kein Vorteil, werden vom Filter fast nie ausgewählt). Gesamtbild unverändert, nach FDR weiterhin kein Einzelmodell.
   PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
+- **Prüfung 20.11. (Termine + Zinscapital-Abgleich):** FRED-Kalender hat teils Einstellzeiten und Doppel-Einträge
+  (Industrieproduktion/Baubeginne 24./25.11.), deshalb offizielle Kalender. Marktwerte gegen PDF: US-Renditen, VIX, SOFR, HY-OAS
+  identisch; Öl (er: Futures, FRED: Spot) und EUR/USD (andere Fixing-Uhrzeit) weichen leicht ab. Leitzinsen identisch.
 - **Wendepunkte:** mit keinem Signal vorhersagbar (Vorhersage 49–52 %). Gute Treffer an Wenden (CFTC, umgedrehtes Momentum) sind Rückblick-Effekte.
   Optimieren auf einen Wendepunkt: 100 % dort, 51 % anderswo → Überoptimierung.
 

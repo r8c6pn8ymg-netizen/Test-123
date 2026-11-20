@@ -60,6 +60,11 @@ CENTRAL_BANKS = [
       "2027-09-15", "2027-10-27", "2027-12-08"]),
 ]
 
+# Hinweise zu einzelnen Terminen (so auf der Quellseite vermerkt)
+CB_NOTES = {
+    ("USD", "2027-10-27"): "Die Fed nennt diese Sitzung „Monetary Policy Strategy Meeting“; für Dezember 2027 ist noch keine Sitzung eingetragen",
+}
+
 NY = "America/New_York"
 MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
 MON_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"]
@@ -240,9 +245,19 @@ def _period(idx: pd.Timestamp, freq: str) -> str:
     return f"{MON_DE[idx.month - 1]} {idx.year}"
 
 
+_FRESH: dict = {}
+
+
+def _fred_fresh(sid: str) -> pd.Series:
+    """FRED-Reihe einmal je Lauf frisch laden (die gestrigen Veroeffentlichungen sollen drin sein)."""
+    if sid not in _FRESH:
+        _FRESH[sid] = fred(sid, refresh=True)
+    return _FRESH[sid]
+
+
 def latest_values(spec: list, get=None) -> list[dict]:
     """Zuletzt veroeffentlichter Wert und Vorwert je Kennzahl (aus FRED)."""
-    get = get or (lambda sid: fred(sid, refresh=True))
+    get = get or _fred_fresh
     out = []
     for name, sid, how in spec:
         s = get(sid).dropna()
@@ -291,16 +306,17 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
         ds = [date.fromisoformat(x) for x in dates]
         if max(ds) < today + timedelta(days=60):
             warnings.append(f"Terminliste {bank} läuft bald aus – bitte auf {src} aktualisieren.")
-        nxt = [d for d in ds if d >= today]
+        nxt = [d for d in ds if d >= today][:2]
         if nxt:
-            bd, bt = _to_berlin(nxt[0], t, tz)
-            next_cb.append(dict(ccy=ccy, bank=bank, date=bd, time=bt, src=src))
+            up = [dict(zip(("date", "time"), _to_berlin(d, t, tz))) for d in nxt]
+            next_cb.append(dict(ccy=ccy, bank=bank, date=up[0]["date"], time=up[0]["time"], src=src, upcoming=up))
         for d in ds:
             bd, bt = _to_berlin(d, t, tz)
             if start.isoformat() <= bd <= end.isoformat():
                 events.append(dict(date=bd, time=bt, ccy=ccy, kind="cb", imp=3,
                                    title=f"{bank}: Zinsentscheid", src=src,
-                                   note=None if t else "Uhrzeit nicht fest (meist mittags Tokio, ca. 4–5 Uhr deutscher Zeit)"))
+                                   note=CB_NOTES.get((ccy, d.isoformat())) or (
+                                       None if t else "Uhrzeit nicht fest (meist mittags Tokio, ca. 4–5 Uhr deutscher Zeit)")))
 
     # --- US-Daten: Datum je Quelle sammeln ---
     pages = pages if pages is not None else {}
@@ -308,14 +324,28 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
 
     def official(name, loader):
         try:
-            return loader() if name not in pages else pages[name]
+            res = loader() if name not in pages else pages[name]
+            if name not in pages and not res:
+                raise ValueError("keine Termine erkannt (Seitenaufbau geändert?)")
+            return res
         except Exception as e:
             warnings.append(f"{name}-Kalender nicht erreichbar ({type(e).__name__}); Termine dafür aus dem FRED-Kalender.")
             return None
 
     years = sorted({start.year, end.year})
-    cen = official("Census", lambda: [r for y in years for r in parse_census(_fetch(
-        f"census_{y}", f"https://www.census.gov/economic-indicators/calendar-listview-{y}.html", "Economic Indicator"))])
+    def census_all():
+        out, errs = [], []
+        for y in years:  # je Jahr einzeln: fehlt die Liste fuers neue Jahr noch, bleibt das alte erhalten
+            try:
+                out += parse_census(_fetch(f"census_{y}",
+                                           f"https://www.census.gov/economic-indicators/calendar-listview-{y}.html",
+                                           "Economic Indicator"))
+            except Exception as e:
+                errs.append(e)
+        if not out and errs:
+            raise errs[0]
+        return out
+    cen = official("Census", census_all)
     bea = official("BEA", lambda: parse_bea(_fetch("bea", "https://www.bea.gov/news/schedule/full", "Release Schedule"), today))
     g17 = official("Fed-G.17", lambda: parse_g17(_fetch(
         "g17", "https://www.federalreserve.gov/releases/g17/release_dates.htm", "Industrial Production")))
@@ -329,7 +359,8 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
         if r["src"] == "census" and cen is not None:
             found[k] = [(d, "census.gov") for d, txt in cen if r["key"] in txt]
         elif r["src"] == "bea" and bea is not None:
-            found[k] = [(d, "bea.gov") for d, txt in bea if txt.startswith(r["key"])]
+            found[k] = [(d, "bea.gov") for d, txt in bea
+                        if r["key"] in txt and not (k == "gdp" and txt.startswith("GDP by"))]
         elif r["src"] == "g17" and g17 is not None:
             found[k] = [(d, "federalreserve.gov") for d in g17]
         elif r["src"] == "ism":
