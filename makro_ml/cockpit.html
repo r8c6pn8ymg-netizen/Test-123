@@ -372,6 +372,21 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     </section>
 
     <section class="panel">
+      <div class="ph"><span>Robustheit · hängt das Ergebnis an meinen Einstellungen?</span><span class="eyebrow">keine Optimierung, nur Kontrolle</span></div>
+      <div class="pb">
+        <div class="note" style="max-width:none">Das Cockpit nutzt eine feste Einstellung aus der Fachliteratur (3 long / 3 short, Momentum 3+12 Monate, Value 10 Jahre). Diese Tabelle zeigt, was mit anderen, ebenso üblichen Einstellungen herausgekommen wäre. Sie dient <b>nicht</b> dazu, die beste auszuwählen. Sie zeigt, wie stark das Ergebnis vom Zufall der Einstellung abhängt. Als realistische Erwartung gilt der <b>Median</b>, nicht der beste Wert.</div>
+        <div class="fcards" id="fRobCards"></div>
+        <div class="grid2b">
+          <div class="scroll-x"><table class="rc" id="fGrid"></table></div>
+          <div style="display:grid;gap:12px;align-content:start">
+            <div class="scroll-x"><table class="rc" id="fCosts"></table></div>
+            <div class="scroll-x"><table class="rc" id="fLoo"></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
       <div class="ph"><span>Einordnung</span></div>
       <div class="pb note" style="max-width:none;display:grid;gap:8px" id="fVerdict"></div>
     </section>
@@ -484,12 +499,29 @@ window.renderFactors = async function () {
     sv.addEventListener('pointermove', hv); sv.addEventListener('pointerdown', hv); sv.addEventListener('pointerleave', () => { $('#fRollTip').hidden = true; $('#fRHi').innerHTML = ''; });
   }
 
+  // Robustheit
+  const RB = F.robust;
+  if (RB) {
+    $('#fRobCards').innerHTML = [
+      ['Sharpe 1977–heute', `${fmt(RB.full_min, 2)} … <b>${fmt(RB.full_med, 2)}</b> … ${fmt(RB.full_max, 2)}`, `Spanne über ${RB.n} Einstellungen (min … Median … max)`],
+      ['Sharpe 2000–heute', `${fmt(RB.post_min, 2)} … <b>${fmt(RB.post_med, 2)}</b> … ${fmt(RB.post_max, 2)}`, 'realistischere Erwartung, nach Bekanntwerden der Faktoren'],
+      ['Standard-Einstellung', `Platz ${RB.std_rank} von ${RB.n}`, 'vorab festgelegt, nicht ausgesucht'],
+      ['Ohne die 12 besten Monate', `Sharpe ${fmt(RB.no_top12, 2)}`, 'Ergebnis hängt nicht an wenigen Ausreißern'],
+    ].map(([a, b, c]) => `<div class="fcard"><span class="ps">${a}</span><span style="font:600 17px var(--mono)">${b}</span><span class="ps">${c}</span></div>`).join('');
+    let gt = '<thead><tr><th style="text-align:left">Long/Short je</th><th>Momentum</th><th>Value</th><th>Sharpe 1977–</th><th>Sharpe 2000–</th></tr></thead><tbody>';
+    for (const g of RB.grid) gt += `<tr style="${g.std ? 'background:var(--accent-bg)' : ''}"><td style="text-align:left">${g.n}${g.std ? ' <span class="q mid">Standard</span>' : ''}</td><td>${g.mom}</td><td>${g.val}</td><td>${sh(g.full)}</td><td>${sh(g.post)}</td></tr>`;
+    $('#fGrid').innerHTML = gt + '</tbody>';
+    $('#fCosts').innerHTML = '<thead><tr><th style="text-align:left">Kosten je Umschichtung</th><th>Sharpe 1977–</th><th>Sharpe 2000–</th></tr></thead><tbody>' + RB.costs.map(c => `<tr style="${c.bp === F.cost_bp ? 'background:var(--accent-bg)' : ''}"><td style="text-align:left">${c.bp} Bp${c.bp === F.cost_bp ? ' (im Backtest)' : ''}</td><td>${sh(c.full)}</td><td>${sh(c.post)}</td></tr>`).join('') + `</tbody><caption style="caption-side:bottom;text-align:left;padding-top:6px" class="dim">Umschichtung rund ${fmt(RB.turnover, 1)}× pro Jahr</caption>`;
+    $('#fLoo').innerHTML = '<thead><tr><th style="text-align:left">Ohne Währung</th><th>Sharpe 1977–</th></tr></thead><tbody>' + Object.entries(RB.loo).map(([k, v]) => `<tr><td style="text-align:left">ohne ${k}</td><td>${sh(v)}</td></tr>`).join('') + '</tbody>';
+  }
+
   const s = F.stats, c = F.corr, pm = F.perm;
   const p3 = p => p < 0.001 ? '&lt; 0,001' : fmt(p, 3);
   $('#fVerdict').innerHTML = `
     <div><b>50 Jahre Historie (1977–heute, ${s.kombi.net.months} Monate):</b> Die Kombination aus Carry, Value und Momentum erzielt nach Kosten eine Sharpe-Ratio von ${fmt(s.kombi.net.sharpe, 2)}. Sie ist hoch signifikant (Newey-West p ${p3(s.kombi.net.p)}) und besser als alle 2.000 Zufalls-Portfolios (Zufalls-p ${p3(pm.kombi.p)}). Carry allein: Sharpe ${fmt(s.carry.net.sharpe, 2)}, p ${p3(s.carry.net.p)}.</div>
     <div><b>Aber der Vorteil schrumpft:</b> Die Sharpe-Ratio der Kombi lag 1977–1999 bei ${fmt(s.kombi.pre2000.sharpe, 2)}, seit 2000 nur noch bei ${fmt(s.kombi.post2000.sharpe, 2)} und seit 2022 bei ${fmt(s.kombi.holdout.sharpe, 2)}. Das ist ein bekanntes Muster: Seit diese Faktoren in der Forschung veröffentlicht und von vielen Fonds gehandelt werden, verdienen sie weniger. Momentum funktioniert bei den großen Währungen seit 2000 gar nicht mehr.</div>
     <div><b>Walk-Forward (adaptiv) bringt nichts:</b> Das laufende Umgewichten nach den letzten 5 Jahren (Sharpe ${fmt(s.adaptiv.net.sharpe, 2)}, max. Drawdown ${fmt(s.adaptiv.net.dd)}%) ist <b>schlechter</b> als die feste Gleichgewichtung (Sharpe ${fmt(s.kombi.net.sharpe, 2)}, max. Drawdown ${fmt(s.kombi.net.dd)}%). Es läuft den Faktoren immer dann hinterher, wenn sie gerade drehen. Deshalb nutzt das Cockpit die feste Kombi.</div>
+    <div><b>Robustheit:</b> Mit anderen üblichen Einstellungen liegt die Sharpe-Ratio seit 1977 zwischen ${fmt(RB.full_min, 2)} und ${fmt(RB.full_max, 2)} (Median ${fmt(RB.full_med, 2)}), seit 2000 im Median nur noch bei ${fmt(RB.post_med, 2)}. Das Ergebnis hängt weder an einer einzelnen Währung noch an wenigen Ausreißer-Monaten. <b>Kosten sind entscheidend:</b> Bei 20 Bp je Umschichtung ist der Vorteil seit 2000 praktisch weg. Bei Privatkunden-Brokern kommen oft schlechtere Spreads und Aufschläge auf die Zinsgutschrift (Swap) dazu, die den Carry-Ertrag deutlich schmälern.</div>
     <div><b>So nutzt du die Seite:</b> Die Rangliste zeigt, welche Währungen nach Zinsen, Bewertung und Trend gerade vorne oder hinten liegen. Über Jahrzehnte war das ein belegter Vorteil, in den letzten Jahren aber kaum noch. Am meisten Gewicht hat Carry. Zeigen Rangliste und Makro-ML-Bias auf dieselbe Währung, ist das ein stärkerer Hinweis. Keine Anlageberatung.</div>`;
 };
 </script>

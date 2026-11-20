@@ -201,13 +201,55 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     hist_rank = dict(d=[str(d.date())[:7] for d in zk.index],
                      ranks={c: [int(v) for v in zk.rank(axis=1, ascending=False)[c].fillna(0).values] for c in CUR})
 
+    # ---- Robustheit: andere (ebenfalls uebliche) Einstellungen, Kosten, Ausreisser, einzelne Waehrungen
+    def variant(n_ls=N_LS, m_s=3, m_l=12, vy=10, cost=COST, drop=None):
+        cols = [c for c in CUR if c != drop]
+        g_ = (100 * (reer[cols] / reer[cols].rolling(vy * 12, min_periods=vy * 6).mean() - 1)).shift(2).reindex(spot.index, method="ffill")
+        m_ = 0.5 * (spot[cols] / spot[cols].shift(m_s) - 1) + 0.5 * (spot[cols] / spot[cols].shift(m_l) - 1)
+        sc = (zrank(carry[cols]) + zrank(-g_) + zrank(m_)) / 3
+        sc = sc[sc.index >= start]
+        w = pd.DataFrame(0.0, index=sc.index, columns=cols)
+        for t, row in sc.iterrows():
+            row = row.dropna()
+            if len(row) < 2 * n_ls:
+                w.loc[t] = np.nan
+                continue
+            o = row.sort_values()
+            w.loc[t, o.index[-n_ls:]] = 1 / n_ls
+            w.loc[t, o.index[:n_ls]] = -1 / n_ls
+        gr = (w * excess[cols].reindex(w.index)).sum(axis=1, min_count=1).dropna()
+        return gr - w.diff().abs().sum(axis=1).reindex(gr.index).fillna(1.0) * cost
+
+    def shp(r):
+        r = r.dropna()
+        return round(float(r.mean() / r.std() * np.sqrt(12)), 2) if len(r) > 24 and r.std() > 0 else None
+
+    grid = []
+    for n_ls in (2, 3):  # 4 je Seite braucht 8 Waehrungen -> erst ab 1999 moeglich, darum nicht im Vergleich
+        for ms, ml in ((1, 12), (3, 12), (6, 12), (3, 6)):
+            for vy in (5, 10):
+                r_ = variant(n_ls, ms, ml, vy)
+                grid.append(dict(n=n_ls, mom=f"{ms}+{ml}M", val=f"{vy}J", full=shp(r_), post=shp(r_[r_.index >= "2000"]),
+                                 std=(n_ls, ms, ml, vy) == (N_LS, 3, 12, 10)))
+    fulls = [g["full"] for g in grid]
+    posts = [g["post"] for g in grid]
+    robust = dict(grid=grid, full_min=min(fulls), full_med=float(np.median(fulls)), full_max=max(fulls),
+                  post_min=min(posts), post_med=float(np.median(posts)), post_max=max(posts),
+                  std_rank=1 + sum(f > next(g["full"] for g in grid if g["std"]) for f in fulls), n=len(grid))
+    robust["costs"] = [dict(bp=bp, full=shp(r_), post=shp(r_[r_.index >= "2000"]))
+                       for bp, r_ in ((bp, variant(cost=bp / 1e4)) for bp in (0, 5, 10, 20, 40))]
+    base = res["kombi"]["net"]
+    robust["turnover"] = round(float(weights["kombi"].diff().abs().sum(axis=1).mean() * 12), 1)
+    robust["no_top12"] = shp(base.drop(base.nlargest(12).index))
+    robust["loo"] = {c: shp(variant(drop=c)) for c in CUR}
+
     corr = pd.DataFrame({k: res[k]["net"] for k in ("carry", "value", "momentum")}).corr().round(2)
     out = dict(generated=str(pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")), asof=str(last.date()),
                live_fx=str(min(px[c].dropna().index[-1] for c in CUR if c != "USD").date()),
                ranking=ranking, longs=longs, shorts=shorts,
                pairs=[dict(long=a, short=b, diff=round(float(d), 2)) for a, b, d in pairs],
                stats=stats, periods=periods, perm=perm, equity=eq, hist_rank=hist_rank,
-               rolling=rolling, factor_weights=factor_weights,
+               rolling=rolling, factor_weights=factor_weights, robust=robust,
                corr={k: corr[k].to_dict() for k in corr.columns}, cost_bp=COST * 1e4, n_ls=N_LS)
     (OUT / "factors.json").write_text(json.dumps(out, ensure_ascii=False))
     return out
