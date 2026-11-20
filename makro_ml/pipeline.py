@@ -404,7 +404,7 @@ def run_model(X: pd.DataFrame, price: pd.Series, h: int, today: pd.Timestamp):
 
     hist = pd.Series(probs, index=dates).dropna()
     return dict(**full, prob=prob_now, oos_from=str(dates[ev][0].date()), hist=hist,
-                cal_p=probs[ev], cal_y=y[ev],  # fuer die Kalibrierung: Prognose und eingetretene Richtung
+                cal_p=probs[ev], cal_y=y[ev], cal_d=dates[ev].values,  # Kalibrierung: Prognose, Ergebnis, Datum
                 pre=pre, post_da=post_da, n_post=int(post_m.sum()))
 
 
@@ -601,21 +601,62 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     # Auswahlfreier Makro-Score fuer den Konsens-Test: ALLE echten Kandidaten, je Basis eine Stimme,
     # ohne Basen, deren Information schon im Faktor-Portfolio oder im CFTC-Signal steckt.
     OVERLAP = {"CBPOL-Diff", "IR3M-Diff", "REALRATE-Diff", "MOM-12M", "MOM-3M", "REER-GAP", "COT-NET", "COT-COMM"}
-    # Kalibrierung: Wenn die echten Modelle X % sagten, wie oft stieg die Waehrung dann? (alle echten Kandidaten, OOS)
-    cp = [r["cal_p"] for (_, b, _, _, _), r in zip(tasks, results) if r is not None and b.group != "Zufall"]
-    cy = [r["cal_y"] for (_, b, _, _, _), r in zip(tasks, results) if r is not None and b.group != "Zufall"]
-    calibration = None
-    if cp:
-        cp_, cy_ = np.concatenate(cp), np.concatenate(cy)
-        bins = [0, .3, .4, .45, .5, .55, .6, .7, 1.0001]
-        rows_c = []
-        for lo, hi in zip(bins[:-1], bins[1:]):
-            m = (cp_ >= lo) & (cp_ < hi)
-            if m.sum() > 200:
-                rows_c.append(dict(lo=round(lo * 100), hi=round(min(hi, 1) * 100), n=int(m.sum()),
-                                   said=round(float(cp_[m].mean()) * 100, 1), rose=round(float(cy_[m].mean()) * 100, 1)))
-        calibration = dict(rows=rows_c, n=int(len(cp_)), brier=round(float(np.mean((cp_ - cy_) ** 2)), 4),
-                           brier_base=round(float(np.mean((cy_.mean() - cy_) ** 2)), 4))
+    # Kalibrierung: Die Modell-Prozente sind zu selbstsicher. Umrechnung p_kal = sigmoid(b * logit(p)) je Horizont-
+    # Gruppe (b < 1 zieht Richtung 50 %, Richtung bleibt gleich). b wird NUR mit Prognosen vor 2016 festgelegt und an
+    # 2016-heute geprueft; fuer die heutige Anzeige danach mit allen bisherigen Prognosen (nur Vergangenheit).
+    sel = [(h, r) for (_, b, h, _, _), r in zip(tasks, results) if r is not None and b.group != "Zufall"]
+    calibration, cal_b = None, {}
+    if sel:
+        def grp(h):
+            return "low" if h <= 30 else "mid" if h <= 60 else "high" if h <= 100 else "long"
+        P_, Y_, D_, G_ = (np.concatenate([r["cal_p"] for _, r in sel]), np.concatenate([r["cal_y"] for _, r in sel]),
+                          np.concatenate([r["cal_d"] for _, r in sel]),
+                          np.concatenate([[grp(h)] * len(r["cal_p"]) for h, r in sel]))
+        L_ = np.log(np.clip(P_, 1e-6, 1 - 1e-6) / (1 - np.clip(P_, 1e-6, 1 - 1e-6)))
+        cut = np.datetime64("2016-01-01")
+
+        def slope(x, y):  # logistische Regression ohne Achsenabschnitt: nur Staerke, keine Richtungsverschiebung
+            b_ = 0.0
+            for _ in range(30):
+                q = 1 / (1 + np.exp(-b_ * x))
+                g, hh = np.sum((y - q) * x), np.sum(q * (1 - q) * x * x) + 1e-9
+                b_ += g / hh
+            return float(b_)
+
+        def table(pp, yy):
+            bins = [0, .3, .4, .45, .48, .52, .55, .6, .7, 1.0001]
+            out_ = []
+            for lo, hi in zip(bins[:-1], bins[1:]):
+                m = (pp >= lo) & (pp < hi)
+                if m.sum() > 500:
+                    out_.append(dict(lo=round(lo * 100), hi=round(min(hi, 1) * 100), n=int(m.sum()),
+                                     said=round(float(pp[m].mean()) * 100, 1), rose=round(float(yy[m].mean()) * 100, 1)))
+            return out_
+        test = D_ >= cut
+        b_train, cal_cmp = {}, {}
+        p_test_cal = np.empty(int(test.sum()))
+        idx_test = np.where(test)[0]
+        for g in ("low", "mid", "high", "long"):
+            mg = G_ == g
+            if (mg & ~test).sum() > 1000:
+                b_train[g] = slope(L_[mg & ~test], Y_[mg & ~test])
+                cal_b[g] = slope(L_[mg], Y_[mg])
+        bt = np.array([b_train.get(g, 1.0) for g in G_[idx_test]])
+        p_test_cal = 1 / (1 + np.exp(-bt * L_[idx_test]))
+        brier = lambda pp, yy: round(float(np.mean((pp - yy) ** 2)), 4)
+        calibration = dict(
+            n=int(len(P_)), rows=table(P_, Y_), brier=brier(P_, Y_), brier_base=brier(np.full(len(Y_), Y_.mean()), Y_),
+            b_train={g: round(v, 3) for g, v in b_train.items()}, b_live={g: round(v, 3) for g, v in cal_b.items()},
+            test_raw=table(P_[test], Y_[test]), test_cal=table(p_test_cal, Y_[test]),
+            test_brier_raw=brier(P_[test], Y_[test]), test_brier_cal=brier(p_test_cal, Y_[test]),
+            test_brier_base=brier(np.full(int(test.sum()), Y_[test].mean()), Y_[test]),
+            test_da_raw=round(float(((P_[test] > .5) == (Y_[test] == 1)).mean()) * 100, 2),
+            test_da_cal=round(float(((p_test_cal > .5) == (Y_[test] == 1)).mean()) * 100, 2))
+
+    def p_cal(prob, h):
+        b_ = cal_b.get("low" if h <= 30 else "mid" if h <= 60 else "high" if h <= 100 else "long", 1.0)
+        pc = float(np.clip(prob, 1e-6, 1 - 1e-6))
+        return 1 / (1 + np.exp(-b_ * np.log(pc / (1 - pc))))
     votes: dict = {}
     for (asset, b, h, _, _), r in zip(tasks, results):
         if r is None:
@@ -651,7 +692,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         models.append(dict(basis=b.id, asset=asset, h=h, tier=t, da=round(r["da"] * 100, 1),
                            da1=round(r["da1"] * 100, 1), da2=round(r["da2"] * 100, 1),
                            naive=round(r["naive"] * 100, 1), p=float(f"{r['p']:.2g}"),
-                           n_eff=r["n_eff"], prob=round(r["prob"], 3), pred=label(r["prob"]),
+                           n_eff=r["n_eff"], prob=round(p_cal(r["prob"], h), 4), prob_raw=round(r["prob"], 3), pred=label(r["prob"]),
                            date=str(b.series.index[-1].date()), oos_from=r["oos_from"],
                            _hist=r["hist"]))
     # Top-N je Waehrung: erst signifikante (A), dann robuste (B), jeweils nach DA

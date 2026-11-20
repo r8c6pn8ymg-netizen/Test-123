@@ -237,7 +237,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
       <div class="pb">
         <div class="chks" id="assetChks"></div>
         <div class="chartbox" id="scatterBox"><svg id="scatter" viewBox="0 0 640 420" role="img" aria-label="Streudiagramm: jedes Modell als Punkt, x = Horizont in Tagen, y = Wahrscheinlichkeit für steigenden Kurs"></svg><div class="tip" id="scTip" hidden></div></div>
-        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. Je weiter vom Mittelstrich, desto überzeugter ist das Modell. <b>Achtung, die Prozentzahl ist keine echte Wahrscheinlichkeit:</b> Die Modelle sind deutlich zu selbstsicher.<span id="calNote"></span> Aussagekräftig ist nur die <b>Richtung</b> (über oder unter 50 %), nicht wie weit ein Punkt vom Mittelstrich entfernt ist. <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
+        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. <b>P(steigt) ist kalibriert:</b> Die Roh-Ausgabe der Modelle war viel zu selbstsicher, deshalb wird sie auf die tatsächlich eingetretene Häufigkeit umgerechnet. Die Richtung (über oder unter 50 %) bleibt dabei gleich, nur die Höhe wird ehrlich. Darum liegen die Punkte nah an 50 %: Mehr geben Makrodaten bei Wechselkursen nicht her. Die Skala ist vergrößert, damit man Unterschiede sieht.<span id="calNote"></span> <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
       </div>
     </section>
     <section class="panel">
@@ -261,7 +261,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <th data-k="basis">Basis</th><th data-k="asset">Asset</th><th data-k="h">Horizont</th><th data-k="da" aria-sort="descending">DA</th>
         <th data-k="da2">DA 1./2. Hälfte</th><th data-k="naive">Naiv</th><th data-k="tier">Güte</th><th data-k="prob">P(steigt)</th><th data-k="pred">Prediction</th><th data-k="date">Datum</th>
       </tr></thead><tbody></tbody></table></div>
-      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>P(steigt)</b> = Ausgabe des Modells. Sie ist zu selbstsicher und keine echte Wahrscheinlichkeit, aussagekräftig ist nur, ob sie über oder unter 50 % liegt (siehe Hinweis beim Scatter). <b>Datum</b> = letzter Datenpunkt der Basis.</div>
+      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>P(steigt)</b> = kalibrierte Wahrscheinlichkeit, dass die Währung über den Horizont steigt (siehe Hinweis beim Scatter). <b>Prediction</b> = Richtung des Modells. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
     </div>
   </section>
 
@@ -854,11 +854,11 @@ window.renderFactors = async function () {
   const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
 
   // ------------------------------------------------------------- Kopf
-  // Kalibrierung: was die Modelle sagten vs. wie oft die Waehrung tatsaechlich stieg (alle echten Kandidaten, OOS)
-  if (D.calibration && D.calibration.rows && D.calibration.rows.length) {
-    const cr = D.calibration.rows, lo = cr[0], hi = cr[cr.length - 1];
-    const f0 = x => Math.round(x).toLocaleString('de-DE');
-    $('#calNote').innerHTML = ` Geprüft an allen ${D.calibration.n.toLocaleString('de-DE')} Prognosen seit 2008 (diese Ansicht, täglich neu): Sagten die Modelle ${f0(lo.lo)}–${f0(lo.hi)} % (Ø ${f0(lo.said)} %), stieg die Währung trotzdem in <b>${f0(lo.rose)} von 100</b> Fällen; sagten sie ${f0(hi.lo)}–${f0(hi.hi)} % (Ø ${f0(hi.said)} %), stieg sie nur in <b>${f0(hi.rose)} von 100</b> Fällen.`;
+  // Kalibrierung: Test der Umrechnung an 2016-heute (Umrechnung nur mit Daten vor 2016 festgelegt)
+  if (D.calibration && D.calibration.test_cal && D.calibration.test_cal.length) {
+    const C = D.calibration, f0 = x => Math.round(x).toLocaleString('de-DE');
+    const r0 = C.test_raw[0], r1 = C.test_raw[C.test_raw.length - 1], c0 = C.test_cal[0], c1 = C.test_cal[C.test_cal.length - 1];
+    $('#calNote').innerHTML = ` <b>Geprüft</b> an ${C.n.toLocaleString('de-DE')} Prognosen, Umrechnung nur mit Daten vor 2016 festgelegt, getestet an 2016 bis heute: Roh sagten die Modelle bis zu Ø ${f0(r0.said)} % bzw. ${f0(r1.said)} %, tatsächlich stieg die Währung in ${f0(r0.rose)} bzw. ${f0(r1.rose)} von 100 Fällen. Kalibriert sagen sie Ø ${fmt(c0.said, 1)} % bzw. ${fmt(c1.said, 1)} %, eingetreten: ${fmt(c0.rose, 1)} bzw. ${fmt(c1.rose, 1)} %. Fehlermaß (Brier, kleiner = besser): roh ${String(C.test_brier_raw).replace('.', ',')}, kalibriert ${String(C.test_brier_cal).replace('.', ',')}, „immer Durchschnitt sagen“ ${String(C.test_brier_base).replace('.', ',')}.`;
   }
   // Auswahl-Effekt ehrlich beziffern: echte Modelle vs. Zufallsmodelle nach derselben Auswahl, dann Schlusstest
   {
@@ -900,7 +900,7 @@ window.renderFactors = async function () {
   $('#assetChks').addEventListener('change', e => { if (e.target.checked) sel.add(e.target.value); else sel.delete(e.target.value); store.set('scSel', [...sel]); drawScatter(); });
 
   const SW = 640, SH = 420, ML = 52, MR = 14, MT = 14, MB = 40;
-  const ext = Math.max(0.06, ...ALL.map(m => Math.abs(m.prob - 0.5))) * 1.12;
+  const ext = Math.max(0.005, ...ALL.map(m => Math.abs(m.prob - 0.5))) * 1.12;  // Skala passt sich an (kalibrierte Werte liegen nah an 50 %)
   const LX0 = Math.log(8), LX1 = Math.log(340);
   const sx = h => ML + (Math.log(h) - LX0) / (LX1 - LX0) * (SW - ML - MR);
   const sy = p => MT + (0.5 + ext - p) / (2 * ext) * (SH - MT - MB);
@@ -912,11 +912,11 @@ window.renderFactors = async function () {
     const y50 = sy(0.5);
     let g = `<rect x="${ML}" y="${MT}" width="${SW - ML - MR}" height="${y50 - MT}" fill="var(--bull-bg)"/>`;
     g += `<rect x="${ML}" y="${y50}" width="${SW - ML - MR}" height="${SH - MB - y50}" fill="var(--bear-bg)"/>`;
-    const step = ext > 0.2 ? 0.1 : ext > 0.1 ? 0.05 : 0.025;
+    const step = ext > 0.2 ? 0.1 : ext > 0.1 ? 0.05 : ext > 0.04 ? 0.025 : ext > 0.02 ? 0.01 : ext > 0.008 ? 0.005 : 0.002;
     for (let v = -Math.floor(ext / step) * step; v <= ext + 1e-9; v += step) {
       const y = sy(0.5 + v); if (Math.abs(v) < 1e-9) continue;
       g += `<line x1="${ML}" x2="${SW - MR}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;
-      g += `<text x="${ML - 8}" y="${y + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${Math.round((0.5 + v) * 100)}%</text>`;
+      g += `<text x="${ML - 8}" y="${y + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${fmt((0.5 + v) * 100, step < 0.01 ? 1 : 0)}%</text>`;
     }
     g += `<line x1="${ML}" x2="${SW - MR}" y1="${y50}" y2="${y50}" stroke="var(--line-2)" stroke-dasharray="4 4"/>`;
     g += `<text x="${ML - 8}" y="${y50 + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">50%</text>`;
@@ -940,7 +940,7 @@ window.renderFactors = async function () {
     const t = M_LABEL(m.basis);
     return `<div class="t">${swatch(m.asset)}${esc(m.asset)} · ${esc(m.basis)}</div><div class="r" style="margin-bottom:4px"><span>${esc(t)}</span></div>
       <div class="r"><span>Horizont</span><b>${m.h} Tage</b></div><div class="r"><span>Prognose</span><b class="${PRED[m.pred]}">${m.pred}</b></div>
-      <div class="r"><span>P(steigt)</span><b>${fmt(m.prob * 100)}%</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
+      <div class="r"><span>P(steigt), kalibriert</span><b>${fmt(m.prob * 100)}%</b></div><div class="r"><span>Roh-Ausgabe Modell</span><b>${m.prob_raw != null ? fmt(m.prob_raw * 100) + '%' : '–'}</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
       <div class="r"><span>Güte</span><b>${m.tier === 'A' ? 'Signifikant' : 'Robust'}</b></div>`;
   }
   const M_LABEL = id => (D.bases[id] || {}).label || id;
