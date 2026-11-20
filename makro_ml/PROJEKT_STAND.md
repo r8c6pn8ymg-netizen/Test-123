@@ -34,11 +34,11 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   erreichen echte Modelle Ø 57,1 %, reine Zufallsmodelle aber auch 54,9 %; im Schlusstest 2022+ bleiben 53,5 % (Zufall 49,5 %).
   Die DA in der Tabelle ist also geschönt, das steht jetzt im Cockpit. Signifikant im Schlusstest nur **AUD** (t-Test p ≈ 0,004,
   nach Bonferroni für 8 Währungen ≈ 0,03). Ensemble JPY nicht mehr signifikant (p ≈ 0,11, vorher 0,04). Nach FDR kein Einzelmodell.
-- **Kalibrierung (20.11.):** Die Roh-Wahrscheinlichkeiten der Modelle waren stark überzeichnet (bei „20 %“ stieg die Währung in
-  ~50 von 100 Fällen, bei „81 %“ in ~53). Jetzt kalibriert: p_kal = sigmoid(b·logit(p)) je Horizont-Gruppe, b nur mit Daten
-  vor 2016 festgelegt und an 2016–heute geprüft: Brier roh 0,256 → kalibriert 0,250 = „immer Durchschnitt“ 0,250. Richtung
-  bleibt gleich (Bullish/Bearish unverändert). 99 % der kalibrierten Werte liegen bei 48–52 % → Prozentzahl enthält praktisch
-  kein Wissen. Ohne Achsenabschnitt (Basisrate seit 2016 ~48 % steigt) bewusst, damit die Richtung nicht verschoben wird.
+- **Kalibrierung (20.11.):** Roh-Wahrscheinlichkeiten waren stark überzeichnet (bei „20 %“ stieg die Währung in ~50 von 100
+  Fällen, bei „81 %“ in ~53). Jetzt p_kal = sigmoid(b·logit(p)) je Horizont-Gruppe, **b ≥ 0** (nie Richtungsumkehr).
+  Prüfung 1: b nur aus Fällen mit Ergebnis vor 2016, Test ab 2016: Brier roh 0,256 → kalibriert 0,250 = Durchschnitt.
+  Prüfung 2: ausgewählte Modelle (Auswahl 2008–2021) im Schlusstest ab 2022: roh 0,255 → kalibriert 0,250, Durchschnitt 0,249,
+  Richtung 52,9 %. Also auch für die besten Modelle steckt in der Prozentzahl kein Wissen, nur in der Richtung ein wenig.
 - **ALFRED vs. FRED:** PAYEMS und Handelsbilanz sahen mit korrigierten Daten geschönt aus; Kernaussagen gleich. Standardansicht = ALFRED.
 - **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten, Gleichstände geteilt):** Kombi Sharpe 0,53 (p < 0,001), Carry 0,51, Value 0,18,
   Momentum 0,10. Vor 2000 Kombi 0,83, seit 2000 0,25, ab 2022 −0,39. Seit 2015: Kombi −0,14, Carry +0,17.
