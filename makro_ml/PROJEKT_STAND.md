@@ -53,6 +53,10 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Kern-PCE (Ø DA 51,5 %, ähnlich gut wie Kern-CPI und weitgehend dieselbe Information), realer Einzelhandel und Erzeugerpreise
   (≈ 49 %, kein Vorteil, werden vom Filter fast nie ausgewählt). Gesamtbild unverändert, nach FDR weiterhin kein Einzelmodell.
   PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
+- **Aktuelle Kurse (20.11.):** Fed-Kurse (H.10) kommen mit ~1 Woche Verzug. Für den aktuellen Stand (Faktor-Rangliste,
+  52-Wochen-Status) werden sie mit den täglichen EZB-Referenzkursen verlängert (`data_sources.live_prices`): nur die Veränderung
+  seit dem letzten Fed-Tag wird übernommen (Verkettung), die Fed-Historie bleibt unverändert. Backtests, Statistik und Makro-ML
+  (FRED/ALFRED) nutzen weiterhin nur Fed-Kurse. EODHD geprüft, aber verworfen (Key müsste offen in der URL stehen).
 - **Unabhängiger Nachbau Makro ML (20.11., `research/nachbau_stichprobe.py`):** 24 angezeigte Modelle (je Währung 3, FRED,
   US-Reihen + CPI-Diff, Horizonte 30–240 Tage) mit eigenem Code und scikit-learn nachgebaut: Trefferquote und heutige
   Roh-Ausgabe bei allen 24 identisch. Ergänzung `research/nachbau_rest.py`: Profi-Faktoren (CFTC, REER, Momentum, VIX),

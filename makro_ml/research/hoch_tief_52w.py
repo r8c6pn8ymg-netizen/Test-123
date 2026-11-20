@@ -144,15 +144,18 @@ def main() -> dict:
     look = {k: round(float(L[(L.cur.isin(CUR7)) & (L.kind == k)]["x20"].mean()), 3) for k in ("new_high", "new_low")}
 
     # Aktueller Stand je Waehrung: Abstand zum 52-Wochen-Hoch/-Tief
+    # Aktueller Stand: Fed-Kurse + neueste EZB-Tage (verkettet). Die Historie oben bleibt reine Fed-Daten.
+    import data_sources as ds
+    pxl, live_meta = ds.live_prices(px)
     now = {}
     for c in CUR7 + ["DXY"]:
-        s = px[c].dropna()
+        s = pxl[c].dropna()
         hi, lo, last = s.iloc[-WIN - 1:-1].max(), s.iloc[-WIN - 1:-1].min(), s.iloc[-1]
         st = ("new_low" if last < lo else "new_high" if last > hi else
               "near_low" if last <= lo * (1 + NEAR) else "near_high" if last >= hi * (1 - NEAR) else None)
         now[c] = dict(date=str(s.index[-1].date()), to_high=round(100 * (last / hi - 1), 2),
                       to_low=round(100 * (last / lo - 1), 2), status=st)
-    out = dict(results=res, placebo_x20=round(placebo, 3), lookahead_x20=look, now=now)
+    out = dict(results=res, placebo_x20=round(placebo, 3), lookahead_x20=look, now=now, live=live_meta)
     (HERE.parent / "output" / "research_52w.json").write_text(to_json(out))
     return out
 

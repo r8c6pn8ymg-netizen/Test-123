@@ -369,3 +369,16 @@ def test_cockpit_ohne_javascript_fehler():
         pytest.skip("node oder Pipeline-Ausgabe fehlt")
     r = subprocess.run(["node", "pruefe_cockpit.js"], cwd=root, capture_output=True, text=True, timeout=300)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_ezb_verlaengerung_aendert_fed_historie_nicht():
+    """Live-Kurse: Fed-Werte bleiben exakt, neue Tage = letzter Fed-Wert x EZB-Veraenderung seit dem letzten Fed-Tag."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import data_sources as ds
+    fed = pd.Series([1.10, 1.11, 1.12], index=pd.to_datetime(["2026-11-11", "2026-11-12", "2026-11-13"]))
+    ecb = pd.Series([1.115, 1.13, 1.0], index=pd.to_datetime(["2026-11-13", "2026-11-16", "2026-11-20"]))
+    out, last = ds.live_extend(fed, ecb)
+    assert (out.loc[fed.index] == fed).all()
+    assert abs(out["2026-11-16"] - 1.12 * 1.13 / 1.115) < 1e-12 and last == "2026-11-20"
+    same, none = ds.live_extend(fed, ecb[ecb.index <= "2026-11-13"])   # keine neuen EZB-Tage -> unveraendert
+    assert none is None and same.equals(fed)

@@ -113,6 +113,61 @@ def ecb(flow: str, key: str, refresh: bool = False) -> pd.Series:
     return s.dropna().sort_index()
 
 
+def ecb_fx_daily(days: int = 450) -> pd.DataFrame:
+    """Taegliche EZB-Referenzkurse (16 Uhr MEZ, ohne Key), umgerechnet in US-Dollar je Waehrungseinheit.
+    Spalten EUR, JPY, GBP, CHF, CAD, AUD, NZD, SEK. Nur fuer den aktuellen Stand gedacht (siehe live_extend)."""
+    cur = ["USD", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD", "SEK"]
+    start = (pd.Timestamp.today() - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
+    raw = _cached("ecb_fx_daily.csv", "https://data-api.ecb.europa.eu/service/data/EXR/D." + "+".join(cur)
+                  + f".EUR.SP00.A?format=csvdata&startPeriod={start}", True)
+    df = pd.read_csv(io.BytesIO(raw))
+    p = df.pivot(index="TIME_PERIOD", columns="CURRENCY", values="OBS_VALUE").sort_index()
+    p.index = pd.to_datetime(p.index)
+    p = p.apply(pd.to_numeric, errors="coerce")
+    out = pd.DataFrame({"EUR": p["USD"]})                     # USD je EUR
+    for c in cur[1:]:
+        out[c] = p["USD"] / p[c]                              # USD je Einheit = (USD je EUR) / (Einheit je EUR)
+    return out.dropna(how="all")
+
+
+def live_extend(fed: pd.Series, ecb: pd.Series) -> tuple[pd.Series, str | None]:
+    """Fed-Reihe (Backtest-Quelle) um die Tage nach ihrem letzten Wert verlaengern. Uebernommen wird nur die
+    VERAENDERUNG der EZB-Kurse seit dem letzten Fed-Tag (Verkettung), nicht ihr Niveau: Fed (12 Uhr New York)
+    und EZB (14:15 Uhr Frankfurt) messen zu verschiedenen Zeiten. Gibt die Reihe und das letzte Datum zurueck."""
+    fed = fed.dropna()
+    ecb = ecb.dropna()
+    base = ecb[ecb.index <= fed.index[-1]]
+    if base.empty:
+        return fed, None
+    new = ecb[ecb.index > fed.index[-1]]
+    if new.empty:
+        return fed, None
+    ext = fed.iloc[-1] * new / base.iloc[-1]
+    return pd.concat([fed, ext]), str(new.index[-1].date())
+
+
+def live_prices(px: dict) -> tuple[dict, dict]:
+    """Fed-Kurse (USD je Waehrung, dazu 'DXY') um die neuesten EZB-Tage verlaengert (verkettet, siehe live_extend).
+    Nur fuer den aktuellen Stand (Rangliste, 52 Wochen), nie fuer Backtests. Rueckfall bei Fehler: reine Fed-Kurse."""
+    meta = {"fed_last": str(min(s.dropna().index[-1] for k, s in px.items() if k != "USD").date()), "ecb_last": None}
+    try:
+        e = ecb_fx_daily()
+    except Exception as ex:  # EZB nicht erreichbar -> Fed-Stand bleibt
+        meta["error"] = type(ex).__name__
+        return dict(px), meta
+    out = dict(px)
+    for c in ["EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD"]:
+        if c in px and c in e:
+            out[c], d = live_extend(px[c], e[c])
+            meta["ecb_last"] = d or meta["ecb_last"]
+    if "DXY" in px:  # Dollar-Index nach ICE-Formel aus den EZB-Kursen, ebenfalls nur verkettet
+        d = e[["EUR", "JPY", "GBP", "CAD", "SEK", "CHF"]].dropna()
+        dxy = (50.14348112 * d["EUR"] ** -0.576 * (1 / d["JPY"]) ** 0.136 * d["GBP"] ** -0.119
+               * (1 / d["CAD"]) ** 0.091 * (1 / d["SEK"]) ** 0.042 * (1 / d["CHF"]) ** 0.036)
+        out["DXY"], _ = live_extend(px["DXY"], dxy)
+    return out, meta
+
+
 SIPRI_PAGE = "https://www.sipri.org/databases/milex"
 
 

@@ -225,7 +225,9 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
 
     # Aktuelle Rangliste (letztes Monatsende mit vollstaendigen Daten) + live mit heutigen Kursen
     last = z["kombi"].dropna(how="all").index[-1]
-    live_spot = pd.Series({c: (px[c].dropna().iloc[-1] if c != "USD" else 1.0) for c in CUR})
+    # heutige Kurse: Fed-Stand, verlaengert um die neuesten EZB-Tage (nur Veraenderung, Backtest unberuehrt)
+    pxl, live_meta = ds.live_prices(px)
+    live_spot = pd.Series({c: (pxl[c].dropna().iloc[-1] if c != "USD" else 1.0) for c in CUR})
     live_mom = 0.5 * (live_spot / spot.iloc[-4] - 1) + 0.5 * (live_spot / spot.iloc[-13] - 1)
     # Leitzinsen fuer die Live-Rangliste tagesaktuell (BIS Tageswerte); Backtest bleibt bei Monatsende-Werten
     live_rate = rate.iloc[-1].copy()
@@ -329,7 +331,8 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
 
     corr = pd.DataFrame({k: res[k]["net"] for k in ("carry", "value", "momentum")}).corr().round(2)
     out = dict(generated=pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%MZ"), asof=str(last.date()),
-               live_fx=str(min(px[c].dropna().index[-1] for c in CUR if c != "USD").date()),
+               live_fx=live_meta["ecb_last"] or live_meta["fed_last"], fed_fx=live_meta["fed_last"],
+               ecb_fx=live_meta["ecb_last"],
                ranking=ranking, longs=longs, shorts=shorts,
                pairs=[dict(long=a, short=b, diff=round(float(d), 2)) for a, b, d in pairs],
                stats=stats, periods=periods, perm=perm, equity=eq, hist_rank=hist_rank,
