@@ -261,7 +261,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <th data-k="basis">Basis</th><th data-k="asset">Asset</th><th data-k="h">Horizont</th><th data-k="da" aria-sort="descending">DA</th>
         <th data-k="da2">DA 1./2. Hälfte</th><th data-k="naive">Naiv</th><th data-k="tier">Güte</th><th data-k="prob">P(steigt)</th><th data-k="pred">Prediction</th><th data-k="date">Datum</th>
       </tr></thead><tbody></tbody></table></div>
-      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>P(steigt)</b> = kalibrierte Wahrscheinlichkeit, dass die Währung über den Horizont steigt (siehe Hinweis beim Scatter). <b>Prediction</b> = Richtung des Modells. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
+      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>P(steigt)</b> = kalibrierte Wahrscheinlichkeit, dass die Währung über den Horizont steigt (siehe Hinweis beim Scatter). <b>Prediction</b> = Richtung des Modells (Roh-Ausgabe über 52 % = Bullish, unter 48 % = Bearish, dazwischen Neutral). Deshalb kann ein „Neutral“-Modell kalibriert minimal über einem „Bullish“-Modell stehen. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
     </div>
   </section>
 
@@ -609,8 +609,13 @@ window.renderFactors = async function () {
     }
     // Rangliste + Positionen nach Auswahl
     const ranked = [...F.ranking].map(r => ({ ...r, sc: selScore(r) })).sort((x, y) => y.sc - x.sc);
-    const longs = ranked.slice(0, F.n_ls).map(r => r.cur), shorts = ranked.slice(-F.n_ls).map(r => r.cur);
-    $('#fStamp').textContent = `Long ${longs.join(', ')} · Short ${shorts.join(', ')}`;
+    // Gleiche Regel wie im Backtest: gleichauf an der Grenze -> beide drin (teilen sich den Platz), nie long und short zugleich
+    const eps = 1e-9, n = F.n_ls, tL = ranked[n - 1].sc, tS = ranked[ranked.length - n].sc;
+    let longs = ranked.filter(r => r.sc > tL - eps).map(r => r.cur), shorts = ranked.filter(r => r.sc < tS + eps).map(r => r.cur);
+    const both = longs.filter(c => shorts.includes(c));
+    longs = longs.filter(c => !both.includes(c)); shorts = shorts.filter(c => !both.includes(c));
+    const tieNote = (longs.length > n || shorts.length > n || both.length) ? ' · gleichauf an der Grenze, Platz geteilt' : '';
+    $('#fStamp').textContent = `Long ${longs.join(', ')} · Short ${shorts.join(', ')}${tieNote}`;
     $('#fRankEyebrow').textContent = `Score = Mittel von ${NAMEOF(fsel)}`;
     const zb = v => { const w = Math.min(Math.abs(v) / 1.6, 1) * 50; return `<span class="zbar"><i style="${v >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${v >= 0 ? 'var(--bull)' : 'var(--bear)'}"></i></span>`; };
     const zc = v => `<span class="${v > 0.3 ? 'pos' : v < -0.3 ? 'negv' : 'dim'}">(${sgn(v, 1)})</span>`;
@@ -676,7 +681,7 @@ window.renderFactors = async function () {
       // Erklaerung aus den aktuellen Ergebnissen (keine festen Zahlen)
       const ns = passed.flatMap(k => Object.values(R[k].detail || {}).map(d => d.n)).filter(n => n > 0);
       const main = passed.map(k => { const r = R[k], h = k.split('_').pop(), up = k.startsWith('new_high') || k.startsWith('near_high');
-        return `<b>${NAME[k.replace(/_\d+$/, '')]}</b>: ${WAS[h]} in ${fmt(r.hit, 0)} statt ${fmt(r.base, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}${per15(r) == null ? '' : `, seit 2015 im Schnitt ${per15(r) > 0 ? (per15(r) < r.mean ? 'nur noch' : '') + ' ' + fmt(per15(r), 2) + ' %' : 'sogar in die Gegenrichtung (' + fmt(per15(r), 2) + ' %)'}`}`; });
+        return `<b>${NAME[k.replace(/_\d+$/, '')]}</b>: ${WAS[h]} in ${fmt(r.hit, 0)} statt ${fmt(r.base, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}${per15(r) == null ? '' : `, seit 2015 im Schnitt ${Math.sign(per15(r)) === Math.sign(r.mean) ? (Math.abs(per15(r)) < Math.abs(r.mean) ? 'nur noch ' : '') + fmt(Math.abs(per15(r)), 2) + ' %' : 'sogar in die Gegenrichtung (' + fmt(per15(r), 2) + ' %)'}`}`; });
       $('#w52Note').innerHTML = `<div><b>So liest du die Tabelle:</b> Bei den 7 Währungen ist der Kassakurs gegen den US-Dollar gemeint (Fed-Tageskurse seit 1971). <b>Tief</b> heißt: Die Währung ist so schwach gegen den Dollar wie seit einem Jahr nicht. Beim <b>USD</b> ist es der Dollar-Index, auf den auch der Dollar-Future DX läuft (Korb aus Euro, Yen, Pfund, CAD, SEK, CHF, offizielle ICE-Formel, Historie ab 1999). ${passed.length ? `„${fmt(R[passed[0]].hit, 0)} von 100 Fällen (an einem beliebigen Tag: ${fmt(R[passed[0]].base, 0)} von 100)“ heißt: Nach dem Ereignis ging es in ${fmt(R[passed[0]].hit, 0)} von 100 Fällen weiter in dieselbe Richtung, an irgendeinem Tag ohne Ereignis in ${fmt(R[passed[0]].base, 0)} von 100.` : ''} Abstand = wie weit der letzte Kurs vom Hoch bzw. Tief der 52 Wochen davor entfernt ist.</div>
         <div><b>Was belegt ist</b> (alle 7 Währungen zusammen, Regeln vorab festgelegt, mit Mehrfachtest-Korrektur, Placebo und Timing-Kontrolle): ${main.length ? main.join('; ') + '.' : 'zurzeit nichts.'} Alle anderen Fälle haben kein verlässliches Muster. Je Währung sind es nur ${ns.length ? Math.min(...ns) + ' bis ' + Math.max(...ns) : 'wenige'} Fälle, die Einzelzahlen schwanken stark. Nur ein Hinweis, kein Signal.</div>`;
       $('#w52Panel').hidden = false;
@@ -854,14 +859,19 @@ window.renderFactors = async function () {
   const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
 
   // ------------------------------------------------------------- Kopf
-  // Kalibrierung: Test der Umrechnung an 2016-heute (Umrechnung nur mit Daten vor 2016 festgelegt)
-  if (D.calibration && D.calibration.test_cal && D.calibration.test_cal.length) {
-    const C = D.calibration, f0 = x => Math.round(x).toLocaleString('de-DE');
-    const r0 = C.test_raw[0], r1 = C.test_raw[C.test_raw.length - 1];
-    const tot = C.test_cal.reduce((a, r) => a + r.n, 0), mid = C.test_cal.filter(r => r.lo >= 48 && r.hi <= 52);
-    const nMid = mid.reduce((a, r) => a + r.n, 0), rMid = nMid ? mid.reduce((a, r) => a + r.rose * r.n, 0) / nMid : null;
-    $('#calNote').innerHTML = ` <b>Geprüft</b> an ${C.n.toLocaleString('de-DE')} Prognosen, Umrechnung nur mit Daten vor 2016 festgelegt, getestet an 2016 bis heute: Roh sagten die Modelle bis zu Ø ${f0(r0.said)} % bzw. ${f0(r1.said)} %, tatsächlich stieg die Währung aber in ${f0(r0.rose)} bzw. ${f0(r1.rose)} von 100 Fällen. Kalibriert liegen ${fmt(nMid / tot * 100, 1)} % aller Prognosen zwischen 48 und 52 %${rMid != null ? `, eingetreten ist dort ${fmt(rMid, 1)} %` : ''}. Fehlermaß (Brier, kleiner = besser): roh ${fmt(C.test_brier_raw, 4)}, kalibriert ${fmt(C.test_brier_cal, 4)}, „immer Durchschnitt sagen“ ${fmt(C.test_brier_base, 4)}. Heißt: Die Prozentzahl enthält praktisch kein Wissen, nur die Richtung wird getestet (Trefferquote, Schlusstest).`;
-  }
+  // Kalibrierung: Test der Umrechnung (nur Faelle, deren Ergebnis vor 2016 feststand) an Prognosen ab 2016,
+  // dazu die ausgewaehlten Modelle (Auswahl 2008-2021) im Schlusstest ab 2022
+  { const C = D.calibration;
+    if (C && C.test_raw && C.test_raw.length && C.test_brier_cal != null) {
+      const f0 = x => Math.round(x).toLocaleString('de-DE'), b4 = x => fmt(x, 4);
+      const r0 = C.test_raw[0], r1 = C.test_raw[C.test_raw.length - 1];
+      let t = ` <b>Geprüft</b> an ${C.n.toLocaleString('de-DE')} Prognosen. Umrechnung nur mit Fällen festgelegt, deren Ergebnis vor 2016 feststand, getestet an den Prognosen ab 2016: Roh sagten die Modelle bis zu Ø ${f0(r0.said)} % bzw. ${f0(r1.said)} %, tatsächlich stieg die Währung aber in ${f0(r0.rose)} bzw. ${f0(r1.rose)} von 100 Fällen.`;
+      if (C.test_mid_share != null) t += ` Kalibriert liegen ${fmt(C.test_mid_share, 1)} % aller Prognosen zwischen 48 und 52 %, eingetreten ist dort ${fmt(C.test_mid_rose, 1)} %.`;
+      t += ` Fehlermaß (Brier, kleiner = besser): roh ${b4(C.test_brier_raw)}, kalibriert ${b4(C.test_brier_cal)}, „immer Durchschnitt sagen“ ${b4(C.test_brier_base)}.`;
+      if (C.sel_brier_raw != null) t += ` Auch für die <b>ausgewählten</b> Modelle (Auswahl 2008–2021, Schlusstest ab 2022, ${C.sel_n.toLocaleString('de-DE')} Prognosen): roh ${b4(C.sel_brier_raw)}, kalibriert ${b4(C.sel_brier_cal)}, Durchschnitt ${b4(C.sel_brier_base)}, Trefferquote der Richtung ${fmt(C.sel_da, 1)} %.`;
+      t += ' Heißt: Die Prozentzahl enthält kaum Wissen, getestet wird vor allem die Richtung (Trefferquote, Schlusstest).';
+      $('#calNote').innerHTML = t;
+    } }
   // Auswahl-Effekt ehrlich beziffern: echte Modelle vs. Zufallsmodelle nach derselben Auswahl, dann Schlusstest
   {
     const V = Object.values(D.validation || {}).filter(v => v.real && v.noise && v.real.da_pre != null && v.noise.da_pre != null);
@@ -955,7 +965,7 @@ window.renderFactors = async function () {
     const t = M_LABEL(m.basis);
     return `<div class="t">${swatch(m.asset)}${esc(m.asset)} · ${esc(m.basis)}</div><div class="r" style="margin-bottom:4px"><span>${esc(t)}</span></div>
       <div class="r"><span>Horizont</span><b>${m.h} Tage</b></div><div class="r"><span>Prognose</span><b class="${PRED[m.pred]}">${m.pred}</b></div>
-      <div class="r"><span>P(steigt), kalibriert</span><b>${fmt(m.prob * 100)}%</b></div><div class="r"><span>Roh-Ausgabe Modell</span><b>${m.prob_raw != null ? fmt(m.prob_raw * 100) + '%' : '–'}</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
+      <div class="r"><span>P(steigt), kalibriert</span><b>${fmt(m.prob * 100, 2)}%</b></div><div class="r"><span>Roh-Ausgabe Modell</span><b>${m.prob_raw != null ? fmt(m.prob_raw * 100) + '%' : '–'}</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
       <div class="r"><span>Güte</span><b>${m.tier === 'A' ? 'Signifikant' : 'Robust'}</b></div>`;
   }
   const M_LABEL = id => (D.bases[id] || {}).label || id;
@@ -1031,7 +1041,7 @@ window.renderFactors = async function () {
       <td class="b">${esc(m.basis)}<small>${esc(M_LABEL(m.basis))}</small></td><td>${swatch(m.asset)} ${m.asset}</td><td>${m.h}d</td>
       <td><b>${fmt(m.da)}%</b></td><td class="dim">${fmt(m.da1)} / ${fmt(m.da2)}</td><td class="dim">${fmt(m.naive)}%</td>
       <td><span class="tier ${m.tier}" title="${m.tier === 'A' ? 'Signifikant: p&lt;0,05, ≥2 Pkt. besser als naiv' : 'Robust: in beiden Hälften ≥50,5 %, ≥1 Pkt. besser als naiv'}">${m.tier === 'A' ? 'SIGNIF.' : 'ROBUST'}</span></td>
-      <td>${fmt(m.prob * 100)}%</td><td><span class="tag ${PRED[m.pred]}"><span class="${PRED[m.pred]}">${m.pred}</span></span></td><td class="dim">${m.date}</td></tr>`).join('')
+      <td>${fmt(m.prob * 100, 2)}%</td><td><span class="tag ${PRED[m.pred]}"><span class="${PRED[m.pred]}">${m.pred}</span></span></td><td class="dim">${m.date}</td></tr>`).join('')
       : `<tr><td colspan="10" class="dim" style="text-align:center;padding:28px">Keine Modelle in diesem Fenster. Breite erhöhen oder anderes Asset wählen.</td></tr>`;
     document.querySelectorAll('#tbl th').forEach(th => th.dataset.k === sortK ? th.setAttribute('aria-sort', sortDir < 0 ? 'descending' : 'ascending') : th.removeAttribute('aria-sort'));
   }

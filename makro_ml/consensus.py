@@ -117,7 +117,7 @@ def sign_permutation(pos: pd.DataFrame, excess: pd.DataFrame, n: int = 2000, see
         w = np.divide(s, cnt[:, None], out=np.zeros_like(s), where=cnt[:, None] > 0)
         turn = np.abs(np.diff(w, axis=0, prepend=0.0)).sum(axis=1)
         r = ((w * ex).sum(axis=1) - turn * cost)[keep]
-        out[i] = r.mean() / r.std() * np.sqrt(12) if r.std() > 0 else 0
+        out[i] = r.mean() / r.std(ddof=1) * np.sqrt(12) if r.std() > 0 else 0  # wie perf() (pandas, ddof=1)
     return out
 
 
@@ -162,7 +162,8 @@ def run_universe(name: str, sig: dict[str, pd.DataFrame], excess: pd.DataFrame, 
             hit = (np.sign(ex_) == np.sign(pos))[(pos != 0) & (ex_ != 0)].stack().mean()  # Teilpositionen (Gleichstand) zaehlen nach Richtung
             stats[k]["hit"] = round(float(hit) * 100, 1)
             sims = sign_permutation(pos, excess)
-            perms[k] = float(f"{(sims >= stats[k]['sharpe']).mean():.3g}")
+            obs = float(r.mean() / r.std(ddof=1) * np.sqrt(12))  # ungerundet vergleichen
+            perms[k] = float(f"{(sims >= obs).mean():.3g}")
             stats[k]["perm_p"] = perms[k]
     # Holm-Korrektur ueber alle Varianten (Mehrfachtests)
     ps = sorted(((s["p"], k) for k, s in stats.items() if s), key=lambda x: x[0])
@@ -236,7 +237,8 @@ def run_relative(name: str, scores: dict[str, pd.DataFrame], excess: pd.DataFram
             hit = (np.sign(ex_) == np.sign(pos))[(pos != 0) & (ex_ != 0)].stack().mean()  # Teilpositionen (Gleichstand) zaehlen nach Richtung
             st["hit"] = round(float(hit) * 100, 1)
             sims = sign_permutation(pos, excess)
-            st["perm_p"] = float(f"{(sims >= st['sharpe']).mean():.3g}")
+            obs = float(r.mean() / r.std(ddof=1) * np.sqrt(12))  # ungerundet vergleichen
+            st["perm_p"] = float(f"{(sims >= obs).mean():.3g}")
         stats[k] = st
     ps = sorted(((s_["p"], k) for k, s_ in stats.items() if s_), key=lambda x: x[0])
     m = len(ps)

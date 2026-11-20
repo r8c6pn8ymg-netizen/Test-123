@@ -602,26 +602,29 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     # ohne Basen, deren Information schon im Faktor-Portfolio oder im CFTC-Signal steckt.
     OVERLAP = {"CBPOL-Diff", "IR3M-Diff", "REALRATE-Diff", "MOM-12M", "MOM-3M", "REER-GAP", "COT-NET", "COT-COMM"}
     # Kalibrierung: Die Modell-Prozente sind zu selbstsicher. Umrechnung p_kal = sigmoid(b * logit(p)) je Horizont-
-    # Gruppe (b < 1 zieht Richtung 50 %, Richtung bleibt gleich). b wird NUR mit Prognosen vor 2016 festgelegt und an
-    # 2016-heute geprueft; fuer die heutige Anzeige danach mit allen bisherigen Prognosen (nur Vergangenheit).
+    # Gruppe, b >= 0 (zieht nur Richtung 50 %, dreht die Richtung nie um). Pruefung 1: b nur mit Faellen, deren Ergebnis
+    # vor 2016 feststand, Test an Prognosen ab 2016. Pruefung 2 (ausgewaehlte Modelle): Modelle, die die Guete-Pruefung
+    # 2008-2021 bestanden haben, im unberuehrten Schlusstest ab 2022. Fuer die heutige Anzeige: b aus allen bisherigen Faellen.
+    def grp(h):
+        return "low" if h <= 30 else "mid" if h <= 60 else "high" if h <= 100 else "long"
     sel = [(h, r) for (_, b, h, _, _), r in zip(tasks, results) if r is not None and b.group != "Zufall"]
     calibration, cal_b = None, {}
     if sel:
-        def grp(h):
-            return "low" if h <= 30 else "mid" if h <= 60 else "high" if h <= 100 else "long"
-        P_, Y_, D_, G_ = (np.concatenate([r["cal_p"] for _, r in sel]), np.concatenate([r["cal_y"] for _, r in sel]),
-                          np.concatenate([r["cal_d"] for _, r in sel]),
-                          np.concatenate([[grp(h)] * len(r["cal_p"]) for h, r in sel]))
+        P_ = np.concatenate([r["cal_p"] for _, r in sel])
+        Y_ = np.concatenate([r["cal_y"] for _, r in sel])
+        D_ = np.concatenate([r["cal_d"] for _, r in sel]).astype("datetime64[D]")
+        H_ = np.concatenate([np.full(len(r["cal_p"]), h) for h, r in sel])
+        G_ = np.array([grp(h) for h in H_])
+        S_ = np.concatenate([np.full(len(r["cal_p"]), bool(r["pre"] is not None and tier(r["pre"]))) for _, r in sel])
         L_ = np.log(np.clip(P_, 1e-6, 1 - 1e-6) / (1 - np.clip(P_, 1e-6, 1 - 1e-6)))
-        cut = np.datetime64("2016-01-01")
+        outcome = D_ + H_.astype("timedelta64[D]")
 
-        def slope(x, y):  # logistische Regression ohne Achsenabschnitt: nur Staerke, keine Richtungsverschiebung
+        def slope(x, y):  # logistische Regression ohne Achsenabschnitt, nicht negativ (keine Richtungsumkehr)
             b_ = 0.0
             for _ in range(30):
                 q = 1 / (1 + np.exp(-b_ * x))
-                g, hh = np.sum((y - q) * x), np.sum(q * (1 - q) * x * x) + 1e-9
-                b_ += g / hh
-            return float(b_)
+                b_ += np.sum((y - q) * x) / (np.sum(q * (1 - q) * x * x) + 1e-9)
+            return max(float(b_), 0.0)
 
         def table(pp, yy):
             bins = [0, .3, .4, .45, .48, .52, .55, .6, .7, 1.0001]
@@ -632,31 +635,39 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
                     out_.append(dict(lo=round(lo * 100), hi=round(min(hi, 1) * 100), n=int(m.sum()),
                                      said=round(float(pp[m].mean()) * 100, 1), rose=round(float(yy[m].mean()) * 100, 1)))
             return out_
-        test = D_ >= cut
-        b_train, cal_cmp = {}, {}
-        p_test_cal = np.empty(int(test.sum()))
-        idx_test = np.where(test)[0]
-        for g in ("low", "mid", "high", "long"):
-            mg = G_ == g
-            if (mg & ~test).sum() > 1000:
-                b_train[g] = slope(L_[mg & ~test], Y_[mg & ~test])
-                cal_b[g] = slope(L_[mg], Y_[mg])
-        bt = np.array([b_train.get(g, 1.0) for g in G_[idx_test]])
-        p_test_cal = 1 / (1 + np.exp(-bt * L_[idx_test]))
+
+        def apply(bmap, mask):
+            return 1 / (1 + np.exp(-np.array([bmap.get(g, 0.0) for g in G_[mask]]) * L_[mask]))
+
         brier = lambda pp, yy: round(float(np.mean((pp - yy) ** 2)), 4)
+        train = outcome < np.datetime64("2016-01-01")
+        test = D_ >= np.datetime64("2016-01-01")
+        b_train = {g: slope(L_[train & (G_ == g)], Y_[train & (G_ == g)]) for g in ("low", "mid", "high", "long")
+                   if (train & (G_ == g)).sum() > 1000}
+        cal_b = {g: slope(L_[G_ == g], Y_[G_ == g]) for g in ("low", "mid", "high", "long") if (G_ == g).sum() > 1000}
+        pc_test = apply(b_train, test)
+        # Pruefung 2: ausgewaehlte Modelle (Auswahl 2008-2021), Schlusstest ab 2022, b nur aus Faellen vor 2022
+        tr22 = outcome < np.datetime64("2022-01-01")
+        b22 = {g: slope(L_[tr22 & (G_ == g)], Y_[tr22 & (G_ == g)]) for g in ("low", "mid", "high", "long")
+               if (tr22 & (G_ == g)).sum() > 1000}
+        hs = S_ & (D_ >= np.datetime64("2022-01-01"))
+        pc_hs = apply(b22, hs)
         calibration = dict(
             n=int(len(P_)), rows=table(P_, Y_), brier=brier(P_, Y_), brier_base=brier(np.full(len(Y_), Y_.mean()), Y_),
             b_train={g: round(v, 3) for g, v in b_train.items()}, b_live={g: round(v, 3) for g, v in cal_b.items()},
-            test_raw=table(P_[test], Y_[test]), test_cal=table(p_test_cal, Y_[test]),
-            test_brier_raw=brier(P_[test], Y_[test]), test_brier_cal=brier(p_test_cal, Y_[test]),
+            test_n=int(test.sum()), test_raw=table(P_[test], Y_[test]), test_cal=table(pc_test, Y_[test]),
+            test_brier_raw=brier(P_[test], Y_[test]), test_brier_cal=brier(pc_test, Y_[test]),
             test_brier_base=brier(np.full(int(test.sum()), Y_[test].mean()), Y_[test]),
-            test_da_raw=round(float(((P_[test] > .5) == (Y_[test] == 1)).mean()) * 100, 2),
-            test_da_cal=round(float(((p_test_cal > .5) == (Y_[test] == 1)).mean()) * 100, 2))
+            test_mid_share=round(float(((pc_test >= .48) & (pc_test < .52)).mean()) * 100, 1),
+            test_mid_rose=round(float(Y_[test][(pc_test >= .48) & (pc_test < .52)].mean()) * 100, 1),
+            sel_n=int(hs.sum()), sel_brier_raw=brier(P_[hs], Y_[hs]) if hs.any() else None,
+            sel_brier_cal=brier(pc_hs, Y_[hs]) if hs.any() else None,
+            sel_brier_base=brier(np.full(int(hs.sum()), Y_[hs].mean()), Y_[hs]) if hs.any() else None,
+            sel_da=round(float(((P_[hs] > .5) == (Y_[hs] == 1)).mean()) * 100, 1) if hs.any() else None)
 
     def p_cal(prob, h):
-        b_ = cal_b.get("low" if h <= 30 else "mid" if h <= 60 else "high" if h <= 100 else "long", 1.0)
         pc = float(np.clip(prob, 1e-6, 1 - 1e-6))
-        return 1 / (1 + np.exp(-b_ * np.log(pc / (1 - pc))))
+        return 1 / (1 + np.exp(-cal_b.get(grp(h), 0.0) * np.log(pc / (1 - pc))))
     votes: dict = {}
     for (asset, b, h, _, _), r in zip(tasks, results):
         if r is None:

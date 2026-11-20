@@ -353,6 +353,7 @@ def test_kalibrierung_aendert_richtung_nicht_und_ist_nicht_schlechter(mode):
     if "test_brier_cal" not in C:
         pytest.skip("alte Ausgabe ohne Kalibrierung")
     assert C["test_brier_cal"] <= C["test_brier_raw"]
+    assert all(v >= 0 for v in list(C["b_train"].values()) + list(C["b_live"].values()))  # nie Richtungsumkehr
     for m in d["models"]:
         assert 0 < m["prob"] < 1
         if abs(m["prob_raw"] - 0.5) > 0.002:
