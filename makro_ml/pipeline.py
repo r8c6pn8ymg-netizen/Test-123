@@ -569,9 +569,15 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     cand = {a: dict(n=0, A=0, B=0, da=[], noise_n=0, noise_A=0, noise_B=0, noise_da=[])
             for a in ASSET_ORDER}
     pre_pool = {a: {"real": [], "noise": []} for a in ASSET_ORDER}
+    # Auswahlfreier Makro-Score fuer den Konsens-Test: ALLE echten Kandidaten, je Basis eine Stimme,
+    # ohne Basen, deren Information schon im Faktor-Portfolio oder im CFTC-Signal steckt.
+    OVERLAP = {"CBPOL-Diff", "IR3M-Diff", "REALRATE-Diff", "MOM-12M", "MOM-3M", "REER-GAP", "COT-NET", "COT-COMM"}
+    votes: dict = {}
     for (asset, b, h, _, _), r in zip(tasks, results):
         if r is None:
             continue
+        if b.group != "Zufall" and b.id not in OVERLAP:
+            votes.setdefault(asset, {}).setdefault(b.id, []).append(np.sign(r["hist"] - 0.5))
         if r["pre"] is not None:
             tp = tier(r["pre"])
             if tp:
@@ -710,6 +716,13 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
             s = sipri[name].dropna() * 100
             milex[code] = dict(y=int(s.index[-1]), v=round(float(s.iloc[-1]), 2),
                                chg=round(float(s.iloc[-1] - s.iloc[-6]), 2))
+    macro_score = {}
+    for a, byb in votes.items():
+        per_basis = pd.concat({bid: pd.concat(v, axis=1).mean(axis=1) for bid, v in byb.items()}, axis=1)
+        sc_ = per_basis.mean(axis=1)[per_basis.count(axis=1) >= 3]
+        macro_score[a] = dict(d=[str(x.date()) for x in sc_.index], v=[round(float(x), 3) for x in sc_.values])
+    (OUT / f"macro_score_{mode}.json").write_text(json.dumps(macro_score))
+
     out = dict(generated=str(pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")),
                fx_through=str(min(p.index[-1] for p in px.values()).date()),
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,

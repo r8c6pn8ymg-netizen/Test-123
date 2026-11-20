@@ -83,6 +83,24 @@ def perf(r: pd.Series) -> dict | None:
                 t=round(t, 2), p=float(f"{p:.3g}"), months=len(r))
 
 
+def core(px: dict[str, pd.Series], refresh: bool = False):
+    """Gemeinsame Bausteine (auch fuer den Konsens-Test): Kurse, Zinsen, Faktor-Scores, Ueberschussrenditen."""
+    spot = pd.DataFrame({c: px[c].resample("ME").last() for c in CUR if c != "USD"})
+    spot["USD"] = 1.0
+    spot = spot[CUR].dropna(how="all")
+    rate = pd.DataFrame({c: ds.bis("WS_CBPOL", f"M.{BIS[c]}", refresh).resample("ME").last() for c in CUR}).ffill()
+    rate = rate.reindex(spot.index, method="ffill")
+    reer = pd.DataFrame({c: ds.bis("WS_EER", f"M.R.N.{BIS[c]}", refresh).resample("ME").last() for c in CUR})
+    gap = (100 * (reer / reer.rolling(120, min_periods=60).mean() - 1)).shift(2).reindex(spot.index, method="ffill")
+    carry = rate.sub(rate["USD"], axis=0)
+    mom = 0.5 * (spot / spot.shift(3) - 1) + 0.5 * (spot / spot.shift(12) - 1)
+    z = {"carry": zrank(carry), "value": zrank(-gap), "momentum": zrank(mom)}
+    z["kombi"] = (z["carry"] + z["value"] + z["momentum"]) / 3
+    excess = (spot.shift(-1) / spot - 1) + carry / 1200
+    excess["USD"] = 0.0
+    return dict(spot=spot, rate=rate, carry=carry, z=z, excess=excess)
+
+
 def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     # Monatsend-Kurse (USD je Waehrung), USD = 1
     spot = pd.DataFrame({c: px[c].resample("ME").last() for c in CUR if c != "USD"})
