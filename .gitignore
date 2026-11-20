@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+# Standard-Ausgabedateien der Skripte, wenn ohne --out im Hauptordner gestartet
+/python_trades*.csv

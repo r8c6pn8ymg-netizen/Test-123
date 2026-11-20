@@ -1,0 +1,6 @@
+-r requirements.txt
+# Lesen der TradingView-Exporte (.xlsx) in load_tv()
+openpyxl==3.1.5
+# Prüfwerkzeuge
+pytest==9.1.1
+ruff==0.16.9

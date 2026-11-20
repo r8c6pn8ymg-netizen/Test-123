@@ -1,0 +1,39 @@
+[project]
+name = "spx-backtests"
+version = "0.1.0"
+description = "SPX500-Backtests (Python, 1:1 zu TradingView) und TradingView-Indikatoren (Pine Script v6)"
+requires-python = ">=3.13"
+
+# ───────────────────────── Ruff (Linting) ─────────────────────────
+[tool.ruff]
+target-version = "py313"
+line-length = 140
+extend-exclude = ["data", "reports"]
+
+[tool.ruff.lint]
+# Feste Regelauswahl, damit das Ergebnis nicht von der Ruff-Version abhängt.
+# Geprüft werden echte Fehlerquellen, keine Schreibweise:
+#   E9 = Syntaxfehler, F = Pyflakes (undefinierte/ungenutzte Namen, Importe), B = Bugbear (typische Logikfehler)
+select = ["E9", "F", "B"]
+# Reine Stilhinweise des bestehenden Codes, keine Fehler:
+#   B007 ungenutzte Schleifenvariable · B905 zip() ohne strict=
+ignore = ["B007", "B905"]
+
+[tool.ruff.lint.per-file-ignores]
+# B023: Die Hilfsfunktionen hit_sl/hit_tp werden noch in derselben Schleifenrunde
+#       aufgerufen, in der sl/tp gesetzt werden – kein echter Fehler (Fehlalarm).
+"monthly_mid_weekly_backtest.py" = ["B023"]
+# F841: Variable `o` (Open) in run_backtest wird nicht verwendet – harmlos, bestehender Code.
+"friday_rush_backtest.py" = ["F841"]
+
+# ───────────────────────── pytest ─────────────────────────
+[tool.pytest.ini_options]
+# Nur tests/ durchsuchen (sma_filter_test.py im Hauptordner ist ein Analyse-Skript, kein Test)
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+    "regression: Abgleich mit TradingView-Exporten bzw. gespeicherten Ergebnissen",
+    "pine: statische Prüfung der Pine-Script-Indikatoren",
+    "slow: dauert länger als ein paar Sekunden",
+]
