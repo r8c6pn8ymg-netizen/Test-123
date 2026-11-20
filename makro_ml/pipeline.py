@@ -315,7 +315,8 @@ def diff_bases(cc: dict, us: dict) -> list[Basis]:
         if key in cc:
             add(key, *cc[key])
     if all(k in cc and k in us for k in ("Y10", "POL")):
-        add("CURVE", (cc["Y10"][0] - cc["POL"][0]) - (us["Y10"][0] - us["POL"][0]), 32)
+        add("CURVE", (cc["Y10"][0] - cc["POL"][0]) - (us["Y10"][0] - us["POL"][0]),
+            max(cc["Y10"][1], cc["POL"][1], us["Y10"][1], us["POL"][1]))
     if all(k in cc and k in us for k in ("POL", "CPI")):
         add("REAL", (cc["POL"][0] - cc["CPI"][0]) - (us["POL"][0] - us["CPI"][0]), 50)
     return res

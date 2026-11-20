@@ -411,9 +411,13 @@ window.freshPill = function (gen) {
   const g = new Date(/Z$/.test(gen) ? gen : gen.replace(' ', 'T') + 'Z');  // aeltere Dateien: UTC ohne Kennzeichen
   if (isNaN(g)) return '';
   const now = new Date();
-  // letzter planmaessiger Lauf (Werktag 07:47 Ortszeit), danach bis zu 2 Std. Rechenzeit
-  const due = new Date(now); due.setHours(7, 47, 0, 0);
-  if (now < due || [0, 6].includes(due.getDay())) { do { due.setDate(due.getDate() - 1); } while ([0, 6].includes(due.getDay())); }
+  // letzter planmaessiger Lauf: Werktag 07:47 deutscher Zeit (Europe/Berlin), unabhaengig von der Zeitzone des Betrachters
+  const bp = d => { const o = {}; new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(d).forEach(p => { o[p.type] = +p.value; }); return o; };
+  const p0 = bp(now), off = Date.UTC(p0.year, p0.month - 1, p0.day, p0.hour, p0.minute, p0.second) - Math.floor(now.getTime() / 1000) * 1000;  // Berlin minus UTC
+  let dd = new Date(Date.UTC(p0.year, p0.month - 1, p0.day));  // Berliner Kalenderdatum
+  const runAt = x => new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate(), 7, 47) - off);
+  let due = runAt(dd);
+  while (now < due || [0, 6].includes(dd.getUTCDay())) { dd = new Date(dd.getTime() - 86400e3); due = runAt(dd); }
   const fresh = g >= new Date(due.getTime() - 2 * 3600e3);
   const late = !fresh && (due - g) < 3 * 86400e3;
   const cls = fresh ? 'hi' : late ? 'mid' : 'lo';

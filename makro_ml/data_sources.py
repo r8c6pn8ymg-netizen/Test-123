@@ -36,7 +36,12 @@ def _cached(name: str, url: str, refresh: bool, max_age_h: float = 20) -> bytes:
         return path.read_bytes()
     try:
         raw = _download(url)
-        path.write_bytes(raw)
+        head = raw[:200].lstrip()
+        if len(raw) < 20 or head[:1] in (b"<", b"{", b"["):  # HTML-/JSON-Fehlerseite statt CSV
+            raise ValueError(f"Unerwartete Antwort von {url[:60]}")
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(raw)
+        tmp.replace(path)
         return raw
     except Exception:
         if path.exists():  # offline -> letzter Stand

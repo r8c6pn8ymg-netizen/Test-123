@@ -71,9 +71,10 @@ def portfolio(pos: pd.DataFrame, excess: pd.DataFrame, cost: float = COST) -> pd
     n = pos.abs().sum(axis=1)
     w = pos.div(n.replace(0, np.nan), axis=0).fillna(0.0)
     gross = (w * excess.reindex(w.index)[w.columns]).sum(axis=1)
-    turn = w.diff().abs().sum(axis=1).fillna(w.abs().sum(axis=1))
+    turn = Fm.turnover(w)
     net = gross - turn * cost
-    net = net[excess.reindex(w.index)[w.columns].notna().any(axis=1)]
+    exw = excess.reindex(w.index)[[c for c in w.columns if c != "USD"]]
+    net = net[exw.notna().any(axis=1)]   # USD allein (immer 0) zaehlt nicht als vorhandener Monat
     return pd.Series(net.values, index=net.index + pd.offsets.MonthEnd(1))  # Ertrag t->t+1 auf t+1
 
 
@@ -165,13 +166,14 @@ def run_universe(name: str, sig: dict[str, pd.DataFrame], excess: pd.DataFrame, 
         stats[k]["p_holm"] = float(f"{min(1.0, max(p * (m - j) for j, (p, _) in enumerate(ps[:i + 1]))):.3g}")
     # 5-Jahres-Bloecke
     blocks = {}
-    yrs = list(range(pd.Timestamp(start).year, 2027, 5))
+    last_y = max(r.index.max().year for r in rets.values() if len(r))
+    yrs = list(range(pd.Timestamp(start).year, last_y + 1, 5))
     for k, r in rets.items():
         blocks[k] = {}
         for y0 in yrs:
             seg = r[(r.index >= f"{y0}-01-01") & (r.index < f"{y0 + 5}-01-01")]
             pf = perf(seg)
-            blocks[k][f"{y0}–{min(y0 + 4, 2026)}"] = pf["sharpe"] if pf else None
+            blocks[k][f"{y0}–{min(y0 + 4, last_y)}"] = pf["sharpe"] if pf else None
     # Walk-Forward (Variante nach In-Sample-Sharpe waehlen)
     wf = {}
     for label, yrs_ in (("IS 5 Jahre", 5), ("IS 10 Jahre", 10), ("IS wachsend", None)):
@@ -238,9 +240,10 @@ def run_relative(name: str, scores: dict[str, pd.DataFrame], excess: pd.DataFram
     blocks = {}
     for k, r in rets.items():
         blocks[k] = {}
-        for y0 in range(pd.Timestamp(start).year, 2027, 5):
+        last_y = r.index.max().year if len(r) else pd.Timestamp.today().year
+        for y0 in range(pd.Timestamp(start).year, last_y + 1, 5):
             pf = perf(r[(r.index >= f"{y0}-01-01") & (r.index < f"{y0 + 5}-01-01")])
-            blocks[k][f"{y0}–{min(y0 + 4, 2026)}"] = pf["sharpe"] if pf else None
+            blocks[k][f"{y0}–{min(y0 + 4, last_y)}"] = pf["sharpe"] if pf else None
     wf = {}
     for label, yrs_ in (("IS 5 Jahre", 5), ("IS 10 Jahre", 10), ("IS wachsend", None)):
         r, picks = walk_forward(rets, yrs_, oos_start)

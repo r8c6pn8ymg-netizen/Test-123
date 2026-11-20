@@ -48,6 +48,14 @@ def zrank(df: pd.DataFrame) -> pd.DataFrame:
     return r.sub(r.mean(axis=1), axis=0).div(r.std(axis=1).replace(0, np.nan), axis=0)
 
 
+def turnover(w: pd.DataFrame) -> pd.Series:
+    """Umschichtung je Monat inkl. Einstieg (erster Monat und nach Pausen zaehlt die volle Position)."""
+    w0 = w.fillna(0.0)
+    t = w0.diff().abs().sum(axis=1)
+    t.iloc[0] = w0.iloc[0].abs().sum()
+    return t
+
+
 def ls_weights(score: pd.DataFrame) -> pd.DataFrame:
     w = pd.DataFrame(0.0, index=score.index, columns=score.columns)
     for t, row in score.iterrows():
@@ -94,10 +102,12 @@ def core(px: dict[str, pd.Series], refresh: bool = False):
     gap = (100 * (reer / reer.rolling(120, min_periods=60).mean() - 1)).shift(2).reindex(spot.index, method="ffill")
     carry = rate.sub(rate["USD"], axis=0)
     mom = 0.5 * (spot / spot.shift(3) - 1) + 0.5 * (spot / spot.shift(12) - 1)
-    z = {"carry": zrank(carry), "value": zrank(-gap), "momentum": zrank(mom)}
+    tradable = spot.notna()  # EUR erst ab 1999 handelbar
+    z = {"carry": zrank(carry.where(tradable)), "value": zrank((-gap).where(tradable)), "momentum": zrank(mom.where(tradable))}
     z["kombi"] = (z["carry"] + z["value"] + z["momentum"]) / 3
     excess = (spot.shift(-1) / spot - 1) + carry / 1200
     excess["USD"] = 0.0
+    excess.loc[excess.drop(columns="USD").isna().all(axis=1), "USD"] = np.nan  # kein Phantom-Monat am Ende
     return dict(spot=spot, rate=rate, carry=carry, z=z, excess=excess)
 
 
@@ -118,19 +128,21 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     carry = rate.sub(rate["USD"], axis=0)
     mom = 0.5 * (spot / spot.shift(3) - 1) + 0.5 * (spot / spot.shift(12) - 1)
     value = -gap  # billig = hoch
-    z = {"carry": zrank(carry), "value": zrank(value), "momentum": zrank(mom)}
+    tradable = spot.notna()
+    z = {"carry": zrank(carry.where(tradable)), "value": zrank(value.where(tradable)), "momentum": zrank(mom.where(tradable))}
     z["kombi"] = (z["carry"] + z["value"] + z["momentum"]) / 3
 
     # Ueberschussrendite Monat t -> t+1 gegen USD inkl. Zinsdifferenz
     excess = (spot.shift(-1) / spot - 1) + carry / 1200
     excess["USD"] = 0.0
+    excess.loc[excess.drop(columns="USD").isna().all(axis=1), "USD"] = np.nan  # kein Phantom-Monat am Ende
     start = pd.Timestamp("1976-12-31")
     res, weights = {}, {}
 
     def run(sc):
         w = ls_weights(sc[sc.index >= start])
         gross = (w * excess.reindex(w.index)).sum(axis=1, min_count=1).dropna()
-        turn = w.diff().abs().sum(axis=1).reindex(gross.index).fillna(1.0)
+        turn = turnover(w).reindex(gross.index).fillna(0.0)
         return w, dict(gross=gross, net=gross - turn * COST)
 
     for k, sc in z.items():
@@ -139,9 +151,10 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     fr = pd.DataFrame({k: res[k]["net"] for k in ("carry", "value", "momentum")})
     roll = (fr.rolling(60, min_periods=60).mean() / fr.rolling(60, min_periods=60).std()).clip(lower=0)
     roll = roll.shift(1)  # Rendite t->t+1 ist auf t datiert -> nur bis t-1 bekannt
+    have = roll.notna().all(axis=1)
     wf = roll.div(roll.sum(axis=1), axis=0)
-    wf[roll.sum(axis=1) == 0] = 1 / 3
-    wf = wf.dropna()
+    wf[have & (roll.sum(axis=1) == 0)] = 1 / 3  # alle Faktoren zuletzt negativ -> gleich gewichten
+    wf = wf[have].dropna()
     sc_ad = sum(z[k].reindex(wf.index).mul(wf[k], axis=0) for k in ("carry", "value", "momentum"))
     weights["adaptiv"], res["adaptiv"] = run(sc_ad)
     factor_weights = {k: [round(float(v), 2) for v in wf[k].resample("YE").mean().values] for k in wf.columns}
@@ -232,7 +245,8 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
         cols = [c for c in CUR if c != drop]
         g_ = (100 * (reer[cols] / reer[cols].rolling(vy * 12, min_periods=vy * 6).mean() - 1)).shift(2).reindex(spot.index, method="ffill")
         m_ = 0.5 * (spot[cols] / spot[cols].shift(m_s) - 1) + 0.5 * (spot[cols] / spot[cols].shift(m_l) - 1)
-        sc = (zrank(carry[cols]) + zrank(-g_) + zrank(m_)) / 3
+        tr_ = spot[cols].notna()
+        sc = (zrank(carry[cols].where(tr_)) + zrank((-g_).where(tr_)) + zrank(m_.where(tr_))) / 3
         sc = sc[sc.index >= start]
         w = pd.DataFrame(0.0, index=sc.index, columns=cols)
         for t, row in sc.iterrows():
@@ -244,7 +258,7 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
             w.loc[t, o.index[-n_ls:]] = 1 / n_ls
             w.loc[t, o.index[:n_ls]] = -1 / n_ls
         gr = (w * excess[cols].reindex(w.index)).sum(axis=1, min_count=1).dropna()
-        return gr - w.diff().abs().sum(axis=1).reindex(gr.index).fillna(1.0) * cost
+        return gr - turnover(w).reindex(gr.index).fillna(0.0) * cost
 
     def shp(r):
         r = r.dropna()
@@ -265,7 +279,7 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     robust["costs"] = [dict(bp=bp, full=shp(r_), post=shp(r_[r_.index >= "2000"]))
                        for bp, r_ in ((bp, variant(cost=bp / 1e4)) for bp in (0, 5, 10, 20, 40))]
     base = res["kombi"]["net"]
-    robust["turnover"] = round(float(weights["kombi"].diff().abs().sum(axis=1).mean() * 12), 1)
+    robust["turnover"] = round(float(turnover(weights["kombi"]).mean() * 12), 1)
     robust["no_top12"] = shp(base.drop(base.nlargest(12).index))
     robust["loo"] = {c: shp(variant(drop=c)) for c in CUR}
 

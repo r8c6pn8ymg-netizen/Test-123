@@ -46,9 +46,9 @@ def cot_trend(c):
 sipri = ds.sipri_share_of_gdp(False)
 def y10(cur):
     cc = {"EUR": ("XM", "EZ"), "GBP": ("GB", "GB"), "CAD": ("CA", "CA"), "NZD": ("NZ", "NZ"), "CHF": ("CH", "CH"), "JPY": ("JP", "JP"), "AUD": ("AU", "AU"), "USD": ("US", "US")}[cur]
-    if cc[1] == "EZ": s = P.monthly(ds.ecb("YC", "B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", False))
-    else: s = ds.fred(f"IRLTLT01{cc[1]}M156N", False)
-    s.index = s.index + pd.offsets.MonthEnd(0); return s
+    if cc[1] == "EZ": s = P.monthly(ds.ecb("YC", "B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", False)); lag = 3
+    else: s = ds.fred(f"IRLTLT01{cc[1]}M156N", False); lag = 62   # gemessene Veroeffentlichungsfrist (ALFRED)
+    s.index = s.index + pd.offsets.MonthEnd(0) + pd.Timedelta(days=lag); return s
 US10 = y10("USD")
 def rate_mom(c):
     d = (y10(c) - US10).dropna(); return (d - d.shift(3)).dropna()
@@ -82,7 +82,7 @@ for name, (fn, cur, inv) in FILES.items():
         s = sg.get(k)
         if s is None or len(s) == 0: continue
         s = s.sort_index(); s = s[~s.index.duplicated()]
-        z = (s - s.mean()) / s.std()
+        z = s / s.std()   # nur skalieren, NICHT um den (zukuenftigen) Gesamtmittelwert verschieben
         at = z.reindex(weeks, method="ffill")           # Stand zu Wochenbeginn (damals bekannt)
         series_store[(name, k)] = (at, ev)
         for t, kind in ev:
