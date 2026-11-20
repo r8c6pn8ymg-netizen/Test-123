@@ -104,11 +104,20 @@ def main() -> dict:
             per = {lab: round(float(sub[(sub.date >= a) & (sub.date <= b + "-12-31")][f"x{h}"].mean()), 3)
                    for lab, a, b in PERIODS}
             by_cur = {c: round(float(sub[sub.cur == c][f"x{h}"].mean()), 3) for c in CUR7}
+            # Je Waehrung einzeln (nur zur Anzeige; wenige Faelle, einzeln nicht signifikant), DXY eingeschlossen
+            detail = {}
+            for c in CUR7 + ["DXY"]:
+                d_ = T[(T.cur == c) & (T.kind == kind)]
+                n_ = int(d_[f"x{h}"].notna().sum())
+                detail[c] = dict(n=n_, hit=round(float(d_[f"hit{h}"].mean()) * 100, 1) if n_ else None,
+                                 base=round(float(d_[f"base{h}"].mean()) * 100, 1) if n_ else None,
+                                 move=round(float(d_[f"x{h}"].mean()), 3) if n_ else None,
+                                 since=str(d_["date"].min().year) if n_ else None)
             dx = T[(T.cur == "DXY") & (T.kind == kind)][f"x{h}"]
             res[f"{kind}_{h}"] = dict(n=int(sub[f"x{h}"].notna().sum()), mean=round(m, 3), p=round(p, 4),
                                       hit=round(float(sub[f"hit{h}"].mean()) * 100, 1),
                                       base=round(float(sub[f"base{h}"].mean()) * 100, 1),
-                                      periods=per, by_cur=by_cur, dxy=round(float(dx.mean()), 3))
+                                      periods=per, by_cur=by_cur, dxy=round(float(dx.mean()), 3), detail=detail)
             keys.append(f"{kind}_{h}")
             ps.append(p)
     for k, a in zip(keys, holm(ps)):
