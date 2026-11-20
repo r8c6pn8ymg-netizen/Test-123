@@ -130,33 +130,84 @@ def test_neue_basen_mit_gemessenen_fristen():
 
 
 # ---------- Termine der Woche ----------
-def test_termine_fred_parser_und_zeitzone():
-    import sys
+def _termine():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
     import termine
-    page = ('<span style="font-weight: bold;">Wednesday November 25, 2026</span>'
-            '<td nowrap style="x">7:30 am</td><td text-align="left"><a href="/release?rid=53">Gross Domestic Product</a>'
-            '<td nowrap style="x"></td><td text-align="left"><a href="/release?rid=54">Personal Income and Outlays</a>'
-            '<td nowrap style="x">N/A</td><td text-align="left"><a href="/release?rid=9">Advance Monthly Sales for Retail and Food Services</a>')
-    rows = termine.parse_fred_calendar(page)
-    assert [r["rid"] for r in rows] == [53, 54, 9]
-    assert rows[1]["t"] == rows[0]["t"]          # leere Zeit = wie Zeile davor
-    assert rows[2]["t"] is None                  # N/A = ohne Uhrzeit
-    t = termine.build(today=__import__("datetime").date(2026, 11, 23), fred_rows=rows)
-    gdp = next(e for e in t["events"] if "BIP" in e["title"])
-    assert gdp["time"] == "14:30"                # 7:30 Central = 14:30 Berlin (Winterzeit)
+    return termine
+
+
+def _fake_get(sid):
+    idx = pd.date_range("2024-01-01", periods=30, freq="MS")
+    return pd.Series(np.arange(100.0, 130.0), index=idx)
+
+
+def test_termine_offizielle_uhrzeit_statt_fred_zeit():
+    """FRED-Kalenderzeiten sind teils Einstellzeiten; verwendet werden die offiziellen New Yorker Zeiten."""
+    from datetime import date
+    t = _termine()
+    rows = [dict(day=date(2026, 11, 20), rid=91, name="Surveys of Consumers"),          # FRED: 10:00 Central
+            dict(day=date(2026, 11, 19), rid=180, name="Unemployment Insurance Weekly Claims Report")]
+    out = t.build(today=date(2026, 11, 20), fred_rows=rows, pages={"Census": [], "BEA": [], "Fed-G.17": []}, get=_fake_get)
+    um = next(e for e in out["events"] if "Michigan" in e["title"])
+    cl = next(e for e in out["events"] if "Erstanträge" in e["title"])
+    assert um["time"] == "16:00" and cl["time"] == "14:30"   # 10:00 bzw. 8:30 New York
+
+
+def test_termine_offizielle_quelle_ersetzt_fred_eintraege():
+    """Census/BEA/G.17 bestimmen die Termine; doppelte FRED-Eintraege (z. B. zweite Industrieproduktion) fallen weg."""
+    from datetime import date
+    t = _termine()
+    rows = [dict(day=date(2026, 11, 24), rid=13, name="G.17 Industrial Production and Capacity Utilization"),
+            dict(day=date(2026, 11, 25), rid=27, name="New Residential Construction")]
+    pages = {"Census": [(date(2026, 11, 18), "x New Residential Construction (Building Permits) November 18")],
+             "BEA": [(date(2026, 11, 25), "GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026")],
+             "Fed-G.17": [date(2026, 11, 17), date(2026, 12, 16)]}
+    out = t.build(today=date(2026, 11, 20), fred_rows=rows, pages=pages, get=_fake_get)
+    ip = [e["date"] for e in out["events"] if e["title"] == "Industrieproduktion"]
+    st = [e["date"] for e in out["events"] if e["title"].startswith("Baubeginne")]
+    assert ip == ["2026-11-17"] and st == ["2026-11-18"]
+    gdp = next(e for e in out["events"] if "BIP" in e["title"])
+    assert gdp["time"] == "14:30" and gdp["src"] == "bea.gov"
+
+
+def test_termine_parser_census_bea_g17():
+    from datetime import date
+    t = _termine()
+    cen = t.parse_census("<td>Advance Monthly Sales for Retail and Food Services</td><td>November 17, 2026</td>"
+                         "<td>8:30 AM</td><td>October 2026</td><td>A202611170830 A202610</td>")
+    assert cen[0][0] == date(2026, 11, 17) and "Advance Monthly Sales" in cen[0][1]
+    bea = t.parse_bea("November 25 8:30 AM N ews Personal Income and Outlays, October 2026 "
+                      "December 8 8:30 AM N ews U.S. International Trade in Goods and Services, October 2026 View",
+                      date(2026, 11, 20))
+    assert bea[0] == (date(2026, 11, 25), "Personal Income and Outlays, October 2026")
+    assert bea[1][0] == date(2026, 12, 8)
+    assert t.parse_g17("17-November-2026 December 2026 16-December-2026") == [date(2026, 11, 17), date(2026, 12, 16)]
+
+
+def test_termine_ism_regel():
+    from datetime import date
+    t = _termine()
+    assert t.ism_dates(date(2026, 12, 1), date(2026, 12, 31), 1) == [date(2026, 12, 1)]   # Di. 1.12.
+    assert t.ism_dates(date(2026, 12, 1), date(2026, 12, 31), 3) == [date(2026, 12, 3)]
+    assert t.ism_dates(date(2027, 1, 1), date(2027, 1, 31), 1) == [date(2027, 1, 4)]     # 1.1. Feiertag, dann Wochenende
+
+
+def test_termine_werte_umrechnung():
+    t = _termine()
+    v = t.latest_values([("M/M", "X", "mom"), ("J/J", "X", "yoy"), ("Diff", "X", "diff_k")], get=_fake_get)
+    assert v[0]["value"] == "+0,8 %" and v[0]["period"] == "Jun 2026"     # 129/128-1
+    assert v[1]["value"] == "10,3 %"                                        # 129/117-1
+    assert v[2]["value"] == "+1 Tsd."
 
 
 def test_termine_notenbanken_vollstaendig_und_sortiert():
-    import sys
     from datetime import date
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
-    import termine
-    assert {c[0] for c in termine.CENTRAL_BANKS} == {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
-    for ccy, bank, *_, dates in termine.CENTRAL_BANKS:
+    t = _termine()
+    assert {c[0] for c in t.CENTRAL_BANKS} == {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
+    for ccy, bank, *_, dates in t.CENTRAL_BANKS:
         assert dates == sorted(dates), bank
-    t = termine.build(today=date(2026, 12, 7), fred_rows=[])
-    cb = [e for e in t["events"] if e["kind"] == "cb"]
+    out = t.build(today=date(2026, 12, 7), fred_rows=[], pages={"Census": [], "BEA": [], "Fed-G.17": []}, get=_fake_get)
+    cb = [e for e in out["events"] if e["kind"] == "cb"]
     assert any(e["ccy"] == "AUD" and e["date"] == "2026-12-08" and e["time"] == "04:30" for e in cb)  # 14:30 Sydney
     assert any(e["ccy"] == "USD" and e["time"] == "20:00" for e in cb)                                 # 14:00 New York
-    assert len(t["next_cb"]) == 8
+    assert len(out["next_cb"]) == 8

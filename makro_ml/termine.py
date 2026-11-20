@@ -1,24 +1,33 @@
-"""Termine der Woche: US-Datentermine (FRED-Kalender) und Zinsentscheide der 8 Notenbanken.
+"""Termine der Woche: US-Datentermine und Zinsentscheide der 8 Notenbanken.
 
 Quellen (kostenlos, ohne Key, ohne Prognosewerte):
-- US-Daten: offizieller Veroeffentlichungskalender von FRED (Fed St. Louis), taeglich neu geladen.
-  Zeiten dort in US Central Time, hier nach deutscher Zeit umgerechnet.
-- Notenbank-Sitzungen: von den offiziellen Seiten der Notenbanken abgeschrieben (Stand 20.11.2026).
-  Die RBNZ-Seite blockt automatische Abrufe; ihre Termine stammen aus der RBNZ-Mitteilung
-  "OCR decision dates ... to Feb 2028" (ueber eine Websuche, bitte im Zweifel auf rbnz.govt.nz pruefen).
-
-Konsensprognosen gibt es nicht kostenlos; die stehen weiter in TradingView.
+- US-Daten, wo moeglich direkt von den Statistikaemtern: Census (Einzelhandel, Bau, Auftraege),
+  BEA (BIP, PCE, Handelsbilanz), Fed (Industrieproduktion). Die BLS-Seite blockt automatische
+  Abrufe; deren Termine (CPI, Arbeitsmarkt, PPI, JOLTS) sowie Erstantraege, Uni Michigan und
+  regionale Fed-Umfragen kommen aus dem FRED-Kalender. Dessen Uhrzeiten sind teils die
+  FRED-Einstellzeiten, deshalb werden ueberall die offiziellen Uhrzeiten (New York) verwendet.
+- ISM-Einkaufsmanagerindizes: ISM veroeffentlicht Industrie am 1. und Dienstleistung am
+  3. US-Geschaeftstag des Monats um 10:00 New York. Die Seite von ISM ist nicht erreichbar,
+  die Termine werden nach dieser Regel berechnet und so gekennzeichnet.
+- Notenbank-Sitzungen: von den offiziellen Seiten abgeschrieben (Stand 20.11.2026). Die RBNZ-Seite
+  blockt automatische Abrufe; ihre Termine stammen aus der RBNZ-Mitteilung "OCR decision dates ...
+  to Feb 2028" (ueber eine Websuche).
+- Zuletzt veroeffentlichte Werte (Ist und Vorwert) aus FRED. Konsensprognosen gibt es nicht
+  kostenlos; die stehen weiter in TradingView.
 """
 from __future__ import annotations
 
 import html
 import json
 import re
-from datetime import date, datetime, time, timedelta
+import urllib.request
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from data_sources import CACHE, _download
+import pandas as pd
+
+from data_sources import CACHE, _download, fred
 
 OUT = Path(__file__).parent / "output"
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -45,59 +54,97 @@ CENTRAL_BANKS = [
       "2027-09-08", "2027-10-27", "2027-12-08"]),
     ("AUD", "RBA", time(14, 30), "Australia/Sydney", "rba.gov.au",  # Entscheid am 2. Sitzungstag
      ["2026-12-08", "2027-02-09", "2027-03-23", "2027-05-04", "2027-06-22", "2027-08-10",
-      "2027-09-28", "2027-11-02", "2027-12-07"]),
+      "2027-09-28", "2027-11-02", "2027-12-14"]),
     ("NZD", "RBNZ", time(14, 0), "Pacific/Auckland", "rbnz.govt.nz (über Websuche)",
      ["2026-12-09", "2027-02-10", "2027-03-17", "2027-05-05", "2027-06-16", "2027-08-04",
       "2027-09-15", "2027-10-27", "2027-12-08"]),
 ]
 
-# FRED-Veroeffentlichungen, die fuer Waehrungen zaehlen: Name im FRED-Kalender -> (deutscher Name, Wichtigkeit 1–3)
+NY = "America/New_York"
+MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
+MON_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"]
+
+# US-Veroeffentlichungen: Schluessel -> Name, Wichtigkeit (1–3), offizielle Uhrzeit New York,
+# Quelle des Datums und Suchtext dort, Werte aus FRED (Bezeichnung, Reihe, Umrechnung)
 US_RELEASES = {
-    "Employment Situation": ("Arbeitsmarktbericht (Non-Farm Payrolls, Arbeitslosenquote)", 3),
-    "Consumer Price Index": ("Verbraucherpreise (CPI)", 3),
-    "Personal Income and Outlays": ("Einkommen & Konsum, PCE-Inflation", 3),
-    "Gross Domestic Product": ("Bruttoinlandsprodukt (BIP)", 3),
-    "Advance Monthly Sales for Retail and Food Services": ("Einzelhandelsumsätze", 2),
-    "Producer Price Index": ("Erzeugerpreise (PPI)", 2),
-    "Job Openings and Labor Turnover Survey": ("Offene Stellen (JOLTS)", 2),
-    "G.17 Industrial Production and Capacity Utilization": ("Industrieproduktion", 2),
-    "Unemployment Insurance Weekly Claims Report": ("Erstanträge Arbeitslosenhilfe", 2),
-    "Surveys of Consumers": ("Verbraucherstimmung Uni Michigan", 2),
-    "ADP National Employment Report": ("ADP-Arbeitsmarkt", 2),
-    "Employment Cost Index": ("Arbeitskostenindex", 2),
-    "U.S. International Trade in Goods and Services": ("Handelsbilanz", 2),
-    "Manufacturer's Shipments, Inventories, and Orders (M3) Survey": ("Auftragseingänge Industrie", 2),
-    "Advance Economic Indicators": ("Vorab: Warenhandel & Lagerbestände", 1),
-    "New Residential Construction": ("Baubeginne & Baugenehmigungen", 1),
-    "New Residential Sales": ("Neubauverkäufe", 1),
-    "Existing Home Sales": ("Verkäufe bestehender Häuser", 1),
-    "Productivity and Costs": ("Produktivität & Lohnstückkosten", 1),
-    "Empire State Manufacturing Survey": ("Empire State Index (Industrie New York)", 1),
-    "Manufacturing Business Outlook Survey": ("Philly-Fed-Index (Industrie)", 1),
-    "Construction Spending": ("Bauausgaben", 1),
+    "nfp": dict(label="Arbeitsmarktbericht (Non-Farm Payrolls, Arbeitslosenquote)", imp=3, et=time(8, 30),
+                src="fred", key="Employment Situation",
+                vals=[("Stellen", "PAYEMS", "diff_k"), ("Quote", "UNRATE", "pct")]),
+    "cpi": dict(label="Verbraucherpreise (CPI)", imp=3, et=time(8, 30), src="fred", key="Consumer Price Index",
+                vals=[("Gesamt M/M", "CPIAUCSL", "mom"), ("Kern M/M", "CPILFESL", "mom")]),
+    "pce": dict(label="Einkommen & Konsum, PCE-Inflation", imp=3, et=time(8, 30), src="bea",
+                key="Personal Income and Outlays",
+                vals=[("Kern-PCE M/M", "PCEPILFE", "mom"), ("Kern-PCE J/J", "PCEPILFE", "yoy")]),
+    "gdp": dict(label="Bruttoinlandsprodukt (BIP)", imp=3, et=time(8, 30), src="bea", key="GDP (",
+                vals=[("real, annualisiert", "A191RL1Q225SBEA", "pct")]),
+    "ism_m": dict(label="ISM-Einkaufsmanagerindex Industrie (PMI)", imp=2, et=time(10, 0), src="ism", key=1, vals=[]),
+    "ism_s": dict(label="ISM-Einkaufsmanagerindex Dienstleistung (PMI)", imp=2, et=time(10, 0), src="ism", key=3, vals=[]),
+    "retail": dict(label="Einzelhandelsumsätze", imp=2, et=time(8, 30), src="census",
+                   key="Advance Monthly Sales for Retail and Food Services", vals=[("M/M", "RSAFS", "mom")]),
+    "ppi": dict(label="Erzeugerpreise (PPI)", imp=2, et=time(8, 30), src="fred", key="Producer Price Index",
+                vals=[("Final Demand M/M", "PPIFIS", "mom")]),
+    "jolts": dict(label="Offene Stellen (JOLTS)", imp=2, et=time(10, 0), src="fred",
+                  key="Job Openings and Labor Turnover Survey", vals=[("Offene Stellen", "JTSJOL", "mio")]),
+    "ip": dict(label="Industrieproduktion", imp=2, et=time(9, 15), src="g17", key=None, vals=[("M/M", "INDPRO", "mom")]),
+    "claims": dict(label="Erstanträge Arbeitslosenhilfe", imp=2, et=time(8, 30), src="fred",
+                   key="Unemployment Insurance Weekly Claims Report", vals=[("Anträge", "ICSA", "k_persons")]),
+    "umich": dict(label="Verbraucherstimmung Uni Michigan", imp=2, et=time(10, 0), src="fred",
+                  key="Surveys of Consumers", vals=[]),  # auf FRED nur mit Verzoegerung (Lizenz)
+    "eci": dict(label="Arbeitskostenindex", imp=2, et=time(8, 30), src="fred", key="Employment Cost Index", vals=[]),
+    "trade": dict(label="Handelsbilanz", imp=2, et=time(8, 30), src="bea",
+                  key="U.S. International Trade in Goods and Services", vals=[("Saldo", "BOPGSTB", "bn")]),
+    "durable": dict(label="Auftragseingänge langlebige Güter", imp=2, et=time(8, 30), src="census",
+                    key="Advance Report on Durable Goods", vals=[("M/M", "DGORDER", "mom")]),
+    "adv": dict(label="Vorab: Warenhandel & Lagerbestände", imp=1, et=time(8, 30), src="census",
+                key="Advance Economic Indicators Report", vals=[]),
+    "starts": dict(label="Baubeginne & Baugenehmigungen", imp=1, et=time(8, 30), src="census",
+                   key="New Residential Construction", vals=[("Baubeginne (Jahresrate)", "HOUST", "k")]),
+    "nhs": dict(label="Neubauverkäufe", imp=1, et=time(10, 0), src="census", key="New Residential Sales",
+                vals=[("Verkäufe (Jahresrate)", "HSN1F", "k")]),
+    "existing": dict(label="Verkäufe bestehender Häuser", imp=1, et=time(10, 0), src="fred", key="Existing Home Sales", vals=[]),
+    "prod": dict(label="Produktivität & Lohnstückkosten", imp=1, et=time(8, 30), src="fred", key="Productivity and Costs", vals=[]),
+    "empire": dict(label="Empire-State-Index (Industrie New York)", imp=1, et=time(8, 30), src="fred",
+                   key="Empire State Manufacturing Survey", vals=[("Index", "GACDISA066MSFRBNY", "level")]),
+    "philly": dict(label="Philly-Fed-Index (Industrie)", imp=1, et=time(8, 30), src="fred",
+                   key="Manufacturing Business Outlook Survey", vals=[("Index", "GACDFSA066MSFRBPHI", "level")]),
+    "constr": dict(label="Bauausgaben", imp=1, et=time(10, 0), src="census",
+                   key="Construction Spending", vals=[("M/M", "TTLCONS", "mom")]),
 }
-CENTRAL = ZoneInfo("America/Chicago")  # "All times are US Central Time" (FRED)
 
 _ROW = re.compile(
     r'<span style="font-weight: bold;">([A-Z][a-z]+day [A-Z][a-z]+ \d{1,2}, \d{4})</span>'
     r'|<td nowrap[^>]*>\s*([^<]*?)\s*</td>\s*<td text-align="left">\s*<a href="/release\?rid=(\d+)">([^<]+)</a>')
 
 
+def _text(raw: str) -> str:
+    raw = re.sub(r"<(script|style).*?</\1>", "", raw, flags=re.S)
+    return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)))
+
+
+def _fetch(name: str, url: str, must: str) -> str:
+    """Seite laden; bei Fehler letzter Stand aus dem Cache (bis 40 Tage alt)."""
+    path = CACHE / f"termine_{name}.html"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; makro-ml-cockpit)"})
+        raw = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "ignore")
+        if must not in raw:
+            raise ValueError(f"{name}: unerwartete Seite")
+        path.write_text(raw)
+        return raw
+    except Exception:
+        if path.exists() and (datetime.now().timestamp() - path.stat().st_mtime) < 40 * 86400:
+            return path.read_text()
+        raise
+
+
 def parse_fred_calendar(page: str) -> list[dict]:
-    """Zeilen des FRED-Wochenkalenders: Datum, Uhrzeit (Central Time), Release-ID, Name."""
-    rows, day, last_t = [], None, None
+    """Zeilen des FRED-Kalenders: Datum, Release-ID, Name (die Uhrzeit dort wird nicht verwendet)."""
+    rows, day = [], None
     for m in _ROW.finditer(page):
         if m.group(1):
-            day, last_t = datetime.strptime(m.group(1), "%A %B %d, %Y").date(), None
-            continue
-        if day is None:
-            continue
-        t_raw = m.group(2).strip()
-        if t_raw and t_raw != "N/A":
-            last_t = datetime.strptime(t_raw.upper().replace(" ", ""), "%I:%M%p").time()
-        elif t_raw == "N/A":
-            last_t = None
-        rows.append(dict(day=day, t=last_t, rid=int(m.group(3)), name=html.unescape(m.group(4)).strip()))
+            day = datetime.strptime(m.group(1), "%A %B %d, %Y").date()
+        elif day is not None:
+            rows.append(dict(day=day, rid=int(m.group(3)), name=html.unescape(m.group(4)).strip()))
     return rows
 
 
@@ -123,6 +170,55 @@ def fred_calendar(start: date, end: date, max_pages: int = 20) -> list[dict]:
     return parse_fred_calendar(raw)
 
 
+def parse_census(page: str) -> list[tuple[date, str]]:
+    """Census-Kalender: jeder Eintrag endet mit einem Code A + JJJJMMTThhmm (Datum, Uhrzeit New York)."""
+    out = []
+    x = _text(page)
+    for m in re.finditer(r"A(\d{12}) A\d{5,6}", x):
+        before = x[max(0, m.start() - 260):m.start()]
+        before = re.split(r"A\d{12} A\d{5,6}", before)[-1]
+        out.append((datetime.strptime(m.group(1)[:8], "%Y%m%d").date(), before.strip()))
+    return out
+
+
+def parse_bea(page: str, today: date) -> list[tuple[date, str]]:
+    """BEA-Terminliste (Monat Tag Uhrzeit, ohne Jahr): Jahr so waehlen, dass das Datum nahe an heute liegt."""
+    x = _text(page)
+    out = []
+    pat = re.compile(rf"({MONTHS}) (\d{{1,2}}) (\d{{1,2}}:\d\d [AP]M) [A-Z] ?(?:ews|rticle|ata)\s+(.+?)"
+                     rf"(?= View| (?:{MONTHS}) \d{{1,2}} \d{{1,2}}:\d\d| Quick Links|$)")
+    for m in pat.finditer(x):
+        mon = datetime.strptime(m.group(1), "%B").month
+        cands = [date(y, mon, int(m.group(2))) for y in (today.year - 1, today.year, today.year + 1)]
+        d = min(cands, key=lambda c: abs((c - today).days))
+        out.append((d, m.group(4).strip()))
+    return out
+
+
+def parse_g17(page: str) -> list[date]:
+    return [datetime.strptime(f"{d}-{mo}-{y}", "%d-%B-%Y").date()
+            for d, mo, y in re.findall(rf"(\d{{1,2}})-({MONTHS})-(\d{{4}})", _text(page))]
+
+
+def ism_dates(start: date, end: date, nth: int) -> list[date]:
+    """n-ter US-Geschaeftstag jedes Monats (ISM-Regel), Feiertage nach US-Bundeskalender."""
+    from pandas.tseries.holiday import USFederalHolidayCalendar
+    hol = set(USFederalHolidayCalendar().holidays(start - timedelta(days=40), end + timedelta(days=40)).date)
+    out, m = [], date(start.year, start.month, 1)
+    while m <= end:
+        d, k = m, 0
+        while True:
+            if d.weekday() < 5 and d not in hol:
+                k += 1
+                if k == nth:
+                    break
+            d += timedelta(days=1)
+        if start <= d <= end:
+            out.append(d)
+        m = date(m.year + (m.month == 12), m.month % 12 + 1, 1)
+    return out
+
+
 def _to_berlin(d: date, t: time | None, tz: str) -> tuple[str, str | None]:
     """Datum und Uhrzeit (HH:MM) in deutscher Zeit; ohne Uhrzeit bleibt das Ortsdatum."""
     if t is None:
@@ -131,44 +227,155 @@ def _to_berlin(d: date, t: time | None, tz: str) -> tuple[str, str | None]:
     return b.date().isoformat(), b.strftime("%H:%M")
 
 
-def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | None = None) -> dict:
+def _de(v: float, d: int = 1, sign: bool = False) -> str:
+    s = f"{v:+,.{d}f}" if sign else f"{v:,.{d}f}"
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _period(idx: pd.Timestamp, freq: str) -> str:
+    if freq == "W":
+        return f"Woche bis {idx:%d.%m.}"
+    if freq == "Q":
+        return f"Q{(idx.month - 1) // 3 + 1} {idx.year}"
+    return f"{MON_DE[idx.month - 1]} {idx.year}"
+
+
+def latest_values(spec: list, get=None) -> list[dict]:
+    """Zuletzt veroeffentlichter Wert und Vorwert je Kennzahl (aus FRED)."""
+    get = get or (lambda sid: fred(sid, refresh=True))
+    out = []
+    for name, sid, how in spec:
+        s = get(sid).dropna()
+        gap = (s.index[-1] - s.index[-2]).days
+        freq = "W" if gap <= 8 else "Q" if gap > 80 else "M"
+        if how == "mom":
+            x = 100 * s.pct_change()
+            f = lambda v: _de(v, 1, True) + " %"
+        elif how == "yoy":
+            x = 100 * s.pct_change(4 if freq == "Q" else 12)
+            f = lambda v: _de(v, 1) + " %"
+        elif how == "diff_k":
+            x = s.diff()
+            f = lambda v: _de(v, 0, True) + " Tsd."
+        elif how == "pct":
+            x = s
+            f = lambda v: _de(v, 1) + " %"
+        elif how == "k_persons":
+            x = s / 1000
+            f = lambda v: _de(v, 0) + " Tsd."
+        elif how == "k":
+            x = s
+            f = lambda v: _de(v, 0) + " Tsd."
+        elif how == "mio":
+            x = s / 1000
+            f = lambda v: _de(v, 2) + " Mio."
+        elif how == "bn":
+            x = s / 1000
+            f = lambda v: _de(v, 1) + " Mrd. $"
+        else:
+            x = s
+            f = lambda v: _de(v, 1)
+        x = x.dropna()
+        out.append(dict(name=name, value=f(x.iloc[-1]), prev=f(x.iloc[-2]), period=_period(x.index[-1], freq)))
+    return out
+
+
+def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | None = None,
+          pages: dict | None = None, get=None) -> dict:
+    """``fred_rows``/``pages``/``get`` nur fuer Tests (sonst werden die Quellen live geladen)."""
     today = today or datetime.now(BERLIN).date()
     start = today - timedelta(days=today.weekday())  # Montag dieser Woche
     end = start + timedelta(days=days - 1)
     events, warnings, next_cb = [], [], []
     for ccy, bank, t, tz, src, dates in CENTRAL_BANKS:
         ds = [date.fromisoformat(x) for x in dates]
+        if max(ds) < today + timedelta(days=60):
+            warnings.append(f"Terminliste {bank} läuft bald aus – bitte auf {src} aktualisieren.")
         nxt = [d for d in ds if d >= today]
         if nxt:
             bd, bt = _to_berlin(nxt[0], t, tz)
-            next_cb.append(dict(ccy=ccy, bank=bank, date=bd, time=bt, src=src,
-                                days=(date.fromisoformat(bd) - today).days))
-        if max(ds) < today + timedelta(days=60):
-            warnings.append(f"Terminliste {bank} läuft bald aus – bitte auf {src} aktualisieren.")
+            next_cb.append(dict(ccy=ccy, bank=bank, date=bd, time=bt, src=src))
         for d in ds:
             bd, bt = _to_berlin(d, t, tz)
             if start.isoformat() <= bd <= end.isoformat():
                 events.append(dict(date=bd, time=bt, ccy=ccy, kind="cb", imp=3,
                                    title=f"{bank}: Zinsentscheid", src=src,
-                                   note=None if t else "Uhrzeit nicht fest (meist mittags Tokio, ca. 04–05 Uhr deutscher Zeit)"))
+                                   note=None if t else "Uhrzeit nicht fest (meist mittags Tokio, ca. 4–5 Uhr deutscher Zeit)"))
+
+    # --- US-Daten: Datum je Quelle sammeln ---
+    pages = pages if pages is not None else {}
+    found: dict[str, list[tuple[date, str]]] = {k: [] for k in US_RELEASES}
+
+    def official(name, loader):
+        try:
+            return loader() if name not in pages else pages[name]
+        except Exception as e:
+            warnings.append(f"{name}-Kalender nicht erreichbar ({type(e).__name__}); Termine dafür aus dem FRED-Kalender.")
+            return None
+
+    years = sorted({start.year, end.year})
+    cen = official("Census", lambda: [r for y in years for r in parse_census(_fetch(
+        f"census_{y}", f"https://www.census.gov/economic-indicators/calendar-listview-{y}.html", "Economic Indicator"))])
+    bea = official("BEA", lambda: parse_bea(_fetch("bea", "https://www.bea.gov/news/schedule/full", "Release Schedule"), today))
+    g17 = official("Fed-G.17", lambda: parse_g17(_fetch(
+        "g17", "https://www.federalreserve.gov/releases/g17/release_dates.htm", "Industrial Production")))
     try:
-        rows = fred_rows if fred_rows is not None else fred_calendar(start, end)
-        seen = set()
-        for r in rows:
-            lab = US_RELEASES.get(r["name"])
-            if not lab or (r["day"], r["name"]) in seen:
-                continue
-            seen.add((r["day"], r["name"]))
-            bd, bt = _to_berlin(r["day"], r["t"], "America/Chicago")
-            events.append(dict(date=bd, time=bt, ccy="USD", kind="data", imp=lab[1], title=lab[0],
-                               src="FRED-Kalender", note=None))
+        frows = fred_rows if fred_rows is not None else fred_calendar(start, end)
     except Exception as e:
-        warnings.append(f"FRED-Kalender nicht erreichbar ({type(e).__name__}); nur Notenbank-Termine.")
+        frows = []
+        warnings.append(f"FRED-Kalender nicht erreichbar ({type(e).__name__}); BLS-Termine fehlen.")
+    src_ok = {"census": cen is not None, "bea": bea is not None, "g17": g17 is not None}
+    for k, r in US_RELEASES.items():
+        if r["src"] == "census" and cen is not None:
+            found[k] = [(d, "census.gov") for d, txt in cen if r["key"] in txt]
+        elif r["src"] == "bea" and bea is not None:
+            found[k] = [(d, "bea.gov") for d, txt in bea if txt.startswith(r["key"])]
+        elif r["src"] == "g17" and g17 is not None:
+            found[k] = [(d, "federalreserve.gov") for d in g17]
+        elif r["src"] == "ism":
+            found[k] = [(d, "ISM-Regel") for d in ism_dates(start, end, r["key"])]
+        else:  # FRED-Kalender (BLS, DOL, Uni Michigan, regionale Fed) oder Rueckfall
+            key = r["key"] if r["src"] == "fred" else _FRED_FALLBACK.get(k)
+            if key and (r["src"] == "fred" or not src_ok.get(r["src"], True)):
+                found[k] = sorted({(x["day"], "FRED-Kalender") for x in frows if x["name"] == key})
+
+    vals_cache: dict = {}
+    for k, lst in found.items():
+        r = US_RELEASES[k]
+        for d, src in lst:
+            bd, bt = _to_berlin(d, r["et"], NY)
+            if not (start.isoformat() <= bd <= end.isoformat()):
+                continue
+            ev = dict(date=bd, time=bt, ccy="USD", kind="data", imp=r["imp"], title=r["label"], src=src,
+                      note="Datum nach ISM-Regel berechnet (1. bzw. 3. US-Geschäftstag), nicht von ISM abgerufen"
+                      if src == "ISM-Regel" else None)
+            if r["vals"]:
+                try:
+                    if k not in vals_cache:
+                        vals_cache[k] = latest_values(r["vals"], get)
+                    ev["vals"] = vals_cache[k]
+                except Exception:
+                    pass
+            events.append(ev)
     events.sort(key=lambda e: (e["date"], e["time"] or "99:99", -e["imp"]))
-    return dict(generated=datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    for c in next_cb:
+        c["days"] = (date.fromisoformat(c["date"]) - today).days
+    return dict(generated=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 week_start=start.isoformat(), week_end=end.isoformat(), today=today.isoformat(),
-                list_as_of=LIST_AS_OF, events=events, next_cb=sorted(next_cb, key=lambda x: x["date"]),
+                list_as_of=LIST_AS_OF, events=events, next_cb=sorted(next_cb, key=lambda x: (x["date"], x["time"] or "")),
                 warnings=warnings)
+
+
+# Namen im FRED-Kalender, falls die offizielle Quelle (Census/BEA/Fed) ausfaellt
+_FRED_FALLBACK = {
+    "pce": "Personal Income and Outlays", "gdp": "Gross Domestic Product",
+    "retail": "Advance Monthly Sales for Retail and Food Services",
+    "ip": "G.17 Industrial Production and Capacity Utilization",
+    "trade": "U.S. International Trade in Goods and Services",
+    "durable": "Manufacturer's Shipments, Inventories, and Orders (M3) Survey",
+    "adv": "Advance Economic Indicators", "starts": "New Residential Construction",
+    "nhs": "New Residential Sales", "constr": "Construction Spending",
+}
 
 
 def main() -> dict:

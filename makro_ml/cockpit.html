@@ -171,6 +171,9 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 .trow.cb .ttl { font-weight: 600; color: var(--warn); }
 .tt { font: 13px var(--mono); color: var(--fg-2); }
 .ttl { min-width: 0; }
+.tv { display: block; font: 12px var(--mono); color: var(--fg-2); margin-top: 2px; }
+.tv b { color: var(--fg); font-weight: 600; }
+.tp { color: var(--muted); }
 .tn { display: block; font-size: 11.5px; color: var(--muted); }
 .imp { font-size: 9px; letter-spacing: 1px; color: var(--accent); white-space: nowrap; }
 .view[hidden] { display: none !important; }
@@ -472,7 +475,7 @@ window.renderTermine = async function () {
     ev.forEach(e => (by[e.date] = by[e.date] || []).push(e));
     $('#tList').innerHTML = Object.keys(by).sort().map(d => `<div class="tday${d < today ? ' past' : ''}${d === today ? ' now' : ''}">
       <div class="tdh">${DAY(d)}${d === today ? ' · heute' : d < today ? ' · vorbei' : ''}</div>
-      ${by[d].map(e => `<div class="trow${e.kind === 'cb' ? ' cb' : ''}"><span class="tt">${e.time || '—'}</span><span class="tag" style="color:var(--c-${e.ccy === 'USD' ? 'DXY' : e.ccy})">${e.ccy}</span><span class="ttl">${esc(e.title)}${e.note ? `<span class="tn">${esc(e.note)}</span>` : ''}</span>${DOTS(e.imp)}</div>`).join('')}
+      ${by[d].map(e => `<div class="trow${e.kind === 'cb' ? ' cb' : ''}"><span class="tt">${e.time || '—'}</span><span class="tag" style="color:var(--c-${e.ccy === 'USD' ? 'DXY' : e.ccy})">${e.ccy}</span><span class="ttl">${esc(e.title)}${(e.vals || []).length ? `<span class="tv">${d < today ? 'Zuletzt' : 'Bisher'} (${esc(e.vals[0].period)}): ${e.vals.map(v => `${esc(v.name)} <b>${esc(v.value)}</b> <span class="tp">davor ${esc(v.prev)}</span>`).join(' · ')}</span>` : ''}${e.note ? `<span class="tn">${esc(e.note)}</span>` : ''}</span>${DOTS(e.imp)}</div>`).join('')}
     </div>`).join('');
   };
   document.querySelectorAll('#tImp button').forEach(b => b.addEventListener('click', () => {
@@ -480,9 +483,11 @@ window.renderTermine = async function () {
   }));
   draw();
   $('#tNote').innerHTML = `${T.warnings.map(w => `<div class="err" style="padding:8px 10px;border-radius:8px">${esc(w)}</div>`).join('')}
-    <div><b>US-Daten:</b> offizieller Veröffentlichungskalender der Fed St. Louis (FRED), jeden Morgen neu geladen. Die Zeiten dort sind US-Ortszeit und hier in deutsche Zeit umgerechnet (14:30 Uhr = 8:30 Uhr New York).</div>
-    <div><b>Zinsentscheide:</b> von den offiziellen Seiten der acht Notenbanken übernommen (Stand ${T.list_as_of.split('-').reverse().join('.')}). Die Seite der RBNZ blockt automatische Abrufe, ihre Termine stammen aus deren veröffentlichter Terminliste (über eine Websuche). Die Bank of Japan nennt keine feste Uhrzeit.</div>
-    <div><b>Nicht enthalten:</b> Prognosen bzw. Konsensschätzungen und Datentermine anderer Länder (z. B. Inflation in Großbritannien oder Australien). Dafür gibt es keine kostenlose, erlaubte Schnittstelle. Die schaust du weiter in TradingView nach.</div>`;
+    <div><b>US-Daten:</b> Termine direkt von den Statistikämtern, wo das geht: Census (Einzelhandel, Bau, Aufträge), BEA (BIP, PCE, Handelsbilanz) und Fed (Industrieproduktion). Die Seite der Arbeitsmarkt-Statistik (BLS) sperrt automatische Abrufe. Deshalb kommen CPI, Arbeitsmarkt, PPI und JOLTS sowie Erstanträge und Umfragen aus dem Kalender der Fed St. Louis (FRED). Uhrzeiten sind überall die offiziellen New Yorker Zeiten, umgerechnet in deutsche Zeit (8:30 Uhr New York = 14:30 Uhr).</div>
+    <div><b>Einkaufsmanagerindizes (PMI):</b> Die ISM-Termine sind nach der festen ISM-Regel berechnet: Industrie am 1., Dienstleistung am 3. US-Geschäftstag des Monats um 16:00 Uhr. Die ISM-Seite selbst ist nicht abrufbar. Die Werte sind lizenziert und nicht frei verfügbar, genau wie die S&amp;P-Global-PMIs (Flash-PMIs für Eurozone, Großbritannien, Japan, Australien). Diese Termine fehlen deshalb.</div>
+    <div><b>Werte:</b> „Bisher“ bzw. „Zuletzt“ ist der zuletzt veröffentlichte Wert aus FRED mit dem Vorwert. Monatsveränderungen sind aus den Indexständen berechnet und können um 0,1 Prozentpunkte von der Pressemeldung abweichen. <b>Prognosen</b> (Konsens) gibt es nicht kostenlos, die stehen weiter in TradingView.</div>
+    <div><b>Zinsentscheide:</b> von den offiziellen Seiten der acht Notenbanken übernommen (Stand ${T.list_as_of.split('-').reverse().join('.')}). Die Seite der RBNZ sperrt automatische Abrufe, ihre Termine stammen aus deren veröffentlichter Terminliste (über eine Websuche). Die Bank of Japan nennt keine feste Uhrzeit.</div>
+    <div><b>Nicht enthalten:</b> Datentermine anderer Länder (z. B. Inflation in Großbritannien oder Japan). Dafür gibt es keine gemeinsame, kostenlose und erlaubte Schnittstelle.</div>`;
 };
 
 // Aktualitaets-Anzeige: taegliche Aktualisierung laeuft Mo–Fr um 07:47 Uhr (deutsche Zeit)
