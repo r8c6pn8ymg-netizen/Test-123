@@ -18,6 +18,7 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `research/trend_volcarry.py` | Trendfolge + Carry mit Bremse, Test nach `research/VORAB_REGISTRIERUNG_trend_carry.md` – verworfen |
 | `research/hoch_tief_52w.py` | 52-Wochen-Hoch/-Tief nach `research/VORAB_REGISTRIERUNG_52w.md`; läuft täglich in der Pipeline |
 | `research/nachbau_stichprobe.py` | Unabhängiger Nachbau einer Stichprobe angezeigter Makro-Modelle (Vergleich DA und Roh-Ausgabe) |
+| `research/nachbau_rest.py` | Unabhängiger Nachbau der übrigen Modell-Arten (Profi-Faktoren, Länder-Differenzen, ALFRED) |
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
 | `termine.py` | Termine der Woche: US-Termine von Census, BEA, Fed (G.17) und FRED-Kalender (BLS), offizielle Uhrzeiten, ISM-PMI nach Regel, letzte Werte aus FRED; Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `pruefe_termine.py` | Unabhängige Gegenprüfung: lädt die offiziellen Seiten selbst und vergleicht jeden Notenbank- und US-Termin (Exit-Code 1 bei Abweichung); läuft täglich nach der Pipeline |
@@ -54,7 +55,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
 - **Unabhängiger Nachbau Makro ML (20.11., `research/nachbau_stichprobe.py`):** 24 angezeigte Modelle (je Währung 3, FRED,
   US-Reihen + CPI-Diff, Horizonte 30–240 Tage) mit eigenem Code und scikit-learn nachgebaut: Trefferquote und heutige
-  Roh-Ausgabe bei allen 24 identisch. Nicht nachgebaut: ALFRED-Variante, Profi-Faktoren (CFTC, REER, Momentum), übrige Länder-Differenzen.
+  Roh-Ausgabe bei allen 24 identisch. Ergänzung `research/nachbau_rest.py`: Profi-Faktoren (CFTC, REER, Momentum, VIX),
+  alle übrigen Länder-Differenzen und die ALFRED-Variante, 44 Modelle, ebenfalls alle identisch (insgesamt 68 von 68).
+  Nicht in der Stichprobe, weil zurzeit kein Modell angezeigt wird: Rohstoffe, EXPORTS, ALFRED-PPIACO/OPHNFB.
 - **Gesamtprüfung 20.11.:** Unabhängige Nachrechnung Carry (eigener Code): Sharpe 0,51 vs. Cockpit 0,51, seit 2000 0,32 vs. 0,33; Newey-West mit
   statsmodels t = 3,71 vs. 3,71. Gefunden: Bei gleichen Werten an der Grenze entschied die Spaltenreihenfolge zufällig
   (z. B. Mai 2016 CAD statt GBP vor dem Brexit); jetzt teilen sich gleichauf liegende Währungen den Platz. Behoben: Absturz am Monatsletzten (ALFRED-Datenstand doppelt), laufender Monat zählte im Faktor-Backtest als voller
