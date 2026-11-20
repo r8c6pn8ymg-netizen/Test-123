@@ -367,7 +367,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
   const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
 
   // ------------------------------------------------------------- Kopf
-  $('#stamp').innerHTML = `<span class="pill">${MODE === 'alfred' ? 'ALFRED · Echtzeit' : 'FRED · korrigiert'}</span><span class="pill">Berechnet ${esc(D.generated)}</span><span class="pill">FX-Kurse bis ${esc(D.fx_through)}</span><span class="pill">${M.length} aktive Modelle</span>`;
+  $('#stamp').innerHTML = `<span class="pill">Berechnet ${esc(D.generated)}</span><span class="pill">FX-Kurse bis ${esc(D.fx_through)}</span><span class="pill">${M.length} aktive Modelle</span>`;
 
   // ---------------------------------------------------------- Heatmap
   let bucket = store.get('bucket', 'high');
