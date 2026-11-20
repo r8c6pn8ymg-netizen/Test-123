@@ -635,7 +635,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     let h = '<thead><tr><th>Asset</th><th>Netto % OI</th><th>4 Wochen</th><th>3J-Perzentil</th><th>Einordnung</th><th>Verlauf 1 Jahr</th></tr></thead><tbody>';
     for (const a of ASSETS) {
       const c = C[a]; if (!c) continue; d0 = c.d;
-      const lab = c.pct3y >= 90 ? ['lo', 'Extrem long, Gegenbewegung möglich'] : c.pct3y <= 10 ? ['lo', 'Extrem short, Gegenbewegung möglich'] : c.net > 0 ? ['hi', 'Spekulanten long'] : ['mid', 'Spekulanten short'];
+      const lab = c.pct3y >= 90 ? ['lo', 'Am 3J-Hoch, Gegenbewegung möglich'] : c.pct3y <= 10 ? ['lo', 'Am 3J-Tief, Gegenbewegung möglich'] : c.net > 0 ? ['hi', 'Spekulanten long'] : ['mid', 'Spekulanten short'];
       h += `<tr><td>${swatch(a)} ${a === 'DXY' ? 'USD-Index' : a}</td><td class="${c.net >= 0 ? 'pos' : 'negv'}">${c.net > 0 ? '+' : ''}${fmt(c.net)}%</td><td>${c.chg4 > 0 ? '+' : ''}${fmt(c.chg4)}</td>
         <td><span class="pctbar" title="${c.pct3y}. Perzentil"><i style="left:calc(${c.pct3y}% - 1px)"></i></span> <span style="margin-left:6px">${c.pct3y}</span></td><td><span class="q ${lab[0]}">${lab[1]}</span></td><td style="width:190px">${spark(c.spark, c.net >= 0 ? 'var(--bull)' : 'var(--bear)')}</td></tr>`;
     }
