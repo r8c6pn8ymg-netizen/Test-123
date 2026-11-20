@@ -219,3 +219,26 @@ def test_termine_geschuetzte_leerzeichen():
     t = _termine()
     bea = t.parse_bea("November&nbsp;25 8:30&nbsp;AM N ews Personal Income and Outlays, October 2026 View", date(2026, 11, 20))
     assert bea == [(date(2026, 11, 25), "Personal Income and Outlays, October 2026")]
+
+
+def test_termine_ergebnis_oder_letzter_stand():
+    """Je Termin eindeutig: Ergebnis (Termin vorbei, neuer Zeitraum da) oder letzter Stand (Termin kommt noch)."""
+    from datetime import date
+    t = _termine()
+    # Welcher Zeitraum erscheint mit dem Termin?
+    assert str(t.expected_period("retail", date(2026, 11, 17), "M").date()) == "2026-10-01"
+    assert str(t.expected_period("jolts", date(2026, 12, 8), "M").date()) == "2026-10-01"
+    assert str(t.expected_period("claims", date(2026, 11, 19), "W").date()) == "2026-11-14"   # Do. -> Sa. davor
+    assert str(t.expected_period("claims", date(2026, 11, 25), "W").date()) == "2026-11-21"   # Mi. (Thanksgiving)
+    assert str(t.expected_period("gdp", date(2026, 11, 25), "Q").date()) == "2026-07-01"      # Q3
+    idx = pd.date_range("2025-01-01", "2026-09-01", freq="MS")                                  # Daten bis Sep
+    get = lambda sid: pd.Series(np.arange(len(idx), dtype=float) + 100, index=idx)
+    rows = [dict(day=date(2026, 11, 20), rid=91, name="Surveys of Consumers")]
+    pages = {"Census": [(date(2026, 11, 17), "Advance Monthly Sales for Retail and Food Services"),
+                        (date(2026, 11, 25), "Advance Report on Durable Goods")], "BEA": [], "Fed-G.17": []}
+    out = t.build(today=date(2026, 11, 20), fred_rows=rows, pages=pages, get=get)
+    ev = {e["title"]: e for e in out["events"]}
+    assert ev["Einzelhandelsumsätze"]["vstate"] == "missing"            # vorbei, aber Okt fehlt noch
+    assert ev["Auftragseingänge langlebige Güter"]["vstate"] == "before"
+    assert ev["Auftragseingänge langlebige Güter"]["vnext"] == "Okt 2026"
+    assert "Uni Michigan" in ev["Verbraucherstimmung Uni Michigan"]["vnote"]  # Grund statt leerer Zeile

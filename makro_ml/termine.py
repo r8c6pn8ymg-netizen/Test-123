@@ -74,47 +74,74 @@ MON_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt",
 US_RELEASES = {
     "nfp": dict(label="Arbeitsmarktbericht (Non-Farm Payrolls, Arbeitslosenquote)", imp=3, et=time(8, 30),
                 src="fred", key="Employment Situation",
-                vals=[("Stellen", "PAYEMS", "diff_k"), ("Quote", "UNRATE", "pct")]),
+                vals=[("neue Stellen", "PAYEMS", "diff_k"), ("Arbeitslosenquote", "UNRATE", "pct")]),
     "cpi": dict(label="Verbraucherpreise (CPI)", imp=3, et=time(8, 30), src="fred", key="Consumer Price Index",
-                vals=[("Gesamt M/M", "CPIAUCSL", "mom"), ("Kern M/M", "CPILFESL", "mom")]),
+                vals=[("Preise zum Vormonat", "CPIAUCSL", "mom"), ("Kern (ohne Energie, Lebensmittel) zum Vormonat", "CPILFESL", "mom")]),
     "pce": dict(label="Einkommen & Konsum, PCE-Inflation", imp=3, et=time(8, 30), src="bea",
                 key="Personal Income and Outlays",
-                vals=[("Kern-PCE M/M", "PCEPILFE", "mom"), ("Kern-PCE J/J", "PCEPILFE", "yoy")]),
+                vals=[("Kern-PCE zum Vormonat", "PCEPILFE", "mom"), ("Kern-PCE zum Vorjahr", "PCEPILFE", "yoy")]),
     "gdp": dict(label="Bruttoinlandsprodukt (BIP)", imp=3, et=time(8, 30), src="bea", key="GDP (",
-                vals=[("real, annualisiert", "A191RL1Q225SBEA", "pct")]),
+                vals=[("Wachstum, aufs Jahr hochgerechnet", "A191RL1Q225SBEA", "pct")]),
     "ism_m": dict(label="ISM-Einkaufsmanagerindex Industrie (PMI)", imp=2, et=time(10, 0), src="ism", key=1, vals=[]),
     "ism_s": dict(label="ISM-Einkaufsmanagerindex Dienstleistung (PMI)", imp=2, et=time(10, 0), src="ism", key=3, vals=[]),
     "retail": dict(label="Einzelhandelsumsätze", imp=2, et=time(8, 30), src="census",
-                   key="Advance Monthly Sales for Retail and Food Services", vals=[("M/M", "RSAFS", "mom")]),
+                   key="Advance Monthly Sales for Retail and Food Services", vals=[("zum Vormonat", "RSAFS", "mom")]),
     "ppi": dict(label="Erzeugerpreise (PPI)", imp=2, et=time(8, 30), src="fred", key="Producer Price Index",
-                vals=[("Final Demand M/M", "PPIFIS", "mom")]),
+                vals=[("Erzeugerpreise zum Vormonat", "PPIFIS", "mom")]),
     "jolts": dict(label="Offene Stellen (JOLTS)", imp=2, et=time(10, 0), src="fred",
-                  key="Job Openings and Labor Turnover Survey", vals=[("Offene Stellen", "JTSJOL", "mio")]),
-    "ip": dict(label="Industrieproduktion", imp=2, et=time(9, 15), src="g17", key=None, vals=[("M/M", "INDPRO", "mom")]),
+                  key="Job Openings and Labor Turnover Survey", vals=[("offene Stellen", "JTSJOL", "mio")]),
+    "ip": dict(label="Industrieproduktion", imp=2, et=time(9, 15), src="g17", key=None, vals=[("zum Vormonat", "INDPRO", "mom")]),
     "claims": dict(label="Erstanträge Arbeitslosenhilfe", imp=2, et=time(8, 30), src="fred",
-                   key="Unemployment Insurance Weekly Claims Report", vals=[("Anträge", "ICSA", "k_persons")]),
+                   key="Unemployment Insurance Weekly Claims Report", vals=[("Anträge pro Woche", "ICSA", "k_persons")]),
     "umich": dict(label="Verbraucherstimmung Uni Michigan", imp=2, et=time(10, 0), src="fred",
                   key="Surveys of Consumers", vals=[]),  # auf FRED nur mit Verzoegerung (Lizenz)
-    "eci": dict(label="Arbeitskostenindex", imp=2, et=time(8, 30), src="fred", key="Employment Cost Index", vals=[]),
+    "eci": dict(label="Arbeitskostenindex", imp=2, et=time(8, 30), src="fred", key="Employment Cost Index",
+                vals=[("Arbeitskosten zum Vorquartal", "ECIALLCIV", "mom")]),
     "trade": dict(label="Handelsbilanz", imp=2, et=time(8, 30), src="bea",
-                  key="U.S. International Trade in Goods and Services", vals=[("Saldo", "BOPGSTB", "bn")]),
+                  key="U.S. International Trade in Goods and Services", vals=[("Saldo (minus = Defizit)", "BOPGSTB", "bn")]),
     "durable": dict(label="Auftragseingänge langlebige Güter", imp=2, et=time(8, 30), src="census",
-                    key="Advance Report on Durable Goods", vals=[("M/M", "DGORDER", "mom")]),
+                    key="Advance Report on Durable Goods", vals=[("Aufträge zum Vormonat", "DGORDER", "mom")]),
     "adv": dict(label="Vorab: Warenhandel & Lagerbestände", imp=1, et=time(8, 30), src="census",
                 key="Advance Economic Indicators Report", vals=[]),
     "starts": dict(label="Baubeginne & Baugenehmigungen", imp=1, et=time(8, 30), src="census",
-                   key="New Residential Construction", vals=[("Baubeginne (Jahresrate)", "HOUST", "k")]),
+                   key="New Residential Construction", vals=[("Baubeginne aufs Jahr hochgerechnet", "HOUST", "k")]),
     "nhs": dict(label="Neubauverkäufe", imp=1, et=time(10, 0), src="census", key="New Residential Sales",
-                vals=[("Verkäufe (Jahresrate)", "HSN1F", "k")]),
+                vals=[("Verkäufe aufs Jahr hochgerechnet", "HSN1F", "k")]),
     "existing": dict(label="Verkäufe bestehender Häuser", imp=1, et=time(10, 0), src="fred", key="Existing Home Sales", vals=[]),
-    "prod": dict(label="Produktivität & Lohnstückkosten", imp=1, et=time(8, 30), src="fred", key="Productivity and Costs", vals=[]),
+    "prod": dict(label="Produktivität & Lohnstückkosten", imp=1, et=time(8, 30), src="fred", key="Productivity and Costs",
+                 vals=[("Produktivität, aufs Jahr hochgerechnet", "PRS85006092", "pct")]),
     "empire": dict(label="Empire-State-Index (Industrie New York)", imp=1, et=time(8, 30), src="fred",
-                   key="Empire State Manufacturing Survey", vals=[("Index", "GACDISA066MSFRBNY", "level")]),
+                   key="Empire State Manufacturing Survey", vals=[("Indexwert (über 0 = Wachstum)", "GACDISA066MSFRBNY", "level")]),
     "philly": dict(label="Philly-Fed-Index (Industrie)", imp=1, et=time(8, 30), src="fred",
-                   key="Manufacturing Business Outlook Survey", vals=[("Index", "GACDFSA066MSFRBPHI", "level")]),
+                   key="Manufacturing Business Outlook Survey", vals=[("Indexwert (über 0 = Wachstum)", "GACDFSA066MSFRBPHI", "level")]),
     "constr": dict(label="Bauausgaben", imp=1, et=time(10, 0), src="census",
-                   key="Construction Spending", vals=[("M/M", "TTLCONS", "mom")]),
+                   key="Construction Spending", vals=[("zum Vormonat", "TTLCONS", "mom")]),
 }
+
+# Welcher Zeitraum mit dem Termin neu erscheint: Monate vor dem Veroeffentlichungsmonat
+# (0 = gleicher Monat, z. B. Regional-Umfragen). Quartalszahlen: Vorquartal, Wochenzahlen: Vorwoche.
+PERIOD_LAG = {"nfp": 1, "cpi": 1, "pce": 1, "retail": 1, "ppi": 1, "jolts": 2, "ip": 1, "trade": 2, "durable": 1,
+              "starts": 1, "nhs": 1, "empire": 0, "philly": 0, "constr": 2}
+# Warum zu einem Termin kein Wert gezeigt wird
+NO_VALUE = {
+    "umich": "Kein Wert: Die Uni Michigan gibt ihre Zahlen an FRED erst rund zwei Monate später frei.",
+    "ism_m": "Kein Wert: Die ISM-Zahlen sind lizenziert und nicht frei abrufbar.",
+    "ism_s": "Kein Wert: Die ISM-Zahlen sind lizenziert und nicht frei abrufbar.",
+    "adv": "Kein Einzelwert: Vorab-Bericht mit mehreren Teilzahlen (Warenhandel, Lager).",
+    "existing": "Kein Wert: Die Zahlen des Maklerverbands NAR sind auf FRED nur eingeschränkt verfügbar.",
+}
+PREV_WORD = {"M": "Vormonat", "Q": "Vorquartal", "W": "Vorwoche"}
+
+
+def expected_period(key: str, release: date, freq: str) -> pd.Timestamp:
+    """Ab diesem Datum (Index bei FRED) gilt der Wert als Ergebnis dieses Termins."""
+    if freq == "W":  # Wochenzahl endet am Samstag vor dem Termin (Do. 19.11. -> Woche bis Sa. 14.11.)
+        return pd.Timestamp(release - timedelta(days=(release.weekday() - 5) % 7 or 7))
+    if freq == "Q":
+        q0 = (release.month - 1) // 3 * 3 + 1
+        return pd.Timestamp(date(release.year, q0, 1)) - pd.DateOffset(months=3)
+    return pd.Timestamp(date(release.year, release.month, 1)) - pd.DateOffset(months=PERIOD_LAG.get(key, 1))
+
 
 _ROW = re.compile(
     r'<span style="font-weight: bold;">([A-Z][a-z]+day [A-Z][a-z]+ \d{1,2}, \d{4})</span>'
@@ -292,7 +319,9 @@ def latest_values(spec: list, get=None) -> list[dict]:
             x = s
             f = lambda v: _de(v, 1)
         x = x.dropna()
-        out.append(dict(name=name, value=f(x.iloc[-1]), prev=f(x.iloc[-2]), period=_period(x.index[-1], freq)))
+        out.append(dict(name=name, value=f(x.iloc[-1]), prev=f(x.iloc[-2]), period=_period(x.index[-1], freq),
+                        prev_period=_period(x.index[-2], freq),
+                        idx=x.index[-1].date().isoformat(), freq=freq, prev_word=PREV_WORD[freq]))
     return out
 
 
@@ -385,9 +414,18 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
                 try:
                     if k not in vals_cache:
                         vals_cache[k] = latest_values(r["vals"], get)
-                    ev["vals"] = vals_cache[k]
+                    v = vals_cache[k]
+                    exp = expected_period(k, d, v[0]["freq"])
+                    have_new = pd.Timestamp(v[0]["idx"]) >= exp
+                    past = bd <= today.isoformat()
+                    ev["vals"] = v
+                    ev["vstate"] = ("result" if have_new else "missing") if past else (
+                        "revision" if have_new else "before")  # BIP: zweite/dritte Schaetzung desselben Quartals
+                    ev["vnext"] = _period(exp, v[0]["freq"])
                 except Exception:
-                    pass
+                    ev["vnote"] = "Wert konnte heute nicht von FRED geladen werden."
+            elif k in NO_VALUE:
+                ev["vnote"] = NO_VALUE[k]
             events.append(ev)
     events.sort(key=lambda e: (e["date"], e["time"] or "99:99", -e["imp"]))
     for c in next_cb:

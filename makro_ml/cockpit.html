@@ -174,6 +174,9 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 .tv { display: block; font: 12px var(--mono); color: var(--fg-2); margin-top: 2px; }
 .tv b { color: var(--fg); font-weight: 600; }
 .tp { color: var(--muted); }
+.vs { font: 600 11px var(--sans); letter-spacing: .02em; color: var(--muted); border: 1px solid var(--line-2); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
+.vl { font-family: var(--sans); font-weight: 600; color: var(--fg-2); }
+.vs.ok { color: var(--bull); border-color: var(--bull); }
 .tn { display: block; font-size: 11.5px; color: var(--muted); }
 .imp { font-size: 9px; letter-spacing: 1px; color: var(--accent); white-space: nowrap; }
 .view[hidden] { display: none !important; }
@@ -473,6 +476,23 @@ window.renderTermine = async function () {
       <div class="cbd">${SHORT(c.date)}<span class="cbt">${c.time ? c.time + ' Uhr' : ''}</span></div>
       <div class="cbs">${days === 0 ? 'heute' : days === 1 ? 'morgen' : 'in ' + days + ' Tagen'}${c.time ? '' : ' · Uhrzeit offen'}</div></div>`;
   }).join('');
+  // Wertezeile: Aktuell (letzter veroeffentlichter Wert) und Davor (Wert der Veroeffentlichung davor)
+  const vline = e => {
+    const v = e.vals || [];
+    if (!v.length) return '';
+    const now = v.map(x => `${esc(x.name)} <b>${esc(x.value)}</b>`).join(', ');
+    const before = v.map(x => esc(x.prev)).join(', ');
+    const badge = e.vstate === 'result' ? '<span class="vs ok">neu</span>' : '';
+    const art = x => (/^Woche/.test(x || '') ? 'die ' : '') + esc(x);
+    const tail = {
+      before: `Der Wert für ${art(e.vnext)} kommt an diesem Termin.`,
+      revision: `An diesem Termin wird der Wert für ${esc(v[0].period)} korrigiert.`,
+      missing: `Der Wert für ${art(e.vnext)} ist noch nicht bei FRED angekommen.`,
+    }[e.vstate];
+    return `<span class="tv">${badge}<b class="vl">Aktuell</b> (${esc(v[0].period)}): ${now}</span>`
+      + `<span class="tv tp"><b class="vl">Davor</b> (${esc(v[0].prev_period)}): ${before}</span>`
+      + (tail ? `<span class="tn">${tail}</span>` : '');
+  };
   let MIN = 2;
   const draw = () => {
     const ev = T.events.filter(e => e.imp >= MIN);
@@ -481,7 +501,7 @@ window.renderTermine = async function () {
     ev.forEach(e => (by[e.date] = by[e.date] || []).push(e));
     $('#tList').innerHTML = Object.keys(by).sort().map(d => `<div class="tday${d < today ? ' past' : ''}${d === today ? ' now' : ''}">
       <div class="tdh">${DAY(d)}${d === today ? ' · heute' : d < today ? ' · vorbei' : ''}</div>
-      ${by[d].map(e => `<div class="trow${e.kind === 'cb' ? ' cb' : ''}"><span class="tt">${e.time || '—'}</span><span class="tag" style="color:var(--c-${e.ccy === 'USD' ? 'DXY' : e.ccy})">${e.ccy}</span><span class="ttl">${esc(e.title)}${(e.vals || []).length ? `<span class="tv">${d < today ? 'Zuletzt' : 'Bisher'} (${esc(e.vals[0].period)}): ${e.vals.map(v => `${esc(v.name)} <b>${esc(v.value)}</b> <span class="tp">davor ${esc(v.prev)}</span>`).join(' · ')}</span>` : ''}${e.note ? `<span class="tn">${esc(e.note)}</span>` : ''}</span>${DOTS(e.imp)}</div>`).join('')}
+      ${by[d].map(e => `<div class="trow${e.kind === 'cb' ? ' cb' : ''}"><span class="tt">${e.time || '—'}</span><span class="tag" style="color:var(--c-${e.ccy === 'USD' ? 'DXY' : e.ccy})">${e.ccy}</span><span class="ttl">${esc(e.title)}${vline(e)}${e.vnote ? `<span class="tn">${esc(e.vnote)}</span>` : ''}${e.note ? `<span class="tn">${esc(e.note)}</span>` : ''}</span>${DOTS(e.imp)}</div>`).join('')}
     </div>`).join('');
   };
   document.querySelectorAll('#tImp button').forEach(b => b.addEventListener('click', () => {
@@ -491,7 +511,7 @@ window.renderTermine = async function () {
   $('#tNote').innerHTML = `${T.warnings.map(w => `<div class="err" style="padding:8px 10px;border-radius:8px">${esc(w)}</div>`).join('')}
     <div><b>US-Daten:</b> Termine direkt von den Statistikämtern, wo das geht: Census (Einzelhandel, Bau, Aufträge), BEA (BIP, PCE, Handelsbilanz) und Fed (Industrieproduktion). Die Seite der Arbeitsmarkt-Statistik (BLS) sperrt automatische Abrufe. Deshalb kommen CPI, Arbeitsmarkt, PPI und JOLTS sowie Erstanträge und Umfragen aus dem Kalender der Fed St. Louis (FRED). Uhrzeiten sind überall die offiziellen New Yorker Zeiten, umgerechnet in deutsche Zeit (8:30 Uhr New York = 14:30 Uhr).</div>
     <div><b>Einkaufsmanagerindizes (PMI):</b> Die ISM-Termine sind nach der festen ISM-Regel berechnet: Industrie am 1., Dienstleistung am 3. US-Geschäftstag des Monats um 16:00 Uhr. Die ISM-Seite selbst ist nicht abrufbar. Die Werte sind lizenziert und nicht frei verfügbar, genau wie die S&amp;P-Global-PMIs (Flash-PMIs für Eurozone, Großbritannien, Japan, Australien). Diese Termine fehlen deshalb.</div>
-    <div><b>Werte:</b> „Bisher“ bzw. „Zuletzt“ ist der zuletzt veröffentlichte Wert aus FRED mit dem Vorwert. Monatsveränderungen sind aus den Indexständen berechnet und können um 0,1 Prozentpunkte von der Pressemeldung abweichen. <b>Prognosen</b> (Konsens) gibt es nicht kostenlos, die stehen weiter in TradingView.</div>
+    <div><b>Werte:</b> <b>Aktuell</b> ist die zuletzt veröffentlichte Zahl, <b>Davor</b> die Zahl der Veröffentlichung davor, jeweils mit dem Monat (bzw. Quartal oder der Woche), für den sie gilt. Das grüne <b>neu</b> heißt: Diese Zahl kam an genau diesem Termin heraus. Bei Terminen, die noch kommen, steht darunter, welcher Monat neu erscheint. „Zum Vormonat“ bzw. „zum Vorjahr“ ist die prozentuale Veränderung. Alle Zahlen kommen aus FRED, Veränderungen sind aus den Indexständen berechnet und können um 0,1 Prozentpunkte von der Pressemeldung abweichen. <b>Prognosen</b> (Schätzungen vorab) gibt es nicht kostenlos, die stehen weiter in TradingView.</div>
     <div><b>Zinsentscheide:</b> von den offiziellen Seiten der acht Notenbanken übernommen (Stand ${T.list_as_of.split('-').reverse().join('.')}). Die Seite der RBNZ sperrt automatische Abrufe, ihre Termine stammen aus deren veröffentlichter Terminliste (über eine Websuche). Die Bank of Japan nennt keine feste Uhrzeit.</div>
     <div><b>Nicht enthalten:</b> Datentermine anderer Länder (z. B. Inflation in Großbritannien oder Japan). Dafür gibt es keine gemeinsame, kostenlose und erlaubte Schnittstelle.</div>`;
 };
