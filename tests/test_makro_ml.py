@@ -326,3 +326,15 @@ def test_52w_kein_blick_in_die_zukunft_und_abstand():
     s2 = s.copy(); s2.iloc[-50:] = 5.0
     cut = idx[340]
     assert list(W.events(s)["new_high"][W.events(s)["new_high"] <= cut]) == list(W.events(s2)["new_high"][W.events(s2)["new_high"] <= cut])
+
+
+def test_faktor_gleichstand_ueber_beide_grenzen_bleibt_ausgeglichen():
+    """Gleichstand, der Long- und Short-Grenze zugleich beruehrt (7 Waehrungen, Raenge 3-5 gleich): ausgeglichen, netto 0."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import factors
+    sc = pd.DataFrame([[1, 2, 3, 3, 3, 6, 7]], columns=["USD", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD"],
+                      index=[pd.Timestamp("1990-01-31")])
+    w = factors.ls_weights(sc).iloc[0]
+    assert abs(w.sum()) < 1e-12
+    assert abs(w[w > 0].sum() + w[w < 0].sum()) < 1e-12
+    assert w["AUD"] == w["NZD"] > 0 and w["USD"] == w["JPY"] < 0

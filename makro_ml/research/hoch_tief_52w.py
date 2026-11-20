@@ -52,6 +52,7 @@ def table(px: dict, lookahead: bool = False) -> pd.DataFrame:
         fr = {h: s.shift(-h) / s - 1 for h in H}
         mu = {h: fr[h].mean() for h in H}
         upbase = {h: float((fr[h].dropna() > 0).mean()) for h in H}
+        dnbase = {h: float((fr[h].dropna() < 0).mean()) for h in H}
         for kind, idx in events(s, lookahead).items():
             d = 1 if "high" in kind else -1
             for t in idx:
@@ -60,7 +61,7 @@ def table(px: dict, lookahead: bool = False) -> pd.DataFrame:
                     v = fr[h].get(t)
                     r[f"x{h}"] = np.nan if pd.isna(v) else 100 * d * (v - mu[h])        # Ueber-Bewegung
                     r[f"hit{h}"] = np.nan if pd.isna(v) else float(d * v > 0)
-                    r[f"base{h}"] = upbase[h] if d > 0 else 1 - upbase[h]
+                    r[f"base{h}"] = np.nan if pd.isna(v) else (upbase[h] if d > 0 else dnbase[h])
                 rows.append(r)
     return pd.DataFrame(rows)
 
@@ -147,8 +148,10 @@ def main() -> dict:
     for c in CUR7 + ["DXY"]:
         s = px[c].dropna()
         hi, lo, last = s.iloc[-WIN - 1:-1].max(), s.iloc[-WIN - 1:-1].min(), s.iloc[-1]
+        st = ("new_low" if last < lo else "new_high" if last > hi else
+              "near_low" if last <= lo * (1 + NEAR) else "near_high" if last >= hi * (1 - NEAR) else None)
         now[c] = dict(date=str(s.index[-1].date()), to_high=round(100 * (last / hi - 1), 2),
-                      to_low=round(100 * (last / lo - 1), 2))
+                      to_low=round(100 * (last / lo - 1), 2), status=st)
     out = dict(results=res, placebo_x20=round(placebo, 3), lookahead_x20=look, now=now)
     (HERE.parent / "output" / "research_52w.json").write_text(to_json(out))
     return out

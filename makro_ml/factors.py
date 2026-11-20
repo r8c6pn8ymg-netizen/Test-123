@@ -56,20 +56,22 @@ def turnover(w: pd.DataFrame) -> pd.Series:
     return t
 
 
-def ls_weights(score: pd.DataFrame) -> pd.DataFrame:
+def ls_weights(score: pd.DataFrame, n_ls: int = N_LS) -> pd.DataFrame:
+    """n_ls Plaetze long (hoechste Werte) und n_ls short (niedrigste), je 1/n_ls.
+    Gleichstand: Eine Gruppe gleicher Werte belegt gemeinsam die Raenge first..last und bekommt den Anteil
+    dieser Raenge, der in die Long- bzw. Short-Plaetze faellt, gleichmaessig verteilt. Reicht eine Gruppe ueber
+    beide Grenzen, werden Long- und Short-Anteil verrechnet. Unabhaengig von der Spaltenreihenfolge."""
     w = pd.DataFrame(0.0, index=score.index, columns=score.columns)
     for t, row in score.iterrows():
         row = row.dropna()
-        if len(row) < 2 * N_LS:
+        if len(row) < 2 * n_ls:
             w.loc[t] = np.nan
             continue
-        # Gleichstand an der Grenze (z. B. GBP und CAD mit derselben Zinsdifferenz): die gleichauf liegenden
-        # Waehrungen teilen sich die freien Plaetze. Vorher entschied die Spaltenreihenfolge zufaellig.
-        for sign, side in ((1, row), (-1, -row)):
-            thr = side.sort_values().iloc[-N_LS]
-            above, tied = side[side > thr].index, side[side == thr].index
-            w.loc[t, above] = sign / N_LS
-            w.loc[t, tied] = sign * (N_LS - len(above)) / (N_LS * len(tied))
+        for sign, v in ((1, row), (-1, -row)):
+            first = v.rank(ascending=False, method="min")        # 1 = groesster Wert
+            size = v.groupby(v).transform("count")               # Groesse der Gleichstands-Gruppe
+            share = (np.minimum(first + size - 1, n_ls) - first + 1).clip(lower=0) / size
+            w.loc[t, v.index] += sign * share / n_ls
     return w
 
 
@@ -276,15 +278,7 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
         tr_ = spot[cols].notna()
         sc = (zrank(carry[cols].where(tr_)) + zrank((-g_).where(tr_)) + zrank(m_.where(tr_))) / 3
         sc = sc[sc.index >= start]
-        w = pd.DataFrame(0.0, index=sc.index, columns=cols)
-        for t, row in sc.iterrows():
-            row = row.dropna()
-            if len(row) < 2 * n_ls:
-                w.loc[t] = np.nan
-                continue
-            o = row.sort_values()
-            w.loc[t, o.index[-n_ls:]] = 1 / n_ls
-            w.loc[t, o.index[:n_ls]] = -1 / n_ls
+        w = ls_weights(sc, n_ls)  # dieselbe Gleichstands-Regel wie im Haupt-Backtest
         gr = (w * excess[cols].reindex(w.index)).sum(axis=1, min_count=1).dropna()
         return gr - turnover(w).reindex(gr.index).fillna(0.0) * cost
 

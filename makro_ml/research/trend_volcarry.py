@@ -4,7 +4,6 @@ T = Trendfolge (Time-Series-Momentum), V = Carry mit Volatilitaets-Bremse. Aufru
 Schreibt output/research_trend_carry.json und gibt die Entscheidung nach der festen Regel aus."""
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -42,7 +41,10 @@ def stats(r: pd.Series) -> dict:
 def net_of(w: pd.DataFrame, ex: pd.DataFrame, cost: float = F.COST) -> pd.Series:
     w = w[w.index >= START]
     gross = (w * ex.reindex(w.index)[w.columns]).sum(axis=1, min_count=1).dropna()
-    return gross - F.turnover(w).reindex(gross.index).fillna(0.0) * cost
+    net = gross - F.turnover(w).reindex(gross.index).fillna(0.0) * cost
+    # Ertrag t -> t+1 auf den Monat datieren, in dem er anfaellt (wie im Faktor-Portfolio), damit die
+    # Zeitraum-Grenzen (vor 2000, ab 2022) stimmen
+    return pd.Series(net.values, index=net.index + pd.offsets.MonthEnd(1))
 
 
 def load():
@@ -71,7 +73,7 @@ def trend_weights(C: dict, vol: pd.DataFrame, shift_signal: int = 0) -> pd.DataF
     raw = (sig * 0.10 / v).where(tradable)
     n = raw.notna().sum(axis=1).replace(0, np.nan)
     w = raw.div(n, axis=0)
-    w["USD"] = 0.0
+    w["USD"] = np.where(n.notna(), 0.0, np.nan)  # Monate ohne jedes Signal zaehlen nicht als 0 %-Monat
     return w[F.CUR]
 
 
@@ -131,7 +133,8 @@ def main() -> dict:
     c = Cn.loc[common].std() / V1.loc[common].std()    # Konstante: gleiche Gesamt-Schwankung (Sharpe unveraendert)
     V = V1 * c
     out["V"] = stats(V)
-    out["V"]["max_leverage"] = round(float((s * c).loc[common].max()), 1)
+    s_paid = pd.Series(s.values, index=s.index + pd.offsets.MonthEnd(1))  # gleiche Datierung wie die Ertraege
+    out["V"]["max_leverage"] = round(float((s_paid * c).reindex(common).max()), 1)
     out["V"]["costs"] = {f"{b} Bp": round(sharpe(net_of(wV, ex, b / 1e4)), 2) for b in (5, 10, 20)}
     import statsmodels.api as sm
     y, xC = V.loc[common], Cn.loc[common]

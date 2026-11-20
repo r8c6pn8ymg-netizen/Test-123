@@ -104,7 +104,7 @@ def perf(r: pd.Series, pos: pd.DataFrame | None = None) -> dict | None:
 def sign_permutation(pos: pd.DataFrame, excess: pd.DataFrame, n: int = 2000, seed: int = 11) -> np.ndarray:
     """Zufalls-Richtungen bei gleicher Aktivitaet: prueft, ob die RICHTUNG Information enthaelt."""
     rng = np.random.default_rng(seed)
-    act = (pos != 0).values
+    act = pos.abs().values  # Positionsgroesse bleibt (auch Teilpositionen bei Gleichstand), nur die Richtung wird zufaellig
     ex = excess.reindex(pos.index)[pos.columns].fillna(0).values
     cnt = act.sum(axis=1)
     out = np.empty(n)
@@ -154,7 +154,7 @@ def run_universe(name: str, sig: dict[str, pd.DataFrame], excess: pd.DataFrame, 
             stats[k]["sharpe_20bp"] = (perf(rets20[k]) or {}).get("sharpe")
             stats[k]["positions"] = round(float((pos != 0).sum(axis=1).mean()), 2)
             ex_ = excess.reindex(pos.index)[pos.columns]
-            hit = (np.sign(ex_) == pos)[(pos != 0) & (ex_ != 0)].stack().mean()
+            hit = (np.sign(ex_) == np.sign(pos))[(pos != 0) & (ex_ != 0)].stack().mean()  # Teilpositionen (Gleichstand) zaehlen nach Richtung
             stats[k]["hit"] = round(float(hit) * 100, 1)
             sims = sign_permutation(pos, excess)
             perms[k] = float(f"{(sims >= stats[k]['sharpe']).mean():.3g}")
@@ -228,7 +228,7 @@ def run_relative(name: str, scores: dict[str, pd.DataFrame], excess: pd.DataFram
             st["sharpe_20bp"] = (perf(portfolio(pos, excess, 0.002)) or {}).get("sharpe")
             st["positions"] = round(float((pos != 0).sum(axis=1).mean()), 2)
             ex_ = excess.reindex(pos.index)[pos.columns]
-            hit = (np.sign(ex_) == pos)[(pos != 0) & (ex_ != 0)].stack().mean()
+            hit = (np.sign(ex_) == np.sign(pos))[(pos != 0) & (ex_ != 0)].stack().mean()  # Teilpositionen (Gleichstand) zaehlen nach Richtung
             st["hit"] = round(float(hit) * 100, 1)
             sims = sign_permutation(pos, excess)
             st["perm_p"] = float(f"{(sims >= st['sharpe']).mean():.3g}")

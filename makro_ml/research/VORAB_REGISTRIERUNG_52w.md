@@ -65,3 +65,9 @@ Für 52-Wochen-Hochs nichts belegt.
 **Selbstprüfung:** Placebo (zufällige Tage) -0.069 %. Timing-Kontrolle mit absichtlichem Zukunftsblick:
 Scheineffekt -3.79 % / -4.01 % (würde also sofort auffallen).
 Unabhängige Nachrechnung (eigene Schleife): new_low_5 +0,222 % (n 571), near_low_20 +0,278 % (n 1.279) – identisch.
+
+**Korrekturen nach Code-Prüfung (20.11., abends):** (1) Vergleichswert „an einem beliebigen Tag“ zählte Tage ohne
+Kursänderung als „gefallen“; jetzt wie die Treffer gezählt (z. B. new_low_5: 48,7 statt 50,3 von 100). p-Werte und
+Entscheidung unverändert. (2) Das Cockpit zeigte Zahlen je Währung auch für Hoch-Tests, die die Regel **nicht** bestanden
+haben – entgegen dieser Registrierung. Jetzt stehen Zahlen nur bei bestandenen Tests, sonst „kein verlässliches Muster“.
+(3) Status (neues Tief / nahe Tief) wird aus ungerundeten Werten bestimmt.

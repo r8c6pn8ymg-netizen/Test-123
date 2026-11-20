@@ -237,7 +237,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
       <div class="pb">
         <div class="chks" id="assetChks"></div>
         <div class="chartbox" id="scatterBox"><svg id="scatter" viewBox="0 0 640 420" role="img" aria-label="Streudiagramm: jedes Modell als Punkt, x = Horizont in Tagen, y = Wahrscheinlichkeit für steigenden Kurs"></svg><div class="tip" id="scTip" hidden></div></div>
-        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. Je weiter vom Mittelstrich, desto sicherer das Modell. <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
+        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. Je weiter vom Mittelstrich, desto überzeugter ist das Modell. Überzeugt heißt nicht treffsicher: Die tatsächliche Trefferquote liegt im Schlusstest knapp über 50 %. <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
       </div>
     </section>
     <section class="panel">
@@ -288,7 +288,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
   <section class="panel">
     <div class="ph"><span>Statistische Tests · Hypothesen gegen Zufall</span><span class="eyebrow">p &lt; 0,05 = signifikant</span></div>
     <div class="pb">
-      <div class="note" style="max-width:none"><b>Was sind Zufallsmodelle?</b> Für jede Währung lasse ich zusätzlich 12 „Basen“ aus reinem Zufallsrauschen durch exakt dieselbe Maschine laufen: gleiches Training, gleiche Horizonte, gleiche Auswahl. Sie können nichts wissen. Was sie trotzdem an Trefferquote schaffen, ist reines Glück. Ein echtes Makro-Modell ist nur dann etwas wert, wenn es <b>deutlich besser als diese Glücks-Messlatte</b> ist. Die Tests prüfen jeweils die Nullhypothese H0: „Die echten Modelle sind nicht besser als Zufall.“ Ein kleiner p-Wert (unter 0,05) heißt: H0 wird verworfen, der Vorteil ist sehr wahrscheinlich echt.</div>
+      <div class="note" style="max-width:none"><b>Was sind Zufallsmodelle?</b> Für jede Währung lasse ich zusätzlich 12 „Basen“ aus reinem Zufallsrauschen durch exakt dieselbe Maschine laufen: gleiches Training, gleiche Horizonte, gleiche Auswahl. Sie können nichts wissen. Was sie trotzdem an Trefferquote schaffen, ist reines Glück. Ein echtes Makro-Modell ist nur dann etwas wert, wenn es <b>deutlich besser als diese Glücks-Messlatte</b> ist. Die Tests prüfen jeweils die Nullhypothese H0: „Die echten Modelle sind nicht besser als Zufall.“ Ein kleiner p-Wert (unter 0,05) heißt: H0 wird verworfen, reiner Zufall ist als Erklärung unwahrscheinlich. Bei vielen Tests gleichzeitig ist das trotzdem manchmal Glück, deshalb gibt es die FDR-Korrektur.</div>
       <div class="scroll-x"><table class="rc" id="stt"></table></div>
       <div class="note" style="max-width:none"><b>t-Test (Welch)</b> und <b>Mann-Whitney-U</b> vergleichen die Trefferquoten der echten Basen mit denen der Zufallsbasen. Jede Basis zählt einmal, gemittelt über ihre Horizonte, weil 60, 61 und 62 Tage fast dasselbe Modell sind. <b>FDR (Benjamini-Hochberg)</b> korrigiert für die vielen gleichzeitig getesteten Modelle und zählt, wie viele bei einer Falsch-Entdeckungsrate von 10 % übrig bleiben. Bei Zufall sollten es null sein. <b>Newey-West</b> testet, ob die wöchentlichen Erträge der Ensemble-Strategie im Schlusstest über null liegen. Dabei wird berücksichtigt, dass Wochen nicht unabhängig voneinander sind.</div>
     </div>
@@ -645,34 +645,38 @@ window.renderFactors = async function () {
 
   drawFactorSel();
 
-  // 52-Wochen-Hoch/-Tief (vorab registrierter Test, nur belegte Effekte als Hinweis)
-  try {
-    const W = await (await fetch('research_52w.json', { cache: 'no-store' })).json();
-    const R = W.results, NAME = { new_low: 'neues 52W-Tief', near_low: 'nahe 52W-Tief (≤ 2 %)', new_high: 'neues 52W-Hoch', near_high: 'nahe 52W-Hoch (≤ 2 %)' };
-    const HOR = { 5: '1 Woche', 20: '1 Monat', 65: '3 Monaten' };
-    const passed = Object.entries(R).filter(([, r]) => r.pass).map(([k]) => k);
-    const status = v => v.to_low < 0 ? 'new_low' : v.to_high > 0 ? 'new_high' : v.to_low <= 2 ? 'near_low' : v.to_high >= -2 ? 'near_high' : null;
-    const WAS = { 5: 'in der Woche danach', 20: 'im Monat danach' };
-    // je Status der passende Zeitraum: bei Tiefs der getestete, bei Hochs 1 Monat (nur beschreibend)
-    const TEST = { new_low: 'new_low_5', near_low: 'near_low_20', new_high: 'new_high_20', near_high: 'near_high_20' };
-    const hint = (st, c) => {
-      if (!st) return '<span class="dim">weder nahe am Hoch noch nahe am Tief</span>';
-      const k = TEST[st], d = (R[k].detail || {})[c === 'USD' ? 'DXY' : c], up = st.includes('high');
-      if (!d || !d.n) return `<b>${NAME[st]}</b>`;
-      const same = d.move > 0, h = k.split('_').pop();
-      return `<b>${NAME[st]}.</b> Bei ${c} nach früheren ${up ? 'Hochs' : 'Tiefs'} (${d.n} Fälle seit ${d.since}): ${WAS[h]} in <b>${fmt(d.hit, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}</b> (an einem beliebigen Tag: ${fmt(d.base, 0)} von 100), im Schnitt ${same ? 'um weitere' : 'eher zurück um'} ${fmt(Math.abs(d.move), 2)} %.`;
-    };
-    let h = '<thead><tr><th>Währung</th><th>Abstand Hoch</th><th>Abstand Tief</th><th style="text-align:left">Status und was bei dieser Währung früher danach passierte</th></tr></thead><tbody>';
-    for (const c of ['USD', 'EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'JPY']) {
-      const v = W.now[c === 'USD' ? 'DXY' : c]; if (!v) continue;
-      h += `<tr><td><b>${c}</b></td><td>${sgn(v.to_high, 1)} %</td><td>${sgn(v.to_low, 1)} %</td><td style="text-align:left;white-space:normal;font-family:var(--sans)">${hint(status(v), c)}</td></tr>`;
-    }
-    $('#w52').innerHTML = h + '</tbody>';
-    $('#w52Stamp').textContent = W.now.EUR ? `Kurse bis ${W.now.EUR.date.split('-').reverse().join('.')}` : '';
-    $('#w52Note').innerHTML = `<div><b>So liest du die Tabelle:</b> Bei den 7 Währungen ist der Kurs gegen den US-Dollar gemeint. <b>Tief</b> heißt: Die Währung ist so schwach gegen den Dollar wie seit einem Jahr nicht. Beim <b>USD</b> ist es der Dollar-Index, auf den auch der Dollar-Future DX läuft (Korb aus Euro, Yen, Pfund, CAD, SEK, CHF, offizielle ICE-Formel, aus den Fed-Kursen nachgerechnet, Historie ab 1999): Ein Hoch dort heißt, der Dollar ist so stark wie seit einem Jahr nicht, das Spiegelbild der Tiefs bei den anderen. <b>„56 von 100 Fällen (an einem beliebigen Tag: 50 von 100)“</b> heißt: Nach einem 52-Wochen-Tief fiel die Währung danach in 56 von 100 Fällen weiter. Ohne dieses Ereignis, also an irgendeinem Tag, fällt sie in derselben Zeit in etwa 50 von 100 Fällen, das ist reiner Zufall. Der Vorteil sind also rund 6 von 100 Fällen. Abstand = wie weit der letzte Kurs vom Hoch bzw. Tief der 52 Wochen davor entfernt ist (negativ beim Tief = darunter, also neues Tief).</div>
-      <div><b>Wichtig:</b> Je Währung sind es nur 45 bis 300 Fälle, die Zahlen schwanken deshalb stark und sind einzeln nicht verlässlich. Verlässlich ist nur die Auswertung aller 7 Währungen zusammen (Regeln vorab festgelegt, seit 1971, mit Mehrfachtest-Korrektur, Placebo und Timing-Kontrolle): <b>Nach einem 52-Wochen-Tief fiel die Währung kurzfristig eher weiter</b> (56 statt 50 von 100 Fällen), nach Hochs gab es kein verlässliches Muster. Seit 2015 ist auch das Muster nach Tiefs fast verschwunden. Deshalb ist das nur ein Hinweis, kein Signal.</div>`;
-    $('#w52Panel').hidden = false;
-  } catch (e) { console.warn('52-Wochen-Daten nicht geladen', e); }
+  // 52-Wochen-Hoch/-Tief (vorab registrierter Test). Zahlen je Waehrung NUR fuer Tests, die die Regel bestanden haben.
+  // Laedt im Hintergrund, damit der Rest der Seite nicht wartet.
+  (async () => {
+    try {
+      const W = await (await fetch('research_52w.json', { cache: 'no-store' })).json();
+      const R = W.results, NAME = { new_low: 'neues 52W-Tief', near_low: 'nahe 52W-Tief (≤ 2 %)', new_high: 'neues 52W-Hoch', near_high: 'nahe 52W-Hoch (≤ 2 %)' };
+      const WAS = { 5: 'in der Woche danach', 20: 'im Monat danach', 65: 'in den 3 Monaten danach' };
+      const passed = Object.keys(R).filter(k => R[k].pass);
+      const hint = (st, c) => {
+        if (!st) return '<span class="dim">weder nahe am Hoch noch nahe am Tief</span>';
+        const k = passed.find(x => x.startsWith(st + '_'));
+        if (!k) return `<b>${NAME[st]}</b>: <span class="dim">kein verlässliches Muster, danach ging es mal hoch, mal runter (getestet, nicht belegt).</span>`;
+        const d = (R[k].detail || {})[c === 'USD' ? 'DXY' : c], up = st.includes('high'), h = k.split('_').pop();
+        if (!d || !d.n) return `<b>${NAME[st]}</b>`;
+        return `<b>${NAME[st]}.</b> Bei ${c} nach früheren ${up ? 'Hochs' : 'Tiefs'} (${d.n} Fälle seit ${d.since}): ${WAS[h]} in <b>${fmt(d.hit, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}</b> (an einem beliebigen Tag: ${fmt(d.base, 0)} von 100), im Schnitt ${d.move > 0 ? 'um weitere' : 'eher zurück um'} ${fmt(Math.abs(d.move), 2)} %.`;
+      };
+      let h = '<thead><tr><th>Währung</th><th>Abstand Hoch</th><th>Abstand Tief</th><th style="text-align:left">Status und was bei dieser Währung früher danach passierte</th></tr></thead><tbody>';
+      for (const c of ['USD', 'EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'JPY']) {
+        const v = W.now[c === 'USD' ? 'DXY' : c]; if (!v) continue;
+        h += `<tr><td><b>${c}</b></td><td>${sgn(v.to_high, 1)} %</td><td>${sgn(v.to_low, 1)} %</td><td style="text-align:left;white-space:normal;font-family:var(--sans)">${hint(v.status, c)}</td></tr>`;
+      }
+      $('#w52').innerHTML = h + '</tbody>';
+      $('#w52Stamp').textContent = W.now.EUR ? `Kurse bis ${W.now.EUR.date.split('-').reverse().join('.')}` : '';
+      // Erklaerung aus den aktuellen Ergebnissen (keine festen Zahlen)
+      const ns = passed.flatMap(k => Object.values(R[k].detail || {}).map(d => d.n)).filter(n => n > 0);
+      const main = passed.map(k => { const r = R[k], h = k.split('_').pop(), up = k.startsWith('new_high') || k.startsWith('near_high');
+        return `<b>${NAME[k.replace(/_\d+$/, '')]}</b>: ${WAS[h]} in ${fmt(r.hit, 0)} statt ${fmt(r.base, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}, seit 2015 im Schnitt nur noch ${fmt(Math.abs(r.periods['2015–heute']), 2)} %`; });
+      $('#w52Note').innerHTML = `<div><b>So liest du die Tabelle:</b> Bei den 7 Währungen ist der Kassakurs gegen den US-Dollar gemeint (Fed-Tageskurse seit 1971). <b>Tief</b> heißt: Die Währung ist so schwach gegen den Dollar wie seit einem Jahr nicht. Beim <b>USD</b> ist es der Dollar-Index, auf den auch der Dollar-Future DX läuft (Korb aus Euro, Yen, Pfund, CAD, SEK, CHF, offizielle ICE-Formel, Historie ab 1999). „56 von 100 Fällen (an einem beliebigen Tag: 50 von 100)“ heißt: Nach dem Ereignis ging es in 56 von 100 Fällen weiter in dieselbe Richtung, an irgendeinem Tag ohne Ereignis in etwa 50 von 100, das ist Zufall. Abstand = wie weit der letzte Kurs vom Hoch bzw. Tief der 52 Wochen davor entfernt ist.</div>
+        <div><b>Was belegt ist</b> (alle 7 Währungen zusammen, Regeln vorab festgelegt, mit Mehrfachtest-Korrektur, Placebo und Timing-Kontrolle): ${main.length ? main.join('; ') + '.' : 'zurzeit nichts.'} Alle anderen Fälle haben kein verlässliches Muster. Je Währung sind es nur ${ns.length ? Math.min(...ns) + ' bis ' + Math.max(...ns) : 'wenige'} Fälle, die Einzelzahlen schwanken stark. Nur ein Hinweis, kein Signal.</div>`;
+      $('#w52Panel').hidden = false;
+    } catch (e) { console.warn('52-Wochen-Daten nicht geladen', e); }
+  })();
 
   // Rang-Verlauf
   const HR = F.hist_rank;
@@ -770,7 +774,7 @@ window.renderFactors = async function () {
     <div><b>Aber der Vorteil schrumpft:</b> Die Sharpe-Ratio der Kombi lag 1977–1999 bei ${fmt(s.kombi.pre2000.sharpe, 2)}, seit 2000 nur noch bei ${fmt(s.kombi.post2000.sharpe, 2)} und seit 2022 bei ${fmt(s.kombi.holdout.sharpe, 2)}. Das ist ein bekanntes Muster: Seit diese Faktoren in der Forschung veröffentlicht und von vielen Fonds gehandelt werden, verdienen sie weniger. Momentum allein kommt seit 2000 nur noch auf eine Sharpe-Ratio von ${fmt(s.momentum.post2000.sharpe, 2)}.</div>
     <div><b>Walk-Forward (adaptiv) bringt nichts:</b> Das laufende Umgewichten nach den letzten 5 Jahren (Sharpe ${fmt(s.adaptiv.net.sharpe, 2)}, max. Drawdown ${fmt(s.adaptiv.net.dd)}%) ist <b>schlechter</b> als die feste Gleichgewichtung (Sharpe ${fmt(s.kombi.net.sharpe, 2)}, max. Drawdown ${fmt(s.kombi.net.dd)}%). Es läuft den Faktoren immer dann hinterher, wenn sie gerade drehen. Deshalb nutzt das Cockpit die feste Kombi.</div>
     <div><b>Robustheit:</b> Mit anderen üblichen Einstellungen liegt die Sharpe-Ratio seit 1977 zwischen ${fmt(RB.full_min, 2)} und ${fmt(RB.full_max, 2)} (Median ${fmt(RB.full_med, 2)}), seit 2000 im Median nur noch bei ${fmt(RB.post_med, 2)}. Das Ergebnis hängt weder an einer einzelnen Währung noch an wenigen Ausreißer-Monaten. <b>Kosten sind entscheidend:</b> Bei 20 Bp je Umschichtung ist der Vorteil seit 2000 praktisch weg. Bei Privatkunden-Brokern kommen oft schlechtere Spreads und Aufschläge auf die Zinsgutschrift (Swap) dazu, die den Carry-Ertrag deutlich schmälern.</div>
-    <div><b>So nutzt du die Seite:</b> Die Rangliste zeigt, welche Währungen nach Zinsen, Bewertung und Trend gerade vorne oder hinten liegen. Über Jahrzehnte war das ein belegter Vorteil, in den letzten Jahren aber kaum noch. Am meisten Gewicht hat Carry. Zeigen Rangliste und Makro-ML-Bias auf dieselbe Währung, ist das ein stärkerer Hinweis. Keine Anlageberatung.</div>`;
+    <div><b>So nutzt du die Seite:</b> Die Rangliste zeigt, welche Währungen nach Zinsen, Bewertung und Trend gerade vorne oder hinten liegen. Über Jahrzehnte war das ein belegter Vorteil, in den letzten Jahren aber kaum noch. Am besten gehalten hat sich Carry. Zeigen Rangliste und Makro-ML-Bias auf dieselbe Währung, ist das <b>kein</b> zusätzlich belegter Vorteil: Der Konsens-Test aus Makro ML, Faktoren und CFTC brachte keinen belastbaren Zusatznutzen. Keine Anlageberatung.</div>`;
 };
 </script>
 
@@ -1121,8 +1125,8 @@ window.renderFactors = async function () {
     <div><b>FRED oder ALFRED.</b> Das Cockpit gibt es in zwei Varianten. Bei FRED nutzen die Modelle die heutigen, korrigierten Zahlen mit geschätzter Veröffentlichungsverzögerung. Bei ALFRED nutzen zehn US-Reihen (PAYEMS, UNRATE, CPI, Kern-CPI, Kern-PCE, Industrieproduktion, Produktivität, Handelsbilanz, realer Einzelhandel, Erzeugerpreise) exakt den Datenstand, der am jeweiligen Tag öffentlich war. Die ALFRED-Variante ist der strengere und realistischere Test.</div>
     <div><b>Veröffentlichungsfristen.</b> Jede Datenreihe wird erst ab ihrer Veröffentlichung genutzt. Die Fristen der OECD- und IMF-Reihen wurden mit den ALFRED-Datenständen 2018–2026 gemessen (90 %-Perzentil). Beispiel: Die britische Arbeitslosenquote erscheint dort erst rund 4 Monate nach Monatsende. Quartalswerte (z. B. Inflation in Australien und Neuseeland) gelten erst ab dem Quartalsende plus Frist.</div>
     <div><b>Schlusstest.</b> Auswahl nur mit 2008–2021, Bewertung auf 2022–heute. Zusätzlich gibt es einen Backtest je Zeitraum (2008–12, 2013–17, 2018–21, 2022–heute). Die Live-Auswahl oben nutzt danach den gesamten Zeitraum, damit die neuesten Daten einfließen.</div>
-    <div><b>Daten.</b> FRED (Fed St. Louis, inkl. OECD- und IMF-Reihen), CFTC (Commitments of Traders), BIS (Leitzinsen, Inflation, effektive Wechselkurse), EZB (Euro-Renditen, Euribor, Arbeitslosigkeit) und SIPRI (Militärausgaben). Die Wechselkurse stammen aus dem H.10-Bericht der Fed und erscheinen mit rund einer Woche Verzug. Der DXY wird aus diesen Kursen mit der offiziellen ICE-Formel berechnet. Die Zinseinpreisung (Marktrendite 1J/2J minus Leitzins) ersetzt OIS-Kurven, FedWatch und ECB-Watch. Sie hat lange Historie und lässt sich deshalb testen.</div>
-    <div><b>Einordnung.</b> Makrodaten erklären Wechselkurse nur zu einem kleinen Teil. Im Schnitt liegen alle Kandidaten nahe 50 %. Der Nutzen entsteht durch die Bündelung vieler kleiner Vorteile zu einem übergeordneten Bias. Keine Anlageberatung.</div>`;
+    <div><b>Daten.</b> FRED (Fed St. Louis, inkl. OECD- und IMF-Reihen), CFTC (Commitments of Traders), BIS (Leitzinsen, Inflation, effektive Wechselkurse), EZB (Euro-Renditen, Euribor, Arbeitslosigkeit) und SIPRI (Militärausgaben). Die Wechselkurse stammen aus dem H.10-Bericht der Fed und erscheinen mit rund einer Woche Verzug. Der DXY wird aus diesen Kursen mit der offiziellen ICE-Formel berechnet. Die Zinseinpreisung (Marktrendite 1J/2J minus Leitzins) ist eine frei verfügbare Näherung für OIS-Kurven, FedWatch und ECB-Watch, nicht dasselbe. Dafür hat sie eine lange Historie und lässt sich testen.</div>
+    <div><b>Einordnung.</b> Makrodaten erklären Wechselkurse nur zu einem kleinen Teil. Im Schnitt liegen alle Kandidaten nahe 50 %. Ob die Bündelung vieler schwacher Signale einen echten Vorteil bringt, ist <b>nicht belegt</b>: Im unberührten Schlusstest ab 2022 sind höchstens einzelne Währungen knapp besser als Zufall (siehe Statistik-Tests), nach Mehrfachtest-Korrektur bleibt kein Einzelmodell. Der Bias ist deshalb ein schwacher Hinweis, kein Signal. Keine Anlageberatung.</div>`;
 
   // ----------------------------------------------------- Kategorien
   function drawCats() {

@@ -62,3 +62,9 @@ Unabhängige Nachrechnung von T mit getrenntem Code: identisch (0,55 / 0,91 / 0,
 V geprüft: aufsummierte Tageserträge = Monatsertrag (Korrelation 0,9997), Varianz-Persistenz 0,6 – das schlechte Ergebnis
 ist echt (Bremse hebelt ruhige Phasen, Carry crasht nach ruhigen Phasen). Passt zu Cederburg et al. (2020, JFE).
 Info: Korrelation Trend–Kombi 0,21 (seit 2000 0,32), Trend–Carry 0,02.
+
+**Fehlerkorrektur nach Code-Prüfung (20.11., abends):** (1) Erträge waren auf den Positionsmonat statt auf den
+Ertragsmonat datiert, dadurch waren die Zeitraum-Grenzen um einen Monat verschoben. (2) Monate ohne jedes Signal zählten
+als 0 %-Monat. (3) Gleichstand über Long- und Short-Grenze zugleich wurde falsch verteilt (Faktor-Code). Nach Korrektur:
+T Forward 2022+ −0,10 (statt −0,16), Kombi Forward −0,39, alle anderen Werte ±0,01. **Entscheidung unverändert** (T und V
+nicht übernommen). Unabhängige Nachrechnung von T erneut identisch.
