@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from data_sources import CACHE, _download, fred
+from data_sources import CACHE, _download, fred, to_json
 
 OUT = Path(__file__).parent / "output"
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -162,11 +162,11 @@ def _fetch(name: str, url: str, must: str) -> str:
         raw = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "ignore")
         if must not in raw:
             raise ValueError(f"{name}: unerwartete Seite")
-        path.write_text(raw)
+        path.write_text(raw, encoding="utf-8")
         return raw
     except Exception:
         if path.exists() and (datetime.now().timestamp() - path.stat().st_mtime) < 40 * 86400:
-            return path.read_text()
+            return path.read_text(encoding="utf-8")
         raise
 
 
@@ -195,11 +195,11 @@ def fred_calendar(start: date, end: date, max_pages: int = 20) -> list[dict]:
             if f"pageID={n + 1}" not in raw:
                 break
         raw = "\n".join(pages)
-        path.write_text(raw)
+        path.write_text(raw, encoding="utf-8")
     except Exception:
         if not path.exists():
             raise
-        raw = path.read_text()
+        raw = path.read_text(encoding="utf-8")
     return parse_fred_calendar(raw)
 
 
@@ -274,17 +274,24 @@ def _period(idx: pd.Timestamp, freq: str) -> str:
 
 
 _FRESH: dict = {}
+_STALE: set = set()
 
 
 def _fred_fresh(sid: str) -> pd.Series:
-    """FRED-Reihe einmal je Lauf frisch laden (die gestrigen Veroeffentlichungen sollen drin sein)."""
+    """FRED-Reihe einmal je Lauf frisch laden (die gestrigen Veroeffentlichungen sollen drin sein).
+    Klappt der Download nicht, liefert der Cache den alten Stand; das wird vermerkt und angezeigt."""
     if sid not in _FRESH:
+        t0 = datetime.now().timestamp()
         _FRESH[sid] = fred(sid, refresh=True)
+        path = CACHE / f"fred_{sid}.csv"
+        if not path.exists() or path.stat().st_mtime < t0 - 60:
+            _STALE.add(sid)
     return _FRESH[sid]
 
 
-def latest_values(spec: list, get=None) -> list[dict]:
-    """Zuletzt veroeffentlichter Wert und Vorwert je Kennzahl (aus FRED)."""
+def latest_values(spec: list, get=None, upto: pd.Timestamp | None = None) -> list[dict]:
+    """Zuletzt veroeffentlichter Wert und Vorwert je Kennzahl (aus FRED); mit ``upto`` der Wert genau
+    fuer diesen Zeitraum (damit ein frueherer Termin seine eigene Zahl zeigt, nicht die neueste)."""
     get = get or _fred_fresh
     out = []
     for name, sid, how in spec:
@@ -319,6 +326,8 @@ def latest_values(spec: list, get=None) -> list[dict]:
             x = s
             f = lambda v: _de(v, 1)
         x = x.dropna()
+        if upto is not None:
+            x = x[x.index <= upto]
         out.append(dict(name=name, value=f(x.iloc[-1]), prev=f(x.iloc[-2]), period=_period(x.index[-1], freq),
                         prev_period=_period(x.index[-2], freq),
                         idx=x.index[-1].date().isoformat(), freq=freq, prev_word=PREV_WORD[freq]))
@@ -328,7 +337,12 @@ def latest_values(spec: list, get=None) -> list[dict]:
 def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | None = None,
           pages: dict | None = None, get=None) -> dict:
     """``fred_rows``/``pages``/``get`` nur fuer Tests (sonst werden die Quellen live geladen)."""
-    today = today or datetime.now(BERLIN).date()
+    if today is None:
+        now = datetime.now(BERLIN)
+        today = now.date()
+    else:  # Tests: Zeitpunkt des taeglichen Laufs
+        now = datetime.combine(today, time(7, 47), BERLIN)
+    now_b = now.strftime("%Y-%m-%d %H:%M")
     start = today - timedelta(days=today.weekday())  # Montag dieser Woche
     end = start + timedelta(days=days - 1)
     events, warnings, next_cb = [], [], []
@@ -363,6 +377,7 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
             return None
 
     years = sorted({start.year, end.year})
+    census_failed: list[int] = []
     def census_all():
         out, errs = [], []
         for y in years:  # je Jahr einzeln: fehlt die Liste fuers neue Jahr noch, bleibt das alte erhalten
@@ -372,6 +387,7 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
                                            "Economic Indicator"))
             except Exception as e:
                 errs.append(e)
+                census_failed.append(y)
         if not out and errs:
             raise errs[0]
         return out
@@ -384,10 +400,16 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
     except Exception as e:
         frows = []
         warnings.append(f"FRED-Kalender nicht erreichbar ({type(e).__name__}); BLS-Termine fehlen.")
+    if cen is not None and census_failed:
+        warnings.append(f"Census-Kalender {', '.join(map(str, census_failed))} nicht erreichbar; "
+                        "Termine dieses Jahres aus dem FRED-Kalender.")
     src_ok = {"census": cen is not None, "bea": bea is not None, "g17": g17 is not None}
     for k, r in US_RELEASES.items():
         if r["src"] == "census" and cen is not None:
             found[k] = [(d, "census.gov") for d, txt in cen if r["key"] in txt]
+            if census_failed and _FRED_FALLBACK.get(k):  # fehlendes Jahr aus FRED ergaenzen
+                found[k] += sorted({(x["day"], "FRED-Kalender") for x in frows
+                                    if x["name"] == _FRED_FALLBACK[k] and x["day"].year in census_failed})
         elif r["src"] == "bea" and bea is not None:
             found[k] = [(d, "bea.gov") for d, txt in bea
                         if r["key"] in txt and not (k == "gdp" and txt.startswith("GDP by"))]
@@ -417,7 +439,9 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
                     v = vals_cache[k]
                     exp = expected_period(k, d, v[0]["freq"])
                     have_new = pd.Timestamp(v[0]["idx"]) >= exp
-                    past = bd <= today.isoformat()
+                    past = f"{bd} {bt or '23:59'}" <= now_b  # erst nach der Uhrzeit vorbei
+                    if past and have_new and pd.Timestamp(v[0]["idx"]) > exp:
+                        v = latest_values(r["vals"], get, upto=exp)  # Zahl genau dieses Termins
                     ev["vals"] = v
                     ev["vstate"] = ("result" if have_new else "missing") if past else (
                         "revision" if have_new else "before")  # BIP: zweite/dritte Schaetzung desselben Quartals
@@ -427,6 +451,9 @@ def build(today: date | None = None, days: int = 14, fred_rows: list[dict] | Non
             elif k in NO_VALUE:
                 ev["vnote"] = NO_VALUE[k]
             events.append(ev)
+    if _STALE:
+        warnings.append("FRED heute nicht erreichbar für " + ", ".join(sorted(_STALE))
+                        + " – die Werte dazu sind vom letzten erfolgreichen Abruf.")
     events.sort(key=lambda e: (e["date"], e["time"] or "99:99", -e["imp"]))
     for c in next_cb:
         c["days"] = (date.fromisoformat(c["date"]) - today).days
@@ -451,7 +478,7 @@ _FRED_FALLBACK = {
 def main() -> dict:
     OUT.mkdir(exist_ok=True)
     t = build()
-    (OUT / "termine.json").write_text(json.dumps(t, ensure_ascii=False))
+    (OUT / "termine.json").write_text(to_json(t))
     print(f"Termine: {len(t['events'])} Einträge {t['week_start']} bis {t['week_end']}")
     for w in t["warnings"]:
         print("  !", w)

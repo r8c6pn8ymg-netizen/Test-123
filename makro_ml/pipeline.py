@@ -457,7 +457,9 @@ ALFRED_SERIES = {  # Basis-ID: (FRED-ID, Transformation)
 
 
 def realtime_features(sid: str, how: str, today: pd.Timestamp, refresh: bool) -> pd.DataFrame:
-    vint = list(pd.date_range("1998-01-31", today, freq="ME")) + [today]
+    vint = list(pd.date_range("1998-01-31", today, freq="ME"))
+    if not vint or vint[-1] != today:  # am Monatsletzten nicht doppelt (sonst Absturz in ALFRED)
+        vint.append(today)
     V = ds.alfred_vintages(sid, vint, refresh)
     rows = {}
     for v in V.columns:
@@ -504,7 +506,7 @@ def main(refresh: bool = True):
     for mode, out in outs.items():
         out["mode"] = mode
         out["comparison"] = comp
-        (OUT / f"data_{mode}.json").write_text(json.dumps(out, ensure_ascii=False))
+        (OUT / f"data_{mode}.json").write_text(ds.to_json(out))
     failed: list[str] = []
     # Faktor-Portfolio (Carry, Value, Momentum) – eigener Reiter im Cockpit
     try:
@@ -739,7 +741,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         per_basis = pd.concat({bid: pd.concat(v, axis=1).mean(axis=1) for bid, v in byb.items()}, axis=1)
         sc_ = per_basis.mean(axis=1)[per_basis.count(axis=1) >= 3]
         macro_score[a] = dict(d=[str(x.date()) for x in sc_.index], v=[round(float(x), 3) for x in sc_.values])
-    (OUT / f"macro_score_{mode}.json").write_text(json.dumps(macro_score))
+    (OUT / f"macro_score_{mode}.json").write_text(ds.to_json(macro_score))
 
     out = dict(generated=pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%MZ"),
                fx_through=str(min(p.index[-1] for p in px.values()).date()),

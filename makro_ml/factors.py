@@ -91,6 +91,17 @@ def perf(r: pd.Series) -> dict | None:
                 t=round(t, 2), p=float(f"{p:.3g}"), months=len(r))
 
 
+def complete_months(spot: pd.DataFrame, px: dict) -> pd.DataFrame:
+    """Kurse nur fuer abgeschlossene Monate: Der laufende Monat (Kurse erst bis z. B. zum 13.) ist kein
+    voller Monat und darf nicht als Monatsrendite in Backtest und Statistik zaehlen. Die Live-Rangliste
+    nutzt weiter die aktuellsten Kurse."""
+    last = max(s.dropna().index[-1] for c, s in px.items() if c in spot.columns)
+    out = spot.copy()
+    if last < spot.index[-1] - pd.Timedelta(days=3):  # Monatsende noch nicht erreicht
+        out.loc[spot.index[-1], [c for c in out.columns if c != "USD"]] = np.nan
+    return out
+
+
 def core(px: dict[str, pd.Series], refresh: bool = False):
     """Gemeinsame Bausteine (auch fuer den Konsens-Test): Kurse, Zinsen, Faktor-Scores, Ueberschussrenditen."""
     spot = pd.DataFrame({c: px[c].resample("ME").last() for c in CUR if c != "USD"})
@@ -105,7 +116,8 @@ def core(px: dict[str, pd.Series], refresh: bool = False):
     tradable = spot.notna()  # EUR erst ab 1999 handelbar
     z = {"carry": zrank(carry.where(tradable)), "value": zrank((-gap).where(tradable)), "momentum": zrank(mom.where(tradable))}
     z["kombi"] = (z["carry"] + z["value"] + z["momentum"]) / 3
-    excess = (spot.shift(-1) / spot - 1) + carry / 1200
+    sp = complete_months(spot, px)
+    excess = (sp.shift(-1) / sp - 1) + carry / 1200
     excess["USD"] = 0.0
     excess.loc[excess.drop(columns="USD").isna().all(axis=1), "USD"] = np.nan  # kein Phantom-Monat am Ende
     return dict(spot=spot, rate=rate, carry=carry, z=z, excess=excess)
@@ -133,7 +145,8 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     z["kombi"] = (z["carry"] + z["value"] + z["momentum"]) / 3
 
     # Ueberschussrendite Monat t -> t+1 gegen USD inkl. Zinsdifferenz
-    excess = (spot.shift(-1) / spot - 1) + carry / 1200
+    sp = complete_months(spot, px)
+    excess = (sp.shift(-1) / sp - 1) + carry / 1200
     excess["USD"] = 0.0
     excess.loc[excess.drop(columns="USD").isna().all(axis=1), "USD"] = np.nan  # kein Phantom-Monat am Ende
     start = pd.Timestamp("1976-12-31")
@@ -319,7 +332,7 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
                stats=stats, periods=periods, perm=perm, equity=eq, hist_rank=hist_rank,
                rolling=rolling, factor_weights=factor_weights, robust=robust, combos=combos,
                corr={k: corr[k].to_dict() for k in corr.columns}, cost_bp=COST * 1e4, n_ls=N_LS)
-    (OUT / "factors.json").write_text(json.dumps(out, ensure_ascii=False))
+    (OUT / "factors.json").write_text(ds.to_json(out))
     return out
 
 

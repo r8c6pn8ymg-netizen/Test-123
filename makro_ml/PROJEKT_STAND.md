@@ -28,8 +28,10 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
 
 ## Ergebnisse (nach allen Korrekturen)
 
-- **Makro ML:** Ø Trefferquote aller Kandidaten ≈ 50 %. Im unberührten Schlusstest 2022+ nur **AUD** signifikant besser als Zufall
-  (t-Test p ≈ 0,007), Ensemble-Strategie bei **JPY** signifikant (Newey-West p ≈ 0,04). Nach FDR-Korrektur bleibt kein Einzelmodell.
+- **Makro ML (Stand 20.11., ALFRED):** Ø Trefferquote aller Kandidaten ≈ 50 %. **Auswahl-Effekt:** Nach der Auswahl der besten
+  erreichen echte Modelle Ø 57,1 %, reine Zufallsmodelle aber auch 54,9 %; im Schlusstest 2022+ bleiben 53,5 % (Zufall 49,5 %).
+  Die DA in der Tabelle ist also geschönt, das steht jetzt im Cockpit. Signifikant im Schlusstest nur **AUD** (t-Test p ≈ 0,004,
+  nach Bonferroni für 8 Währungen ≈ 0,03). Ensemble JPY nicht mehr signifikant (p ≈ 0,11, vorher 0,04). Nach FDR kein Einzelmodell.
 - **ALFRED vs. FRED:** PAYEMS und Handelsbilanz sahen mit korrigierten Daten geschönt aus; Kernaussagen gleich. Standardansicht = ALFRED.
 - **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten):** Kombi Sharpe 0,51 (p < 0,001), Carry 0,52, Value 0,18, Momentum 0,10.
   Seit 2015: Kombi −0,17, **Carry +0,23** (einziger positiver Faktor). Realistische Erwartung: Median aller Einstellungen, seit 2000 ≈ 0,19.
@@ -40,6 +42,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Kern-PCE (Ø DA 51,5 %, ähnlich gut wie Kern-CPI und weitgehend dieselbe Information), realer Einzelhandel und Erzeugerpreise
   (≈ 49 %, kein Vorteil, werden vom Filter fast nie ausgewählt). Gesamtbild unverändert, nach FDR weiterhin kein Einzelmodell.
   PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
+- **Gesamtprüfung 20.11.:** Unabhängige Nachrechnung Carry (eigener Code): Sharpe 0,51 vs. Cockpit 0,52; Newey-West mit statsmodels
+  t = 3,51 vs. 3,52. Behoben: Absturz am Monatsletzten (ALFRED-Datenstand doppelt), laufender Monat zählte im Faktor-Backtest als voller
+  Monat (jetzt 598 statt 599 Monate, Ergebnis unverändert), NaN in JSON, heutige US-Termine morgens als „fehlt“ markiert.
 - **Prüfung 20.11. (Termine + Zinscapital-Abgleich):** FRED-Kalender hat teils Einstellzeiten und Doppel-Einträge
   (Industrieproduktion/Baubeginne 24./25.11.), deshalb offizielle Kalender. Marktwerte gegen PDF: US-Renditen, VIX, SOFR, HY-OAS
   identisch; Öl (er: Futures, FRED: Spot) und EUR/USD (andere Fixing-Uhrzeit) weichen leicht ab. Leitzinsen identisch.

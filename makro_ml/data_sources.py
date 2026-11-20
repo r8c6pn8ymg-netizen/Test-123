@@ -49,6 +49,28 @@ def _cached(name: str, url: str, refresh: bool, max_age_h: float = 20) -> bytes:
         raise
 
 
+def to_json(obj) -> str:
+    """JSON ohne NaN/Inf (die waeren ungueltiges JSON und wuerden das Cockpit leer lassen) -> null."""
+    import json
+    import math
+
+    def clean(o):
+        if isinstance(o, dict):
+            return {k: clean(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [clean(v) for v in o]
+        if isinstance(o, float) or type(o).__module__ == "numpy":
+            try:
+                f = float(o)
+            except (TypeError, ValueError):
+                return o
+            if not math.isfinite(f):
+                return None
+            return int(o) if type(o).__name__.startswith("int") else f
+        return o
+    return json.dumps(clean(obj), ensure_ascii=False, allow_nan=False)
+
+
 def fred(series_id: str, refresh: bool = False) -> pd.Series:
     raw = _cached(f"fred_{series_id}.csv",
                   f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}", refresh)

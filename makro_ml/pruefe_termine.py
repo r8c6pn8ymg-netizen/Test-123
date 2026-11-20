@@ -82,13 +82,15 @@ def official_cb() -> dict:
     x = page("rba")
     off["AUD"] = set()
     for y, end in ((Y0, f"Board meeting schedules {Y1}"), (Y1, "Related Information")):
-        off["AUD"] |= {date(y, M[m], int(d2)) for d1, d2, m in
-                       re.findall(r"(\d{1,2})–(\d{1,2}) (\w+)", between(x, f"Board meeting schedules {y}", end)) if m in M}
+        seg = between(x, f"Board meeting schedules {y}", end)
+        off["AUD"] |= {date(y, M[m2], int(d2)) for d1, m1, d2, m2 in
+                       re.findall(r"(\d{1,2})(?: (\w+))?–(\d{1,2}) (\w+)", seg) if m2 in M}
     x = page("fomc")
     off["USD"] = set()
-    for y, end in ((Y0, f"{Y0 - 1} FOMC Meetings"), (Y1, "Note:")):
-        off["USD"] |= {date(y, M[m], int(d2)) for m, d1, d2 in
-                       re.findall(rf"({MN}) (\d{{1,2}})-(\d{{1,2}})", between(x, f"{y} FOMC Meetings", end))}
+    for y, end in ((Y0, f"{Y0 - 1} FOMC Meetings"), (Y1, f"{Y0} FOMC Meetings")):
+        seg = between(x, f"{y} FOMC Meetings", end).split("Note:")[0]  # Hinweis auf Termine im Folgejahr ignorieren
+        for m1, m2, d1, d2 in re.findall(rf"({MN})(?:/({MN}))? (\d{{1,2}})-(\d{{1,2}})", seg):
+            off["USD"].add(date(y, M[m2 or m1], int(d2)))
     return off
 
 

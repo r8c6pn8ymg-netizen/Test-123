@@ -242,3 +242,56 @@ def test_termine_ergebnis_oder_letzter_stand():
     assert ev["Auftragseingänge langlebige Güter"]["vstate"] == "before"
     assert ev["Auftragseingänge langlebige Güter"]["vnext"] == "Okt 2026"
     assert "Uni Michigan" in ev["Verbraucherstimmung Uni Michigan"]["vnote"]  # Grund statt leerer Zeile
+
+
+# ---------- Pruefung 20.11. (Gesamt-Review) ----------
+def test_json_ohne_nan():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import json
+    import data_sources as ds
+    s = ds.to_json({"a": float("nan"), "b": [np.float64(1.5), np.inf], "c": np.int64(3)})
+    assert json.loads(s) == {"a": None, "b": [1.5, None], "c": 3}
+
+
+def test_faktor_laufender_monat_zaehlt_nicht():
+    """Kurse nur bis Monatsmitte: der laufende Monat darf keine Monatsrendite liefern."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import factors
+    idx = pd.date_range("2026-01-01", "2026-11-13", freq="B")
+    px = {c: pd.Series(np.linspace(1, 2, len(idx)), index=idx) for c in ("EUR", "GBP")}
+    spot = pd.DataFrame({c: px[c].resample("ME").last() for c in px})
+    spot["USD"] = 1.0
+    sp = factors.complete_months(spot, px)
+    assert sp.loc["2026-11-30", ["EUR", "GBP"]].isna().all()       # November unvollstaendig
+    assert sp.loc["2026-10-31", ["EUR", "GBP"]].notna().all()
+    full = {c: pd.Series(1.0, index=pd.date_range("2026-01-01", "2026-11-30", freq="D")) for c in px}
+    assert factors.complete_months(spot, full).loc["2026-11-30", ["EUR", "GBP"]].notna().all()
+
+
+def test_alfred_datenstand_am_monatsende_nicht_doppelt():
+    import inspect
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import pipeline
+    src = inspect.getsource(pipeline.realtime_features)
+    assert "vint[-1] != today" in src
+
+
+def test_termin_heute_morgens_noch_nicht_vorbei():
+    """Lauf um 07:47: ein US-Termin um 14:30 desselben Tages ist noch nicht vorbei (nicht "fehlt bei FRED")."""
+    from datetime import date
+    t = _termine()
+    widx = pd.date_range("2026-10-03", "2026-11-14", freq="W-SAT")              # Daten bis Woche 14.11.
+    get = lambda sid: pd.Series(np.arange(len(widx), dtype=float) * 1000 + 200000, index=widx)
+    rows = [dict(day=date(2026, 11, 25), rid=180, name="Unemployment Insurance Weekly Claims Report")]
+    out = t.build(today=date(2026, 11, 25), fred_rows=rows, pages={"Census": [], "BEA": [], "Fed-G.17": []}, get=get)
+    cl = next(e for e in out["events"] if e["title"].startswith("Erstanträge"))
+    assert cl["vstate"] == "before" and cl["vnext"] == "Woche bis 21.11."
+
+
+def test_werte_fuer_bestimmten_zeitraum():
+    """upto: ein Termin zeigt die Zahl seines eigenen Zeitraums, nicht eine spaeter erschienene."""
+    t = _termine()
+    widx = pd.date_range("2026-10-03", "2026-11-28", freq="W-SAT")
+    get = lambda sid: pd.Series(np.arange(len(widx), dtype=float) * 1000 + 200000, index=widx)
+    v = t.latest_values([("Anträge", "ICSA", "k_persons")], get, upto=pd.Timestamp("2026-11-14"))
+    assert v[0]["period"] == "Woche bis 14.11." and v[0]["prev_period"] == "Woche bis 07.11."

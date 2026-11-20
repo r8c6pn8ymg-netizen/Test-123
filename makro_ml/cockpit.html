@@ -261,7 +261,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <th data-k="basis">Basis</th><th data-k="asset">Asset</th><th data-k="h">Horizont</th><th data-k="da" aria-sort="descending">DA</th>
         <th data-k="da2">DA 1./2. Hälfte</th><th data-k="naive">Naiv</th><th data-k="tier">Güte</th><th data-k="prob">P(steigt)</th><th data-k="pred">Prediction</th><th data-k="date">Datum</th>
       </tr></thead><tbody></tbody></table></div>
-      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung, rein out-of-sample seit 2008. <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
+      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
     </div>
   </section>
 
@@ -509,8 +509,8 @@ window.renderTermine = async function () {
   }));
   draw();
   $('#tNote').innerHTML = `${T.warnings.map(w => `<div class="err" style="padding:8px 10px;border-radius:8px">${esc(w)}</div>`).join('')}
-    <div><b>US-Daten:</b> Termine direkt von den Statistikämtern, wo das geht: Census (Einzelhandel, Bau, Aufträge), BEA (BIP, PCE, Handelsbilanz) und Fed (Industrieproduktion). Die Seite der Arbeitsmarkt-Statistik (BLS) sperrt automatische Abrufe. Deshalb kommen CPI, Arbeitsmarkt, PPI und JOLTS sowie Erstanträge und Umfragen aus dem Kalender der Fed St. Louis (FRED). Uhrzeiten sind überall die offiziellen New Yorker Zeiten, umgerechnet in deutsche Zeit (8:30 Uhr New York = 14:30 Uhr).</div>
-    <div><b>Einkaufsmanagerindizes (PMI):</b> Die ISM-Termine sind nach der festen ISM-Regel berechnet: Industrie am 1., Dienstleistung am 3. US-Geschäftstag des Monats um 16:00 Uhr. Die ISM-Seite selbst ist nicht abrufbar. Die Werte sind lizenziert und nicht frei verfügbar, genau wie die S&amp;P-Global-PMIs (Flash-PMIs für Eurozone, Großbritannien, Japan, Australien). Diese Termine fehlen deshalb.</div>
+    <div><b>US-Daten:</b> Termine direkt von den Statistikämtern, wo das geht: Census (Einzelhandel, Bau, Aufträge), BEA (BIP, PCE, Handelsbilanz) und Fed (Industrieproduktion). Die Seite der Arbeitsmarkt-Statistik (BLS) sperrt automatische Abrufe. Deshalb kommen CPI, Arbeitsmarkt, PPI und JOLTS sowie Erstanträge und Umfragen aus dem Kalender der Fed St. Louis (FRED). Uhrzeiten sind überall die offiziellen New Yorker Zeiten, umgerechnet in deutsche Zeit (8:30 Uhr New York ist meist 14:30 Uhr, in den Wochen der unterschiedlichen Zeitumstellung 13:30 Uhr).</div>
+    <div><b>Einkaufsmanagerindizes (PMI):</b> Die ISM-Termine sind nach der festen ISM-Regel berechnet: Industrie am 1., Dienstleistung am 3. US-Geschäftstag des Monats um 10:00 Uhr New Yorker Zeit (meist 16:00 Uhr deutscher Zeit). Die ISM-Seite selbst ist nicht abrufbar. Die Werte sind lizenziert und nicht frei verfügbar, genau wie die S&amp;P-Global-PMIs (Flash-PMIs für Eurozone, Großbritannien, Japan, Australien). Diese Termine fehlen deshalb.</div>
     <div><b>Werte:</b> <b>Aktuell</b> ist die zuletzt veröffentlichte Zahl, <b>Davor</b> die Zahl der Veröffentlichung davor, jeweils mit dem Monat (bzw. Quartal oder der Woche), für den sie gilt. Das grüne <b>neu</b> heißt: Diese Zahl kam an genau diesem Termin heraus. Bei Terminen, die noch kommen, steht darunter, welcher Monat neu erscheint. „Zum Vormonat“ bzw. „zum Vorjahr“ ist die prozentuale Veränderung. Alle Zahlen kommen aus FRED, Veränderungen sind aus den Indexständen berechnet und können um 0,1 Prozentpunkte von der Pressemeldung abweichen. <b>Prognosen</b> (Schätzungen vorab) gibt es nicht kostenlos, die stehen weiter in TradingView.</div>
     <div><b>Zinsentscheide:</b> von den offiziellen Seiten der acht Notenbanken übernommen (Stand ${T.list_as_of.split('-').reverse().join('.')}). Die Seite der RBNZ sperrt automatische Abrufe, ihre Termine stammen aus deren veröffentlichter Terminliste (über eine Websuche). Die Bank of Japan nennt keine feste Uhrzeit.</div>
     <div><b>Nicht enthalten:</b> Datentermine anderer Länder (z. B. Inflation in Großbritannien oder Japan). Dafür gibt es keine gemeinsame, kostenlose und erlaubte Schnittstelle.</div>`;
@@ -808,6 +808,15 @@ window.renderFactors = async function () {
   const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
 
   // ------------------------------------------------------------- Kopf
+  // Auswahl-Effekt ehrlich beziffern: echte Modelle vs. Zufallsmodelle nach derselben Auswahl, dann Schlusstest
+  {
+    const V = Object.values(D.validation || {}).filter(v => v.real && v.noise && v.real.da_pre != null && v.noise.da_pre != null);
+    if (V.length) {
+      const avg = f => V.reduce((a, v) => a + f(v), 0) / V.length;
+      const f1 = x => x.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      $('#daBias').innerHTML = ` Zum Vergleich: Reine Zufallsmodelle erreichen nach derselben Auswahl im Schnitt <b>${f1(avg(v => v.noise.da_pre))} %</b>, die echten ${f1(avg(v => v.real.da_pre))} %. Im unberührten Schlusstest ab 2022 bleiben bei den echten ${f1(avg(v => v.real.da_post))} % übrig, beim Zufall ${f1(avg(v => v.noise.da_post))} %. Realistisch sind also Werte knapp über 50 %, nicht die DA in der Tabelle.`;
+    }
+  }
   $('#stamp').innerHTML = `${window.freshPill(D.generated)}<span class="pill">FX-Kurse bis ${esc(D.fx_through)}</span><span class="pill">${M.length} aktive Modelle</span>`;
 
   // ---------------------------------------------------------- Heatmap
