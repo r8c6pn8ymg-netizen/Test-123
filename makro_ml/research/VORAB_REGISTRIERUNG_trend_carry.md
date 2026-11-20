@@ -45,4 +45,20 @@ Zwei Strategien werden getestet, deshalb Signifikanzschwelle **p < 0,025** (Bonf
 - Besteht nichts: Ergebnis als „getestet und verworfen“ dokumentieren, Cockpit bleibt unverändert.
 
 ## Protokoll nach Sichtung der Ergebnisse
-(wird nach dem Lauf ergänzt)
+Lauf am 20.11.2026, Regeln unverändert, keine Fehlerkorrektur nötig. Ergebnisse (netto, 5 Bp):
+
+| | Sharpe 1977– | vor 2000 | seit 2000 | Forward 2022+ | Newey-West p | Sonstiges |
+|---|---|---|---|---|---|---|
+| T Trendfolge | 0,55 | 0,91 | 0,21 | **−0,16** | 0,00007 | Zufalls-p 0,000 (95 %-Grenze 0,23); 10/20 Bp: 0,52/0,45 |
+| Carry (Basis) | 0,51 | 0,73 | 0,32 | 0,54 | 0,0004 | |
+| V Carry mit Bremse | 0,21 | 0,13 | 0,35 | 0,41 | 0,086 | Alpha ggü. Carry −0,8 %/J (p 0,74), Hebel bis 10,7×, Drawdown −53 % |
+| Kombi (Standard) | 0,54 | 0,84 | 0,25 | −0,40 | 0,0001 | |
+
+**Entscheidung nach Regel:** T **nicht** aufgenommen (Forward-Test 2022+ negativ). V **nicht** aufgenommen (kein Alpha,
+schlechter als Carry). Kombination entfällt (nur bestandene Strategien zulässig).
+
+**Selbstprüfung:** Timing-Test bestanden (Signal aus der Zukunft 1,58; einen Monat später 0,42 < 0,55), Placebo −0,24.
+Unabhängige Nachrechnung von T mit getrenntem Code: identisch (0,55 / 0,91 / 0,21 / −0,16, 598 Monate).
+V geprüft: aufsummierte Tageserträge = Monatsertrag (Korrelation 0,9997), Varianz-Persistenz 0,6 – das schlechte Ergebnis
+ist echt (Bremse hebelt ruhige Phasen, Carry crasht nach ruhigen Phasen). Passt zu Cederburg et al. (2020, JFE).
+Info: Korrelation Trend–Kombi 0,21 (seit 2000 0,32), Trend–Carry 0,02.

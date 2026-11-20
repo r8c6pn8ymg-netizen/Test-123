@@ -15,6 +15,7 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `pipeline.py` | Makro-ML-Modelle (FRED- und ALFRED-Variante), Schlusstest, Statistik-Tests, CFTC, Zinseinpreisung |
 | `factors.py` | Faktor-Portfolio Carry/Value/Momentum seit 1977, alle 7 Faktor-Auswahlen, Robustheit |
 | `consensus.py` | Konsens-Test (Makro + Faktor + CFTC, gegen USD und relativ) – nur Forschung, nicht im Cockpit |
+| `research/trend_volcarry.py` | Trendfolge + Carry mit Bremse, Test nach `research/VORAB_REGISTRIERUNG_trend_carry.md` – verworfen |
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
 | `termine.py` | Termine der Woche: US-Termine von Census, BEA, Fed (G.17) und FRED-Kalender (BLS), offizielle Uhrzeiten, ISM-PMI nach Regel, letzte Werte aus FRED; Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `pruefe_termine.py` | Unabhängige Gegenprüfung: lädt die offiziellen Seiten selbst und vergleicht jeden Notenbank- und US-Termin (Exit-Code 1 bei Abweichung); läuft täglich nach der Pipeline |
@@ -50,6 +51,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
 - **Prüfung 20.11. (Termine + Zinscapital-Abgleich):** FRED-Kalender hat teils Einstellzeiten und Doppel-Einträge
   (Industrieproduktion/Baubeginne 24./25.11.), deshalb offizielle Kalender. Marktwerte gegen PDF: US-Renditen, VIX, SOFR, HY-OAS
   identisch; Öl (er: Futures, FRED: Spot) und EUR/USD (andere Fixing-Uhrzeit) weichen leicht ab. Leitzinsen identisch.
+- **Trendfolge & Carry mit Bremse (20.11., vorab registriert, `research/`):** Trendfolge 1977– Sharpe 0,55 (hoch signifikant),
+  aber seit 2000 0,21 und Forward-Test 2022+ −0,16 → nach Regel nicht übernommen. Carry mit Volatilitäts-Bremse schlechter als
+  Carry (Alpha negativ, Hebel bis 10,7×) → verworfen. Nicht erneut mit anderen Einstellungen versuchen (wäre Überoptimierung).
 - **Wendepunkte:** mit keinem Signal vorhersagbar (Vorhersage 49–52 %). Gute Treffer an Wenden (CFTC, umgedrehtes Momentum) sind Rückblick-Effekte.
   Optimieren auf einen Wendepunkt: 100 % dort, 51 % anderswo → Überoptimierung.
 
