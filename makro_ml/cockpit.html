@@ -1,0 +1,558 @@
+<title>Makro ML Cockpit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: Terminal-Cockpit – Kopfzeile, Heatmap, dann Scatter | Leaderboard, darunter Tabelle & Analysen.
+   Bewusst nur dunkel (Terminal-Look wie im Vorbild). */
+:root {
+  color-scheme: dark;
+  --bg: #090b0e;
+  --panel: #0f1216;
+  --panel-2: #14181d;
+  --line: #1e242b;
+  --line-2: #2a313a;
+  --fg: #e7eaee;
+  --fg-2: #a3acb7;
+  --muted: #6c7682;
+  --accent: #8b8ff8;
+  --accent-bg: rgba(139,143,248,.14);
+  --bull: #34d399;
+  --bull-bg: rgba(52,211,153,.10);
+  --bull-bg-2: rgba(52,211,153,.30);
+  --bear: #f2626b;
+  --bear-bg: rgba(242,98,107,.10);
+  --bear-bg-2: rgba(242,98,107,.30);
+  --neutral: #c9ccd1;
+  --warn: #e0a83a;
+  --c-DXY: #199e70; --c-EUR: #3987e5; --c-JPY: #c98500; --c-NZD: #9085e9;
+  --c-CAD: #d95926; --c-AUD: #e66767; --c-CHF: #0ca30c; --c-GBP: #d55181;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 18px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 14px; }
+header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.brand .sub { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.stamp { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.tabs { display: inline-flex; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; flex-wrap: wrap; }
+.tabs button, .seg button { background: none; border: 0; color: var(--muted); font: 500 13px var(--sans); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+.tabs button[aria-pressed="true"] { color: var(--fg); background: var(--panel-2); }
+.seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.seg button { border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; padding: 5px 12px; }
+.seg button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: var(--accent-bg); }
+button:focus-visible, input:focus-visible, select:focus-visible, label.chk:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.panel > .ph { padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 600; font-size: 13px; color: var(--fg-2);
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel > .pb { padding: 14px 16px; display: grid; gap: 12px; min-width: 0; }
+.eyebrow { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 14px; }
+.grid2b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 1000px) { .grid2, .grid2b { grid-template-columns: minmax(0, 1fr); } }
+.note { color: var(--muted); font-size: 12px; max-width: 75ch; }
+.note b { color: var(--fg-2); font-weight: 600; }
+
+/* Heatmap */
+.hm { overflow-x: auto; }
+.hm table { width: 100%; border-collapse: separate; border-spacing: 4px; min-width: 460px; }
+.hm th { font: 500 11.5px var(--mono); color: var(--muted); text-align: center; padding: 6px 4px; }
+.hm th.row { text-align: left; color: var(--fg-2); width: 70px; }
+.hm td { text-align: center; font: 600 12.5px var(--mono); padding: 8px 4px; border-radius: 6px; background: var(--panel-2); color: var(--muted); cursor: default; }
+.hm td small { display: block; font: 400 10.5px var(--mono); color: var(--fg-2); opacity: .75; }
+
+/* Scatter */
+.chks { display: flex; flex-wrap: wrap; gap: 6px; }
+label.chk { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); border-radius: 7px; padding: 4px 9px 4px 7px;
+  font: 500 12px var(--mono); color: var(--fg-2); cursor: pointer; user-select: none; }
+label.chk input { accent-color: var(--accent); margin: 0; }
+label.chk svg { flex: none; }
+label.chk.off { opacity: .45; }
+.chartbox { position: relative; }
+.chartbox svg { width: 100%; height: auto; display: block; }
+.tip { position: absolute; pointer-events: none; background: #1a1f26; border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px;
+  font-size: 12px; color: var(--fg); min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.4); z-index: 5; }
+.tip .t { font-weight: 600; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--fg-2); font-family: var(--mono); font-size: 11.5px; }
+.tip .r b { color: var(--fg); font-weight: 600; }
+
+/* Leaderboard */
+.lb { display: grid; gap: 8px; max-height: 560px; overflow-y: auto; padding-right: 2px; }
+.lbi { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 11px 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); cursor: pointer; text-align: left; color: inherit; font: inherit; width: 100%; }
+.lbi:hover { border-color: var(--line-2); }
+.lbi .cur { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.lbi .dir { font: 700 11px var(--mono); letter-spacing: .06em; margin-top: 2px; }
+.lbi .hz { display: inline-block; margin-top: 5px; font: 600 11px var(--mono); background: var(--line); color: var(--fg); padding: 2px 7px; border-radius: 5px; }
+.lbi .mid { font-weight: 600; font-size: 14.5px; }
+.lbi .mid small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 2px; }
+.lbi .ratio { font: 500 12px var(--mono); text-align: right; }
+.bar { height: 6px; border-radius: 3px; background: var(--bear-bg-2); overflow: hidden; margin-top: 6px; width: 140px; margin-left: auto; display: flex; gap: 2px; }
+.bar i { display: block; height: 100%; background: var(--bull); border-radius: 3px 0 0 3px; }
+.bull { color: var(--bull); } .bear { color: var(--bear); } .neu { color: var(--neutral); }
+@media (max-width: 560px) { .lbi { grid-template-columns: 76px minmax(0,1fr); } .lbi .ratio { grid-column: 1 / -1; text-align: left; } .bar { margin-left: 0; } }
+
+/* Tabelle */
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.fld { display: grid; gap: 4px; }
+.fld label { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+select, input[type=number] { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line-2); border-radius: 7px; padding: 7px 10px; font: 500 13px var(--mono); min-width: 0; }
+input[type=number] { width: 86px; }
+.chip { font: 500 12px var(--mono); padding: 5px 10px; border-radius: 7px; border: 1px solid var(--line-2); color: var(--fg-2); white-space: nowrap; }
+.chip.bull { border-color: rgba(52,211,153,.45); background: var(--bull-bg); color: var(--bull); }
+.chip.bear { border-color: rgba(242,98,107,.45); background: var(--bear-bg); color: var(--bear); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tbl { overflow: auto; max-height: 620px; border: 1px solid var(--line); border-radius: 10px; }
+table.data { width: 100%; border-collapse: collapse; min-width: 860px; font-variant-numeric: tabular-nums; }
+table.data th { position: sticky; top: 0; background: var(--panel-2); font: 600 10.5px var(--sans); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; }
+table.data th[aria-sort] { color: var(--fg); }
+table.data td { padding: 10px 12px; border-bottom: 1px solid var(--line); font: 500 13px var(--mono); color: var(--fg); white-space: nowrap; }
+table.data td.b { font-family: var(--sans); font-weight: 600; white-space: normal; }
+table.data td.b small { display: block; color: var(--muted); font-weight: 400; font-size: 11.5px; }
+table.data tr:hover td { background: rgba(255,255,255,.02); }
+.tag { display: inline-block; font: 600 11.5px var(--sans); padding: 3px 8px; border-radius: 5px; }
+.tag.bull { background: var(--bull-bg); } .tag.bear { background: var(--bear-bg); } .tag.neu { background: rgba(201,204,209,.08); }
+.tier { font: 600 10.5px var(--mono); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--fg-2); }
+.tier.A { border-color: var(--accent); color: var(--accent); }
+.dim { color: var(--muted); }
+
+/* Paar-Rechner & Realitätscheck */
+.pair { display: grid; gap: 12px; }
+.pairout { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.pairout .big { font: 700 26px var(--mono); letter-spacing: -.02em; }
+.pairout .verdict { font: 700 13px var(--mono); letter-spacing: .06em; }
+table.rc { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 520px; }
+table.rc th { font: 600 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+table.rc th:first-child, table.rc td:first-child { text-align: left; }
+table.rc td { font: 500 12.5px var(--mono); padding: 8px; border-bottom: 1px solid var(--line); text-align: right; }
+.q { font: 600 11px var(--sans); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.q.hi { background: var(--bull-bg); color: var(--bull); } .q.mid { background: var(--accent-bg); color: var(--accent); } .q.lo { background: rgba(224,168,58,.12); color: var(--warn); }
+.scroll-x { overflow-x: auto; }
+
+/* Makro-Kacheln */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: var(--panel-2); min-width: 0; }
+.tile .k { font: 600 11px var(--mono); color: var(--fg-2); }
+.tile .v { font: 600 19px var(--mono); margin-top: 2px; }
+.tile .d { font-size: 11px; color: var(--muted); }
+.err { padding: 40px; text-align: center; color: var(--bear); }
+@media (prefers-reduced-motion: no-preference) { .lbi, .seg button, .tabs button { transition: border-color .15s, background .15s, color .15s; } }
+</style>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Makro ML Cockpit</h1>
+      <span class="sub">FX-Bias aus Makrodaten · 10–90 Tage</span>
+    </div>
+    <div class="stamp" id="stamp"><span class="pill">Lade Daten …</span></div>
+  </header>
+
+  <section class="panel">
+    <div class="ph"><span>Makro ML Charts · Heatmap (Long Ratio je Asset &amp; Horizont)</span>
+      <div class="seg" id="bucketSeg">
+        <button type="button" data-b="low" aria-pressed="false">Low (10–30)</button>
+        <button type="button" data-b="mid" aria-pressed="false">Mid (30–60)</button>
+        <button type="button" data-b="high" aria-pressed="true">High (60–90)</button>
+      </div>
+    </div>
+    <div class="pb"><div class="hm" id="heatmap"></div>
+      <div class="note">Zelle = Anteil der Modelle mit Prognose <b>Bullish</b> unter allen bullischen und bearishen Modellen im Fenster Horizont ±5 Tage. Darunter die Anzahl der Modelle. Grün = Währung steigt gegen USD (bei DXY: Dollar steigt).</div>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><span>Makro ML Scatter · Horizont vs. Bias</span><span class="eyebrow" id="scCount"></span></div>
+      <div class="pb">
+        <div class="chks" id="assetChks"></div>
+        <div class="chartbox" id="scatterBox"><svg id="scatter" viewBox="0 0 640 420" role="img" aria-label="Streudiagramm: jedes Modell als Punkt, x = Horizont in Tagen, y = Wahrscheinlichkeit für steigenden Kurs"></svg><div class="tip" id="scTip" hidden></div></div>
+        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. Je weiter vom Mittelstrich, desto sicherer das Modell. <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span>Makro ML Pairs · Leaderboard</span><span class="eyebrow">Klick = in Tabelle filtern</span></div>
+      <div class="pb"><div class="lb" id="leader"></div></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="ph"><span>Makro ML Live Predictions</span><span class="eyebrow" id="tblInfo"></span></div>
+    <div class="pb">
+      <div class="filters">
+        <div class="fld"><label for="fAsset">Future</label><select id="fAsset"></select></div>
+        <div class="fld"><label for="fH">Horizont (Tage)</label><input id="fH" type="number" min="10" max="90" step="5" value="50"></div>
+        <div class="fld"><label for="fW">Breite (±)</label><input id="fW" type="number" min="0" max="45" step="5" value="45"></div>
+        <div class="fld"><label for="fTier">Güte</label><select id="fTier"><option value="AB">Signifikant + Robust</option><option value="A">Nur signifikant</option></select></div>
+        <div class="chips"><span class="chip" id="rangeChip"></span><span class="dim" id="nRes" style="font:500 12px var(--mono)"></span></div>
+      </div>
+      <div class="chips" id="sumChips"></div>
+      <div class="tbl"><table class="data" id="tbl"><thead><tr>
+        <th data-k="basis">Basis</th><th data-k="asset">Asset</th><th data-k="h">Horizont</th><th data-k="da" aria-sort="descending">DA</th>
+        <th data-k="da2">DA 1./2. Hälfte</th><th data-k="naive">Naiv</th><th data-k="tier">Güte</th><th data-k="prob">P(steigt)</th><th data-k="pred">Prediction</th><th data-k="date">Datum</th>
+      </tr></thead><tbody></tbody></table></div>
+      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung, rein out-of-sample seit 2008. <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
+    </div>
+  </section>
+
+  <div class="grid2b">
+    <section class="panel">
+      <div class="ph"><span>Paar-Rechner</span><span class="eyebrow">Basis vs. Quote</span></div>
+      <div class="pb pair">
+        <div class="filters">
+          <div class="fld"><label for="pBase">Basis</label><select id="pBase"></select></div>
+          <div class="fld"><label for="pQuote">Quote</label><select id="pQuote"></select></div>
+          <div class="fld"><label for="pBucket">Horizont</label><select id="pBucket"><option value="all">10–90 Tage</option><option value="low">10–30</option><option value="mid">30–60</option><option value="high">60–90</option></select></div>
+        </div>
+        <div class="pairout" id="pairOut"></div>
+        <div class="note">Paar-Bias = Long Ratio der Basis minus Long Ratio der Quote. USD wird über den Dollar-Index (DXY) abgebildet. Beispiel: DXY bearish und CHF bullish ergibt USD/CHF fallend.</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span>Realitäts-Check · Signal vs. Zufall</span></div>
+      <div class="pb">
+        <div class="scroll-x"><table class="rc" id="rc"></table></div>
+        <div class="note">Für jede Währung laufen zusätzlich 12 Modelle auf <b>reinen Zufallsreihen</b> durch dieselben Tests. Bestehen echte Makro-Modelle kaum häufiger als Zufallsmodelle, ist der Bias dieser Währung mit Vorsicht zu genießen.</div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="ph"><span>Bias-Verlauf (Out-of-Sample)</span>
+      <div class="fld" style="grid-auto-flow:column;align-items:center;gap:8px"><label for="hAsset">Asset</label><select id="hAsset"></select></div></div>
+    <div class="pb">
+      <div class="chartbox" id="histBox"><svg id="hist" viewBox="0 0 1200 330" role="img" aria-label="Verlauf: Anteil bullischer Modelle und Kurs"></svg><div class="tip" id="hTip" hidden></div></div>
+      <div class="note">Oben: Anteil der heute angezeigten Modelle, die damals out-of-sample bullish waren. Unten: Kurs der Währung in USD (DXY: Indexpunkte). Weil die Modelle mit Wissen von heute ausgewählt wurden, wirkt dieser Rückblick etwas besser, als er live gewesen wäre.</div>
+    </div>
+  </section>
+
+  <div class="grid2b">
+    <section class="panel">
+      <div class="ph"><span>US-Makro · aktueller Stand</span><span class="eyebrow">FRED</span></div>
+      <div class="pb"><div class="tiles" id="macroTiles"></div></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span>Militärausgaben · % des BIP</span><span class="eyebrow">SIPRI, jährlich</span></div>
+      <div class="pb"><div class="tiles" id="milTiles"></div>
+        <div class="note">Die Daten erscheinen nur jährlich und wirken auf 10–90 Tage kaum. Sie laufen trotzdem als Basis „MILEX-Diff“ durch die Tests, kommen aber nur selten durch.</div></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="ph"><span>Methodik</span></div>
+    <div class="pb note" style="max-width:none;display:grid;gap:8px" id="method"></div>
+  </section>
+</div>
+
+<script>
+(async function () {
+  const $ = s => document.querySelector(s);
+  let D;
+  try { D = await (await fetch('data.json', { cache: 'no-store' })).json(); }
+  catch (e) { $('#app').innerHTML = '<div class="panel err">Die Daten (data.json) konnten nicht geladen werden. Bitte die Seite neu laden.</div>'; return; }
+
+  const css = getComputedStyle(document.documentElement);
+  const COL = a => css.getPropertyValue('--c-' + a).trim();
+  const SHAPES = { DXY: 'circle', EUR: 'square', JPY: 'diamond', NZD: 'tri', CAD: 'tridown', AUD: 'plus', CHF: 'hex', GBP: 'x' };
+  const ASSETS = D.assets;
+  const M = D.models;
+  const fmt = (v, d = 1) => Number(v).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const PRED = { Bullish: 'bull', Bearish: 'bear', Neutral: 'neu' };
+  const BUCKETS = { low: [10, 20, 30], mid: [30, 40, 50, 60], high: [60, 70, 80, 90] };
+  const RANGE = { all: [10, 90], low: [10, 30], mid: [30, 60], high: [60, 90] };
+  const store = { get(k, d) { try { const v = localStorage.getItem('mlc_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+                  set(k, v) { try { localStorage.setItem('mlc_' + k, JSON.stringify(v)); } catch (e) {} } };
+
+  function shapePath(shape, x, y, r, filled, color) {
+    const f = filled ? `fill="${color}" stroke="var(--bg)" stroke-width="1.5"` : `fill="var(--panel)" stroke="${color}" stroke-width="2"`;
+    switch (shape) {
+      case 'square': return `<rect x="${x - r * .85}" y="${y - r * .85}" width="${r * 1.7}" height="${r * 1.7}" rx="1.5" ${f}/>`;
+      case 'diamond': return `<path d="M${x} ${y - r * 1.15}L${x + r * 1.15} ${y}L${x} ${y + r * 1.15}L${x - r * 1.15} ${y}Z" ${f}/>`;
+      case 'tri': return `<path d="M${x} ${y - r * 1.15}L${x + r * 1.05} ${y + r * .8}L${x - r * 1.05} ${y + r * .8}Z" ${f}/>`;
+      case 'tridown': return `<path d="M${x} ${y + r * 1.15}L${x + r * 1.05} ${y - r * .8}L${x - r * 1.05} ${y - r * .8}Z" ${f}/>`;
+      case 'plus': { const a = r * 1.1, b = r * .42; return `<path d="M${x - b} ${y - a}h${2 * b}v${a - b}h${a - b}v${2 * b}h${-(a - b)}v${a - b}h${-2 * b}v${-(a - b)}h${-(a - b)}v${-2 * b}h${a - b}Z" ${f}/>`; }
+      case 'x': { const a = r * 1.05, b = r * .38, c = Math.SQRT1_2; const P = [[-b, -a], [b, -a], [b, -b], [a, -b], [a, b], [b, b], [b, a], [-b, a], [-b, b], [-a, b], [-a, -b], [-b, -b]].map(([u, v]) => `${x + (u - v) * c},${y + (u + v) * c}`); return `<polygon points="${P.join(' ')}" ${f}/>`; }
+      case 'hex': { const P = [0, 1, 2, 3, 4, 5].map(i => `${x + r * 1.1 * Math.cos(Math.PI / 3 * i)},${y + r * 1.1 * Math.sin(Math.PI / 3 * i)}`); return `<polygon points="${P.join(' ')}" ${f}/>`; }
+      default: return `<circle cx="${x}" cy="${y}" r="${r}" ${f}/>`;
+    }
+  }
+  const swatch = a => `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${shapePath(SHAPES[a], 7, 7, 4.6, true, COL(a))}</svg>`;
+
+  function stats(list) {
+    const bull = list.filter(m => m.pred === 'Bullish').length, bear = list.filter(m => m.pred === 'Bearish').length;
+    const dirN = bull + bear;
+    return { bull, bear, neu: list.length - dirN, n: list.length, lr: dirN ? bull / dirN * 100 : null };
+  }
+  const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
+
+  // ------------------------------------------------------------- Kopf
+  $('#stamp').innerHTML = `<span class="pill">Berechnet ${esc(D.generated)}</span><span class="pill">FX-Kurse bis ${esc(D.fx_through)}</span><span class="pill">${M.length} aktive Modelle</span>`;
+
+  // ---------------------------------------------------------- Heatmap
+  let bucket = store.get('bucket', 'high');
+  function drawHeatmap() {
+    document.querySelectorAll('#bucketSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === bucket));
+    const cols = BUCKETS[bucket];
+    let h = '<table><thead><tr><th class="row">Asset / Horizont</th>' + cols.map(c => `<th>${c}d</th>`).join('') + '</tr></thead><tbody>';
+    for (const a of ASSETS) {
+      h += `<tr><th class="row" scope="row">${a}</th>`;
+      for (const c of cols) {
+        const s = stats(M.filter(m => m.asset === a && inRange(m, c - 5, c + 5)));
+        if (s.lr == null) { h += `<td title="Keine bullischen/bearishen Modelle">–${s.n ? `<small>${s.n} neutral</small>` : ''}</td>`; continue; }
+        const dev = Math.min(Math.abs(s.lr - 50) / 50, 1);
+        const bull = s.lr > 50, flat = Math.abs(s.lr - 50) < 0.01;
+        const bg = flat ? 'var(--panel-2)' : `color-mix(in srgb, ${bull ? 'var(--bull)' : 'var(--bear)'} ${Math.round(10 + dev * 26)}%, var(--panel-2))`;
+        h += `<td style="background:${bg};color:${flat ? 'var(--fg)' : bull ? 'var(--bull)' : 'var(--bear)'}" title="${a} ${c - 5}–${c + 5}d: ${s.bull} bullish, ${s.bear} bearish, ${s.neu} neutral">${Math.round(s.lr)}%<small>${s.bull + s.bear} Mod.</small></td>`;
+      }
+      h += '</tr>';
+    }
+    $('#heatmap').innerHTML = h + '</tbody></table>';
+  }
+  $('#bucketSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; bucket = b.dataset.b; store.set('bucket', bucket); drawHeatmap(); });
+
+  // ---------------------------------------------------------- Scatter
+  const withModels = ASSETS.filter(a => M.some(m => m.asset === a));
+  let sel = new Set(store.get('scSel', withModels).filter(a => ASSETS.includes(a)));
+  $('#assetChks').innerHTML = ASSETS.map(a => `<label class="chk${M.some(m => m.asset === a) ? '' : ' off'}"><input type="checkbox" value="${a}" id="chk-${a}"${sel.has(a) ? ' checked' : ''}>${swatch(a)}${a}</label>`).join('');
+  $('#assetChks').addEventListener('change', e => { if (e.target.checked) sel.add(e.target.value); else sel.delete(e.target.value); store.set('scSel', [...sel]); drawScatter(); });
+
+  const SW = 640, SH = 420, ML = 52, MR = 14, MT = 14, MB = 40;
+  const ext = Math.max(0.06, ...M.map(m => Math.abs(m.prob - 0.5))) * 1.12;
+  const sx = h => ML + (h - 5) / 90 * (SW - ML - MR);
+  const sy = p => MT + (0.5 + ext - p) / (2 * ext) * (SH - MT - MB);
+  let scPts = [];
+  function jitter(m) { let s = 0; for (const ch of m.basis + m.asset) s = (s * 31 + ch.charCodeAt(0)) % 997; return (s / 997 - 0.5) * 3.2; }
+  function drawScatter() {
+    const pts = M.filter(m => sel.has(m.asset));
+    $('#scCount').textContent = `${pts.length} Modelle`;
+    const y50 = sy(0.5);
+    let g = `<rect x="${ML}" y="${MT}" width="${SW - ML - MR}" height="${y50 - MT}" fill="var(--bull-bg)"/>`;
+    g += `<rect x="${ML}" y="${y50}" width="${SW - ML - MR}" height="${SH - MB - y50}" fill="var(--bear-bg)"/>`;
+    const step = ext > 0.2 ? 0.1 : ext > 0.1 ? 0.05 : 0.025;
+    for (let v = -Math.floor(ext / step) * step; v <= ext + 1e-9; v += step) {
+      const y = sy(0.5 + v); if (Math.abs(v) < 1e-9) continue;
+      g += `<line x1="${ML}" x2="${SW - MR}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;
+      g += `<text x="${ML - 8}" y="${y + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${Math.round((0.5 + v) * 100)}%</text>`;
+    }
+    g += `<line x1="${ML}" x2="${SW - MR}" y1="${y50}" y2="${y50}" stroke="var(--line-2)" stroke-dasharray="4 4"/>`;
+    g += `<text x="${ML - 8}" y="${y50 + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">50%</text>`;
+    g += `<text x="${ML + 8}" y="${MT + 16}" font-size="11" font-weight="600" fill="var(--bull)" letter-spacing=".08em">BULLISH</text>`;
+    g += `<text x="${ML + 8}" y="${SH - MB - 8}" font-size="11" font-weight="600" fill="var(--bear)" letter-spacing=".08em">BEARISH</text>`;
+    g += `<line x1="${ML}" x2="${SW - MR}" y1="${SH - MB}" y2="${SH - MB}" stroke="var(--line-2)"/>`;
+    for (const t of [10, 30, 50, 70, 90]) {
+      g += `<line x1="${sx(t)}" x2="${sx(t)}" y1="${SH - MB}" y2="${SH - MB + 5}" stroke="var(--line-2)"/>`;
+      g += `<text x="${sx(t)}" y="${SH - MB + 19}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">${t}</text>`;
+    }
+    g += `<text x="${(ML + SW - MR) / 2}" y="${SH - 4}" text-anchor="middle" font-size="11" fill="var(--muted)">Horizont (Tage)</text>`;
+    g += `<text transform="translate(13 ${(MT + SH - MB) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="var(--muted)">P(steigt)</text>`;
+    // Robuste zuerst, signifikante obenauf
+    scPts = pts.map(m => ({ m, x: sx(m.h + jitter(m)), y: sy(m.prob) })).sort((a, b) => (a.m.tier < b.m.tier) - (a.m.tier > b.m.tier));
+    for (const p of scPts) g += shapePath(SHAPES[p.m.asset], p.x, p.y, 4.6, p.m.tier === 'A', COL(p.m.asset));
+    if (!pts.length) g += `<text x="${(ML + SW - MR) / 2}" y="${(MT + SH - MB) / 2}" text-anchor="middle" fill="var(--muted)" font-size="13">Keine Währung ausgewählt</text>`;
+    g += `<g id="scHi"></g>`;
+    $('#scatter').innerHTML = g;
+  }
+  function tipHtml(m) {
+    const t = M_LABEL(m.basis);
+    return `<div class="t">${swatch(m.asset)}${esc(m.asset)} · ${esc(m.basis)}</div><div class="r" style="margin-bottom:4px"><span>${esc(t)}</span></div>
+      <div class="r"><span>Horizont</span><b>${m.h} Tage</b></div><div class="r"><span>Prognose</span><b class="${PRED[m.pred]}">${m.pred}</b></div>
+      <div class="r"><span>P(steigt)</span><b>${fmt(m.prob * 100)}%</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
+      <div class="r"><span>Güte</span><b>${m.tier === 'A' ? 'Signifikant' : 'Robust'}</b></div>`;
+  }
+  const M_LABEL = id => (D.bases[id] || {}).label || id;
+  function placeTip(tip, box, px, py) {
+    const bw = box.clientWidth; tip.hidden = false;
+    const w = tip.offsetWidth, hgt = tip.offsetHeight;
+    let left = px + 14; if (left + w > bw) left = px - w - 14; if (left < 0) left = 4;
+    let top = py - hgt - 10; if (top < 0) top = py + 14;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function scHover(ev) {
+    const svg = $('#scatter'), r = svg.getBoundingClientRect(), k = SW / r.width;
+    const x = (ev.clientX - r.left) * k, y = (ev.clientY - r.top) * k;
+    let best = null, bd = 16 * 16;
+    for (const p of scPts) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = p; } }
+    const tip = $('#scTip'), hi = $('#scHi');
+    if (!best) { tip.hidden = true; hi.innerHTML = ''; return; }
+    hi.innerHTML = `<circle cx="${best.x}" cy="${best.y}" r="9" fill="none" stroke="var(--fg)" stroke-width="1.5"/>`;
+    tip.innerHTML = tipHtml(best.m);
+    placeTip(tip, $('#scatterBox'), best.x / k, best.y / k);
+  }
+  $('#scatter').addEventListener('pointermove', scHover);
+  $('#scatter').addEventListener('pointerdown', scHover);
+  $('#scatter').addEventListener('pointerleave', () => { $('#scTip').hidden = true; const h = $('#scHi'); if (h) h.innerHTML = ''; });
+
+  // ------------------------------------------------------- Leaderboard
+  function dominantH(list) {
+    const c = {}; list.forEach(m => { const k = Math.min(90, Math.max(10, Math.round(m.h / 10) * 10)); c[k] = (c[k] || 0) + 1; });
+    return Object.entries(c).sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0];
+  }
+  function drawLeader() {
+    let h = '';
+    for (const a of ASSETS) {
+      const list = M.filter(m => m.asset === a), s = stats(list);
+      if (!list.length) { h += `<div class="lbi" style="cursor:default"><div><div class="cur">${swatch(a)}${a}</div><div class="dir dim">KEINE DATEN</div></div><div class="mid">Kein Modell besteht die Tests<small>Bias nicht belastbar</small></div><div></div></div>`; continue; }
+      const dir = s.lr == null || Math.abs(s.lr - 50) < 0.01 ? 'NEUTRAL' : s.lr > 50 ? 'BULLISH' : 'BEARISH';
+      const cls = dir === 'BULLISH' ? 'bull' : dir === 'BEARISH' ? 'bear' : 'neu';
+      const domList = list.filter(m => (dir === 'BULLISH' ? m.pred === 'Bullish' : dir === 'BEARISH' ? m.pred === 'Bearish' : true));
+      const nA = list.filter(m => m.tier === 'A').length;
+      h += `<button type="button" class="lbi" data-a="${a}"><div><div class="cur">${swatch(a)}${a}</div><div class="dir ${cls}">${dir}</div><span class="hz">${dominantH(domList) || '–'}d</span></div>
+        <div class="mid">Bias aus ${s.n} Modell(en)<small>${s.bull} bullish · ${s.bear} bearish · ${s.neu} neutral${nA ? ` · ${nA} signifikant` : ''}</small></div>
+        <div class="ratio ${cls}">${dir === 'NEUTRAL' ? 'Neutral' : dir === 'BULLISH' ? 'Bullish' : 'Bearish'} · ${s.lr == null ? '–' : Math.round(s.lr)}% Long Ratio<div class="bar" aria-hidden="true"><i style="width:${s.lr ?? 50}%"></i></div></div></button>`;
+    }
+    $('#leader').innerHTML = h;
+  }
+  $('#leader').addEventListener('click', e => {
+    const b = e.target.closest('button.lbi'); if (!b) return;
+    $('#fAsset').value = b.dataset.a; drawTable(); $('#tbl').closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ------------------------------------------------------------ Tabelle
+  $('#fAsset').innerHTML = '<option value="ALL">Alle</option>' + ASSETS.map(a => `<option>${a}</option>`).join('');
+  const tf = store.get('tbl', { a: 'ALL', h: 50, w: 45, t: 'AB' });
+  $('#fAsset').value = tf.a; $('#fH').value = tf.h; $('#fW').value = tf.w; $('#fTier').value = tf.t;
+  let sortK = 'da', sortDir = -1;
+  function drawTable() {
+    const a = $('#fAsset').value, hc = +$('#fH').value || 50, w = Math.max(0, +$('#fW').value || 0), t = $('#fTier').value;
+    store.set('tbl', { a, h: hc, w, t });
+    const lo = hc - w, hi = hc + w;
+    $('#rangeChip').textContent = `${Math.max(0, lo)}d – ${hi}d`;
+    let rows = M.filter(m => (a === 'ALL' || m.asset === a) && inRange(m, lo, hi) && t.includes(m.tier));
+    rows.sort((x, y) => { const p = x[sortK], q = y[sortK]; return (p < q ? -1 : p > q ? 1 : 0) * sortDir || y.da - x.da; });
+    $('#nRes').textContent = `${rows.length} Ergebnisse`;
+    const s = stats(rows);
+    const pb = s.n ? s.bull / s.n * 100 : 0, pr = s.n ? s.bear / s.n * 100 : 0;
+    const overall = !s.n ? '–' : s.bull > s.bear ? 'Bullish' : s.bear > s.bull ? 'Bearish' : 'Neutral';
+    $('#sumChips').innerHTML = `<span class="chip bull">Bullish: ${fmt(pb)}%</span><span class="chip bear">Bearish: ${fmt(pr)}%</span>${s.neu ? `<span class="chip">Neutral: ${fmt(100 - pb - pr)}%</span>` : ''}<span class="chip ${overall === 'Bullish' ? 'bull' : overall === 'Bearish' ? 'bear' : ''}">Overall Bias: ${overall}</span>`;
+    $('#tblInfo').textContent = a === 'ALL' ? 'Alle Assets' : a;
+    $('#tbl tbody').innerHTML = rows.length ? rows.map(m => `<tr>
+      <td class="b">${esc(m.basis)}<small>${esc(M_LABEL(m.basis))}</small></td><td>${swatch(m.asset)} ${m.asset}</td><td>${m.h}d</td>
+      <td><b>${fmt(m.da)}%</b></td><td class="dim">${fmt(m.da1)} / ${fmt(m.da2)}</td><td class="dim">${fmt(m.naive)}%</td>
+      <td><span class="tier ${m.tier}" title="${m.tier === 'A' ? 'Signifikant: p&lt;0,05, ≥2 Pkt. besser als naiv' : 'Robust: in beiden Hälften ≥50,5 %, ≥1 Pkt. besser als naiv'}">${m.tier === 'A' ? 'SIGNIF.' : 'ROBUST'}</span></td>
+      <td>${fmt(m.prob * 100)}%</td><td><span class="tag ${PRED[m.pred]}"><span class="${PRED[m.pred]}">${m.pred}</span></span></td><td class="dim">${m.date}</td></tr>`).join('')
+      : `<tr><td colspan="10" class="dim" style="text-align:center;padding:28px">Keine Modelle in diesem Fenster. Breite erhöhen oder anderes Asset wählen.</td></tr>`;
+    document.querySelectorAll('#tbl th').forEach(th => th.dataset.k === sortK ? th.setAttribute('aria-sort', sortDir < 0 ? 'descending' : 'ascending') : th.removeAttribute('aria-sort'));
+  }
+  ['#fAsset', '#fH', '#fW', '#fTier'].forEach(s => $(s).addEventListener('input', drawTable));
+  document.querySelector('#tbl thead').addEventListener('click', e => {
+    const th = e.target.closest('th'); if (!th) return;
+    if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = ['basis', 'asset', 'tier', 'pred'].includes(sortK) ? 1 : -1; }
+    drawTable();
+  });
+
+  // ------------------------------------------------------- Paar-Rechner
+  const pairOpts = ASSETS.map(a => `<option value="${a}">${a === 'DXY' ? 'USD (DXY)' : a}</option>`).join('');
+  $('#pBase').innerHTML = pairOpts; $('#pQuote').innerHTML = pairOpts;
+  const pp = store.get('pair', { b: 'DXY', q: 'CHF', k: 'high' });
+  $('#pBase').value = pp.b; $('#pQuote').value = pp.q; $('#pBucket').value = pp.k;
+  function drawPair() {
+    const b = $('#pBase').value, q = $('#pQuote').value, k = $('#pBucket').value; store.set('pair', { b, q, k });
+    const [lo, hi] = RANGE[k];
+    const sb = stats(M.filter(m => m.asset === b && inRange(m, lo, hi))), sq = stats(M.filter(m => m.asset === q && inRange(m, lo, hi)));
+    const nm = a => a === 'DXY' ? 'USD' : a;
+    if (b === q) { $('#pairOut').innerHTML = '<span class="dim">Basis und Quote müssen verschieden sein.</span>'; return; }
+    if (sb.lr == null || sq.lr == null) { $('#pairOut').innerHTML = `<span class="dim">Für ${sb.lr == null ? nm(b) : nm(q)} gibt es in diesem Horizont keine bullischen oder bearishen Modelle.</span>`; return; }
+    const sc = sb.lr - sq.lr, dir = sc > 15 ? 'BULLISH' : sc < -15 ? 'BEARISH' : 'NEUTRAL';
+    const cls = dir === 'BULLISH' ? 'bull' : dir === 'BEARISH' ? 'bear' : 'neu';
+    $('#pairOut').innerHTML = `<div><div class="eyebrow">${nm(b)}/${nm(q)}</div><div class="big ${cls}">${sc > 0 ? '+' : ''}${Math.round(sc)}</div></div>
+      <div><div class="verdict ${cls}">${dir}</div><div class="dim" style="font:500 12px var(--mono)">${nm(b)} ${Math.round(sb.lr)}% Long (${sb.bull + sb.bear} Mod.) · ${nm(q)} ${Math.round(sq.lr)}% Long (${sq.bull + sq.bear} Mod.)</div></div>`;
+  }
+  ['#pBase', '#pQuote', '#pBucket'].forEach(s => $(s).addEventListener('input', drawPair));
+
+  // --------------------------------------------------- Realitäts-Check
+  function drawRC() {
+    const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN;
+    let h = '<thead><tr><th>Asset</th><th>Kandidaten</th><th>Ø DA echt</th><th>Ø DA Zufall</th><th>Bestanden echt</th><th>Bestanden Zufall</th><th>Signal-Qualität</th></tr></thead><tbody>';
+    for (const a of ASSETS) {
+      const c = D.candidates[a]; if (!c) continue;
+      const pr = c.n ? (c.A + c.B) / c.n * 100 : 0, pn = c.noise_n ? (c.noise_A + c.noise_B) / c.noise_n * 100 : 0;
+      const ratio = pr / Math.max(pn, 0.5);
+      const q = pr < 3 ? ['lo', 'zu wenig Modelle'] : ratio >= 2 ? ['hi', 'klar über Zufall'] : ratio >= 1.3 ? ['mid', 'leicht über Zufall'] : ['lo', 'nicht besser als Zufall'];
+      h += `<tr><td>${swatch(a)} ${a}</td><td>${c.n}</td><td>${fmt(mean(c.da))}%</td><td class="dim">${fmt(mean(c.noise_da))}%</td><td>${fmt(pr)}%</td><td class="dim">${fmt(pn)}%</td><td><span class="q ${q[0]}">${q[1]}</span></td></tr>`;
+    }
+    $('#rc').innerHTML = h + '</tbody>';
+  }
+
+  // -------------------------------------------------------- Bias-Verlauf
+  const hAssets = ASSETS.filter(a => D.history[a]);
+  $('#hAsset').innerHTML = hAssets.map(a => `<option>${a}</option>`).join('');
+  $('#hAsset').value = store.get('hAsset', hAssets.includes('CHF') ? 'CHF' : hAssets[0]);
+  const HW = 1200, HH = 330, HL = 56, HR = 16, top1 = 12, h1 = 150, top2 = 196, h2 = 104;
+  let hState = null;
+  function drawHist() {
+    const a = $('#hAsset').value; store.set('hAsset', a);
+    const H = D.history[a]; if (!H) { $('#hist').innerHTML = ''; return; }
+    const n = H.d.length, xs = i => HL + i / (n - 1) * (HW - HL - HR);
+    const y1 = v => top1 + (100 - v) / 100 * h1;
+    const pmin = Math.min(...H.px), pmax = Math.max(...H.px), pad = (pmax - pmin) * 0.06 || 1;
+    const y2 = v => top2 + (pmax + pad - v) / (pmax - pmin + 2 * pad) * h2;
+    const col = COL(a);
+    let g = '';
+    for (const v of [0, 25, 50, 75, 100]) {
+      g += `<line x1="${HL}" x2="${HW - HR}" y1="${y1(v)}" y2="${y1(v)}" stroke="${v === 50 ? 'var(--line-2)' : 'var(--line)'}" ${v === 50 ? 'stroke-dasharray="4 4"' : ''}/>`;
+      g += `<text x="${HL - 8}" y="${y1(v) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${v}%</text>`;
+    }
+    // Fläche oberhalb/unterhalb 50 %
+    const up = H.bull.map((v, i) => `${xs(i)},${y1(Math.max(v, 50))}`).join(' '), dn = H.bull.map((v, i) => `${xs(i)},${y1(Math.min(v, 50))}`).join(' ');
+    g += `<polygon points="${xs(0)},${y1(50)} ${up} ${xs(n - 1)},${y1(50)}" fill="var(--bull-bg-2)"/>`;
+    g += `<polygon points="${xs(0)},${y1(50)} ${dn} ${xs(n - 1)},${y1(50)}" fill="var(--bear-bg-2)"/>`;
+    g += `<polyline points="${H.bull.map((v, i) => `${xs(i)},${y1(v)}`).join(' ')}" fill="none" stroke="var(--fg-2)" stroke-width="1.2" stroke-linejoin="round"/>`;
+    g += `<text x="${HL}" y="${top1 - 1}" font-size="11" fill="var(--muted)" dy="-1"></text>`;
+    // Kurs
+    const ticks = 4;
+    for (let i = 0; i <= ticks; i++) {
+      const v = pmin + (pmax - pmin) * i / ticks;
+      g += `<line x1="${HL}" x2="${HW - HR}" y1="${y2(v)}" y2="${y2(v)}" stroke="var(--line)"/>`;
+      g += `<text x="${HL - 8}" y="${y2(v) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${v < 10 ? fmt(v, v < 0.1 ? 4 : 3) : fmt(v, 1)}</text>`;
+    }
+    g += `<polyline points="${H.px.map((v, i) => `${xs(i)},${y2(v)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+    g += `<circle cx="${xs(n - 1)}" cy="${y2(H.px[n - 1])}" r="4" fill="${col}" stroke="var(--panel)" stroke-width="2"/>`;
+    // Jahres-Achse
+    let lastY = '';
+    H.d.forEach((d, i) => { const y = d.slice(0, 4); if (y !== lastY && d.slice(5, 7) === '01' || (i === 0)) { if (y !== lastY) { lastY = y; if (+y % 2 === 0 || n < 300) g += `<text x="${xs(i)}" y="${HH - 6}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--fg-2)">${y}</text><line x1="${xs(i)}" x2="${xs(i)}" y1="${top2 + h2}" y2="${top2 + h2 + 5}" stroke="var(--line-2)"/>`; } } });
+    g += `<text x="${HL + 6}" y="${top1 + 13}" font-size="11" font-weight="600" fill="var(--fg-2)">Anteil bullischer Modelle</text>`;
+    g += `<text x="${HL + 6}" y="${top2 + 13}" font-size="11" font-weight="600" fill="var(--fg-2)">Kurs ${a === 'DXY' ? 'Dollar-Index' : a + ' in USD'}</text>`;
+    g += `<g id="hHi"></g>`;
+    $('#hist').innerHTML = g;
+    hState = { H, xs, y1, y2, n, a };
+  }
+  function hHover(ev) {
+    if (!hState) return;
+    const svg = $('#hist'), r = svg.getBoundingClientRect(), k = HW / r.width;
+    const x = (ev.clientX - r.left) * k; const { H, xs, y1, y2, n, a } = hState;
+    if (x < HL || x > HW - HR) { $('#hTip').hidden = true; $('#hHi').innerHTML = ''; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - HL) / (HW - HL - HR) * (n - 1))));
+    $('#hHi').innerHTML = `<line x1="${xs(i)}" x2="${xs(i)}" y1="${top1}" y2="${top2 + h2}" stroke="var(--fg-2)" stroke-width="1"/><circle cx="${xs(i)}" cy="${y1(H.bull[i])}" r="4" fill="var(--fg)" stroke="var(--panel)" stroke-width="2"/><circle cx="${xs(i)}" cy="${y2(H.px[i])}" r="4" fill="${COL(a)}" stroke="var(--panel)" stroke-width="2"/>`;
+    const tip = $('#hTip');
+    tip.innerHTML = `<div class="t">${H.d[i]}</div><div class="r"><span>Bullische Modelle</span><b>${fmt(H.bull[i])}%</b></div><div class="r"><span>Kurs</span><b>${fmt(H.px[i], H.px[i] < 10 ? 4 : 2)}</b></div>`;
+    placeTip(tip, $('#histBox'), xs(i) / k, y1(H.bull[i]) / k);
+  }
+  $('#hist').addEventListener('pointermove', hHover); $('#hist').addEventListener('pointerdown', hHover);
+  $('#hist').addEventListener('pointerleave', () => { $('#hTip').hidden = true; const h = $('#hHi'); if (h) h.innerHTML = ''; });
+  $('#hAsset').addEventListener('input', drawHist);
+
+  // ------------------------------------------------------------ Kacheln
+  const fmtL = (id, v) => id === 'ICSA' ? fmt(v / 1000, 0) + 'k' : id === 'PAYEMS' ? (v > 0 ? '+' : '') + fmt(v, 0) + 'k' : id === 'BOPGSTB' ? fmt(v, 1) + ' Mrd' : id === 'UMCSENT' ? fmt(v, 1) : fmt(v, 2) + '%';
+  $('#macroTiles').innerHTML = Object.entries(D.latest).map(([id, o]) => `<div class="tile" title="${esc(M_LABEL(id))}"><div class="k">${esc(id)}</div><div class="v">${fmtL(id, o.v)}</div><div class="d">${esc(M_LABEL(id))} · ${o.d.slice(0, 7)}</div></div>`).join('');
+  $('#milTiles').innerHTML = Object.entries(D.milex).map(([k, o]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${fmt(o.v, 2)}%</div><div class="d">${o.y} · 5J ${o.chg > 0 ? '▲ +' : o.chg < 0 ? '▼ ' : '± '}${fmt(o.chg, 2)} Pkt.</div></div>`).join('');
+
+  $('#method').innerHTML = `
+    <div><b>Modelle.</b> Ein Modell ist die Kombination aus Basis-Indikator, Währung und Horizont (10–90 Tage in 5er-Schritten). Es ist jeweils eine logistische Regression auf drei Merkmale der Basis: Niveau, Veränderung über 3 Monate und Veränderung über 12 Monate. Bei Länder-Basen („…-Diff“) wird die Differenz zwischen dem Land und den USA verwendet. Insgesamt laufen ${Object.values(D.candidates).reduce((s, c) => s + c.n, 0)} Kandidaten durch die Tests, angezeigt werden maximal 50 je Währung.</div>
+    <div><b>Ohne Blick in die Zukunft.</b> Makrodaten fließen erst ab ihrem geschätzten Veröffentlichungstag ein. Die Modelle werden alle 26 Wochen neu trainiert, und zwar nur mit Fällen, deren Ergebnis zu diesem Zeitpunkt schon feststand. Die DA ist komplett out-of-sample (ab 2008, wöchentliche Stichproben).</div>
+    <div><b>Gegen Glückstreffer.</b> <span class="tier A">SIGNIF.</span> heißt: DA ≥ 53 %, in beiden Zeithälften ≥ 51 %, mindestens 2 Punkte besser als die naive Regel und p &lt; 0,05 im Binomialtest. Die Stichprobe wird dabei um überlappende Zeitfenster bereinigt. <span class="tier">ROBUST</span> heißt: DA ≥ 52 %, in beiden Hälften ≥ 50,5 % und mindestens 1 Punkt besser als naiv. Zusätzlich vergleicht der Realitäts-Check jede Währung mit Zufallsmodellen.</div>
+    <div><b>Daten.</b> FRED (Fed St. Louis, inkl. OECD-Reihen), BIS (Leitzinsen, Inflation), EZB (Euro-Renditen, Euribor, Arbeitslosigkeit) und SIPRI (Militärausgaben). Die Wechselkurse stammen aus dem H.10-Bericht der Fed und erscheinen mit rund einer Woche Verzug. Der DXY wird aus diesen Kursen mit der offiziellen ICE-Formel berechnet. 2J-US-Rendite und 3M-Geldmarktsätze dienen als frei verfügbarer Ersatz für OIS-Kurven.</div>
+    <div><b>Einordnung.</b> Makrodaten erklären Wechselkurse nur zu einem kleinen Teil. Im Schnitt liegen alle Kandidaten nahe 50 %. Der Nutzen entsteht durch die Bündelung vieler kleiner Vorteile zu einem übergeordneten Bias. Keine Anlageberatung.</div>`;
+
+  drawHeatmap(); drawScatter(); drawLeader(); drawTable(); drawPair(); drawRC(); drawHist();
+})();
+</script>
