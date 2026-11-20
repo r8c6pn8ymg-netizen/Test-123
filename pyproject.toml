@@ -35,5 +35,6 @@ addopts = "-ra --strict-markers"
 markers = [
     "regression: Abgleich mit TradingView-Exporten bzw. gespeicherten Ergebnissen",
     "pine: statische Prüfung der Pine-Script-Indikatoren",
+    "analysis: Schnelltests der Analyse-Skripte (laufen im Testordner, vergleichen mit gespeicherten Ergebnissen)",
     "slow: dauert länger als ein paar Sekunden",
 ]

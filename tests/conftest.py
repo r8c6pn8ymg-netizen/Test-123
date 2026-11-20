@@ -8,19 +8,24 @@ doppelt installiert werden. In CI/venv (pandas direkt verfügbar) passiert nicht
 
 from __future__ import annotations
 
+import json
+import shutil
+import subprocess
 import sys
-import sysconfig
 from pathlib import Path
 
 try:
     import pandas  # noqa: F401
 except ModuleNotFoundError:
-    ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
-    for base in (sysconfig.get_config_var("prefix"), "/usr/local", "/usr"):
-        cand = Path(base) / "lib" / ver / "site-packages"
-        if (cand / "pandas").is_dir():
-            sys.path.append(str(cand))
-            break
+    # Suchpfade des System-Pythons übernehmen (nur bei gleicher Version, sonst passen die Pakete nicht)
+    exe = shutil.which(f"python{sys.version_info.major}.{sys.version_info.minor}") or shutil.which("python3")
+    if exe:
+        probe = "import json, sys; print(json.dumps([sys.version_info[:2], sys.path]))"
+        res = subprocess.run([exe, "-c", probe], capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            ver, paths = json.loads(res.stdout)
+            if tuple(ver) == sys.version_info[:2]:
+                sys.path.extend(p for p in paths if p and p not in sys.path)
 
 import pandas as pd
 import pytest
