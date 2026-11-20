@@ -358,3 +358,14 @@ def test_kalibrierung_aendert_richtung_nicht_und_ist_nicht_schlechter(mode):
         assert 0 < m["prob"] < 1
         if abs(m["prob_raw"] - 0.5) > 0.002:
             assert (m["prob"] > 0.5) == (m["prob_raw"] > 0.5), m
+
+
+def test_cockpit_ohne_javascript_fehler():
+    """Die Seite muss in allen Reitern ohne JavaScript-Fehler laden (z. B. doppelt deklarierte Variable)."""
+    import shutil
+    import subprocess
+    root = Path(__file__).resolve().parents[1] / "makro_ml"
+    if not shutil.which("node") or not (root / "output" / "data_alfred.json").exists():
+        pytest.skip("node oder Pipeline-Ausgabe fehlt")
+    r = subprocess.run(["node", "pruefe_cockpit.js"], cwd=root, capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr

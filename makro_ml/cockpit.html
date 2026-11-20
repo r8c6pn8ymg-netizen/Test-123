@@ -610,11 +610,11 @@ window.renderFactors = async function () {
     // Rangliste + Positionen nach Auswahl
     const ranked = [...F.ranking].map(r => ({ ...r, sc: selScore(r) })).sort((x, y) => y.sc - x.sc);
     // Gleiche Regel wie im Backtest: gleichauf an der Grenze -> beide drin (teilen sich den Platz), nie long und short zugleich
-    const eps = 1e-9, n = F.n_ls, tL = ranked[n - 1].sc, tS = ranked[ranked.length - n].sc;
+    const eps = 1e-9, nLS = F.n_ls, tL = ranked[nLS - 1].sc, tS = ranked[ranked.length - nLS].sc;
     let longs = ranked.filter(r => r.sc > tL - eps).map(r => r.cur), shorts = ranked.filter(r => r.sc < tS + eps).map(r => r.cur);
     const both = longs.filter(c => shorts.includes(c));
     longs = longs.filter(c => !both.includes(c)); shorts = shorts.filter(c => !both.includes(c));
-    const tieNote = (longs.length > n || shorts.length > n || both.length) ? ' · gleichauf an der Grenze, Platz geteilt' : '';
+    const tieNote = (longs.length > nLS || shorts.length > nLS || both.length) ? ' · gleichauf an der Grenze, Platz geteilt' : '';
     $('#fStamp').textContent = `Long ${longs.join(', ')} · Short ${shorts.join(', ')}${tieNote}`;
     $('#fRankEyebrow').textContent = `Score = Mittel von ${NAMEOF(fsel)}`;
     const zb = v => { const w = Math.min(Math.abs(v) / 1.6, 1) * 50; return `<span class="zbar"><i style="${v >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${v >= 0 ? 'var(--bull)' : 'var(--bear)'}"></i></span>`; };
