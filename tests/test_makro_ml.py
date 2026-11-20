@@ -211,3 +211,11 @@ def test_termine_notenbanken_vollstaendig_und_sortiert():
     assert any(e["ccy"] == "AUD" and e["date"] == "2026-12-08" and e["time"] == "04:30" for e in cb)  # 14:30 Sydney
     assert any(e["ccy"] == "USD" and e["time"] == "20:00" for e in cb)                                 # 14:00 New York
     assert len(out["next_cb"]) == 8
+
+
+def test_termine_geschuetzte_leerzeichen():
+    """&nbsp; zwischen Monat und Tag (kommt bei BoE/BoC vor) darf Termine nicht verschlucken."""
+    from datetime import date
+    t = _termine()
+    bea = t.parse_bea("November&nbsp;25 8:30&nbsp;AM N ews Personal Income and Outlays, October 2026 View", date(2026, 11, 20))
+    assert bea == [(date(2026, 11, 25), "Personal Income and Outlays, October 2026")]

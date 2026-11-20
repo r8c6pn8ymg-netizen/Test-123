@@ -123,7 +123,8 @@ _ROW = re.compile(
 
 def _text(raw: str) -> str:
     raw = re.sub(r"<(script|style).*?</\1>", "", raw, flags=re.S)
-    return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)))
+    # geschuetzte Leerzeichen (&nbsp;) wie normale behandeln, sonst passen Datumsmuster nicht
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw)).replace("\xa0", " "))
 
 
 def _fetch(name: str, url: str, must: str) -> str:
