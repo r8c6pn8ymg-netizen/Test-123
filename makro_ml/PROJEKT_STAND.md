@@ -33,8 +33,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Die DA in der Tabelle ist also geschönt, das steht jetzt im Cockpit. Signifikant im Schlusstest nur **AUD** (t-Test p ≈ 0,004,
   nach Bonferroni für 8 Währungen ≈ 0,03). Ensemble JPY nicht mehr signifikant (p ≈ 0,11, vorher 0,04). Nach FDR kein Einzelmodell.
 - **ALFRED vs. FRED:** PAYEMS und Handelsbilanz sahen mit korrigierten Daten geschönt aus; Kernaussagen gleich. Standardansicht = ALFRED.
-- **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten):** Kombi Sharpe 0,51 (p < 0,001), Carry 0,52, Value 0,18, Momentum 0,10.
-  Seit 2015: Kombi −0,17, **Carry +0,23** (einziger positiver Faktor). Realistische Erwartung: Median aller Einstellungen, seit 2000 ≈ 0,19.
+- **Faktor-Portfolio 1977–2026 (nach 5 Bp Kosten, Gleichstände geteilt):** Kombi Sharpe 0,54 (p < 0,001), Carry 0,51, Value 0,18,
+  Momentum 0,10. Vor 2000 Kombi 0,84, seit 2000 0,25, ab 2022 −0,39. Seit 2015: Kombi −0,14, Carry +0,17.
+  Realistische Erwartung: Median aller Einstellungen seit 2000 ≈ 0,19.
   Ab ~20 Bp Kosten ist der Vorteil seit 2000 weg. Walk-Forward-Umgewichtung („Adaptiv“) ist schlechter als fest.
 - **CFTC:** als Gegensignal nicht belegt (1990–2014 Verlust), nur als Warnhinweis bei Extremen.
 - **Konsens/Ampel:** bringt keinen belastbaren Zusatznutzen (wenige Trades, nach Mehrfachtest-Korrektur nicht signifikant) → bewusst **nicht** gebaut.
@@ -42,8 +43,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Kern-PCE (Ø DA 51,5 %, ähnlich gut wie Kern-CPI und weitgehend dieselbe Information), realer Einzelhandel und Erzeugerpreise
   (≈ 49 %, kein Vorteil, werden vom Filter fast nie ausgewählt). Gesamtbild unverändert, nach FDR weiterhin kein Einzelmodell.
   PMIs und Konsensprognosen sind kostenpflichtig; TradingView-/Investing-Kalender haben keine offene Schnittstelle.
-- **Gesamtprüfung 20.11.:** Unabhängige Nachrechnung Carry (eigener Code): Sharpe 0,51 vs. Cockpit 0,52; Newey-West mit statsmodels
-  t = 3,51 vs. 3,52. Behoben: Absturz am Monatsletzten (ALFRED-Datenstand doppelt), laufender Monat zählte im Faktor-Backtest als voller
+- **Gesamtprüfung 20.11.:** Unabhängige Nachrechnung Carry (eigener Code): Sharpe 0,51 vs. Cockpit 0,51, seit 2000 0,32 vs. 0,33; Newey-West mit
+  statsmodels t = 3,71 vs. 3,71. Gefunden: Bei gleichen Werten an der Grenze entschied die Spaltenreihenfolge zufällig
+  (z. B. Mai 2016 CAD statt GBP vor dem Brexit); jetzt teilen sich gleichauf liegende Währungen den Platz. Behoben: Absturz am Monatsletzten (ALFRED-Datenstand doppelt), laufender Monat zählte im Faktor-Backtest als voller
   Monat (jetzt 598 statt 599 Monate, Ergebnis unverändert), NaN in JSON, heutige US-Termine morgens als „fehlt“ markiert.
 - **Prüfung 20.11. (Termine + Zinscapital-Abgleich):** FRED-Kalender hat teils Einstellzeiten und Doppel-Einträge
   (Industrieproduktion/Baubeginne 24./25.11.), deshalb offizielle Kalender. Marktwerte gegen PDF: US-Renditen, VIX, SOFR, HY-OAS

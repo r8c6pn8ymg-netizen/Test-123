@@ -295,3 +295,17 @@ def test_werte_fuer_bestimmten_zeitraum():
     get = lambda sid: pd.Series(np.arange(len(widx), dtype=float) * 1000 + 200000, index=widx)
     v = t.latest_values([("Anträge", "ICSA", "k_persons")], get, upto=pd.Timestamp("2026-11-14"))
     assert v[0]["period"] == "Woche bis 14.11." and v[0]["prev_period"] == "Woche bis 07.11."
+
+
+def test_faktor_gleichstand_wird_geteilt():
+    """Gleiche Werte an der Grenze: kein zufaelliger Gewinner, sondern geteilter Platz; Summe long = 1, short = -1."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import factors
+    sc = pd.DataFrame([[0.0, -0.375, -0.325, 0.125, -1.125, 0.125, 1.375, 1.875]],
+                      columns=["USD", "EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD"], index=[pd.Timestamp("2016-05-31")])
+    w = factors.ls_weights(sc).iloc[0]
+    assert abs(w["GBP"] - 1 / 6) < 1e-12 and abs(w["CAD"] - 1 / 6) < 1e-12
+    assert abs(w[w > 0].sum() - 1) < 1e-12 and abs(w[w < 0].sum() + 1) < 1e-12
+    # Spaltenreihenfolge darf nichts mehr aendern
+    w2 = factors.ls_weights(sc[sc.columns[::-1]]).iloc[0]
+    assert (w2.reindex(w.index) - w).abs().max() < 1e-12

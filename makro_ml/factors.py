@@ -63,9 +63,13 @@ def ls_weights(score: pd.DataFrame) -> pd.DataFrame:
         if len(row) < 2 * N_LS:
             w.loc[t] = np.nan
             continue
-        s = row.sort_values()
-        w.loc[t, s.index[-N_LS:]] = 1 / N_LS
-        w.loc[t, s.index[:N_LS]] = -1 / N_LS
+        # Gleichstand an der Grenze (z. B. GBP und CAD mit derselben Zinsdifferenz): die gleichauf liegenden
+        # Waehrungen teilen sich die freien Plaetze. Vorher entschied die Spaltenreihenfolge zufaellig.
+        for sign, side in ((1, row), (-1, -row)):
+            thr = side.sort_values().iloc[-N_LS]
+            above, tied = side[side > thr].index, side[side == thr].index
+            w.loc[t, above] = sign / N_LS
+            w.loc[t, tied] = sign * (N_LS - len(above)) / (N_LS * len(tied))
     return w
 
 
