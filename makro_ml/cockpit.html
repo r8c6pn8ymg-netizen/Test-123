@@ -154,6 +154,25 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 .pctbar i { position: absolute; top: -3px; width: 3px; height: 14px; border-radius: 2px; background: var(--fg); }
 .pos { color: var(--bull); } .negv { color: var(--bear); }
 .view { display: grid; gap: 14px; min-width: 0; }
+.cbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.cbc { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel-2); }
+.cbc.soon { border-color: var(--warn); }
+.cbh { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--fg-2); }
+.cbd { font: 600 14px var(--mono); margin-top: 4px; }
+
+.cbt { display: block; font-weight: 500; color: var(--fg-2); }
+.cbs { font-size: 12px; color: var(--muted); }
+.tag { font: 700 12px var(--mono); }
+.tday { margin-bottom: 14px; }
+.tday.past { opacity: .5; }
+.tdh { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.tday.now .tdh { color: var(--accent); }
+.trow { display: grid; grid-template-columns: 52px 40px 1fr auto; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+.trow.cb .ttl { font-weight: 600; color: var(--warn); }
+.tt { font: 13px var(--mono); color: var(--fg-2); }
+.ttl { min-width: 0; }
+.tn { display: block; font-size: 11.5px; color: var(--muted); }
+.imp { font-size: 9px; letter-spacing: 1px; color: var(--accent); white-space: nowrap; }
 .view[hidden] { display: none !important; }
 .fcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .fcard { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
@@ -179,6 +198,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <button type="button" data-m="fred" aria-pressed="false" title="Makro ML mit heutigen, korrigierten Makrozahlen">Makro ML · FRED</button>
         <button type="button" data-m="alfred" aria-pressed="false" title="Makro ML mit Makrozahlen, wie sie am jeweiligen Tag veröffentlicht waren">Makro ML · ALFRED</button>
         <button type="button" data-m="faktoren" aria-pressed="false" title="Carry, Value, Momentum: Rangliste der 8 Währungen">Faktor-Portfolio</button>
+        <button type="button" data-m="termine" aria-pressed="false" title="US-Datentermine und Zinsentscheide der 8 Notenbanken">Termine</button>
       </div>
       <div class="stamp" id="stamp"><span class="pill">Lade Daten …</span></div>
     </div>
@@ -404,7 +424,67 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
   </div>
 </div>
 
+<div id="termView" class="view" hidden>
+    <section class="panel">
+      <div class="ph"><span>Nächste Zinsentscheide · alle 8 Notenbanken</span><span class="eyebrow">Zeiten in deutscher Zeit</span></div>
+      <div class="pb"><div class="cbgrid" id="tNext"></div></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span>Termine der Woche · diese und nächste Woche</span><span class="eyebrow" id="tRange"></span></div>
+      <div class="pb">
+        <div class="seg" id="tImp" role="group" aria-label="Wichtigkeit" style="margin-bottom:12px">
+          <button type="button" data-i="3" aria-pressed="false">Nur wichtig</button>
+          <button type="button" data-i="2" aria-pressed="true">Wichtig + mittel</button>
+          <button type="button" data-i="1" aria-pressed="false">Alle</button>
+        </div>
+        <div id="tList"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span>Woher die Termine kommen</span></div>
+      <div class="pb note" style="max-width:none;display:grid;gap:8px" id="tNote"></div>
+    </section>
+  </div>
+
 <script>
+window.renderTermine = async function () {
+  const $ = s => document.querySelector(s);
+  const T = await (await fetch('termine.json', { cache: 'no-store' })).json();
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const DAY = d => new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  const SHORT = d => new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+  const DOTS = i => '<span class="imp" title="Wichtigkeit ' + i + ' von 3">' + '●'.repeat(i) + '<span style="opacity:.25">' + '●'.repeat(3 - i) + '</span></span>';
+  $('#stamp').innerHTML = `${window.freshPill(T.generated)}<span class="pill">Notenbank-Liste Stand ${T.list_as_of.split('-').reverse().join('.')}</span>`;
+  $('#tRange').textContent = `${SHORT(T.week_start)} – ${SHORT(T.week_end)}`;
+  $('#tNext').innerHTML = T.next_cb.map(c => {
+    const days = Math.round((new Date(c.date) - new Date(today)) / 864e5);
+    const soon = days <= 7;
+    return `<div class="cbc${soon ? ' soon' : ''}"><div class="cbh"><span class="tag" style="color:var(--c-${c.ccy === 'USD' ? 'DXY' : c.ccy})">${c.ccy}</span><span>${esc(c.bank)}</span></div>
+      <div class="cbd">${SHORT(c.date)}<span class="cbt">${c.time ? c.time + ' Uhr' : ''}</span></div>
+      <div class="cbs">${days <= 0 ? 'heute' : days === 1 ? 'morgen' : 'in ' + days + ' Tagen'}${c.time ? '' : ' · Uhrzeit offen'}</div></div>`;
+  }).join('');
+  let MIN = 2;
+  const draw = () => {
+    const ev = T.events.filter(e => e.imp >= MIN);
+    if (!ev.length) { $('#tList').innerHTML = '<div class="note">Keine Termine in diesem Zeitraum.</div>'; return; }
+    const by = {};
+    ev.forEach(e => (by[e.date] = by[e.date] || []).push(e));
+    $('#tList').innerHTML = Object.keys(by).sort().map(d => `<div class="tday${d < today ? ' past' : ''}${d === today ? ' now' : ''}">
+      <div class="tdh">${DAY(d)}${d === today ? ' · heute' : d < today ? ' · vorbei' : ''}</div>
+      ${by[d].map(e => `<div class="trow${e.kind === 'cb' ? ' cb' : ''}"><span class="tt">${e.time || '—'}</span><span class="tag" style="color:var(--c-${e.ccy === 'USD' ? 'DXY' : e.ccy})">${e.ccy}</span><span class="ttl">${esc(e.title)}${e.note ? `<span class="tn">${esc(e.note)}</span>` : ''}</span>${DOTS(e.imp)}</div>`).join('')}
+    </div>`).join('');
+  };
+  document.querySelectorAll('#tImp button').forEach(b => b.addEventListener('click', () => {
+    MIN = +b.dataset.i; document.querySelectorAll('#tImp button').forEach(x => x.setAttribute('aria-pressed', x === b)); draw();
+  }));
+  draw();
+  $('#tNote').innerHTML = `${T.warnings.map(w => `<div class="err" style="padding:8px 10px;border-radius:8px">${esc(w)}</div>`).join('')}
+    <div><b>US-Daten:</b> offizieller Veröffentlichungskalender der Fed St. Louis (FRED), jeden Morgen neu geladen. Die Zeiten dort sind US-Ortszeit und hier in deutsche Zeit umgerechnet (14:30 Uhr = 8:30 Uhr New York).</div>
+    <div><b>Zinsentscheide:</b> von den offiziellen Seiten der acht Notenbanken übernommen (Stand ${T.list_as_of.split('-').reverse().join('.')}). Die Seite der RBNZ blockt automatische Abrufe, ihre Termine stammen aus deren veröffentlichter Terminliste (über eine Websuche). Die Bank of Japan nennt keine feste Uhrzeit.</div>
+    <div><b>Nicht enthalten:</b> Prognosen bzw. Konsensschätzungen und Datentermine anderer Länder (z. B. Inflation in Großbritannien oder Australien). Dafür gibt es keine kostenlose, erlaubte Schnittstelle. Die schaust du weiter in TradingView nach.</div>`;
+};
+
 // Aktualitaets-Anzeige: taegliche Aktualisierung laeuft Mo–Fr um 07:47 Uhr (deutsche Zeit)
 window.freshPill = function (gen) {
   if (!gen) return '';
@@ -632,11 +712,18 @@ window.renderFactors = async function () {
   let D;
   let MODE = 'alfred';  // Standard: strengere Echtzeit-Variante
   try { MODE = localStorage.getItem('mlc_mode') || 'alfred'; } catch (e) {}
-  if (['#alfred', '#fred', '#faktoren'].includes(location.hash)) MODE = location.hash.slice(1);
+  if (['#alfred', '#fred', '#faktoren', '#termine'].includes(location.hash)) MODE = location.hash.slice(1);
   document.querySelectorAll('#modeSeg button').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.m === MODE);
     b.addEventListener('click', () => { if (b.dataset.m === MODE) return; try { localStorage.setItem('mlc_mode', b.dataset.m); } catch (e) {} location.hash = b.dataset.m; location.reload(); });
   });
+  if (MODE === 'termine') {
+    $('#macroView').hidden = true; $('#termView').hidden = false;
+    document.querySelector('.brand .sub').textContent = 'US-Datentermine · Zinsentscheide der 8 Notenbanken';
+    try { await window.renderTermine(); }
+    catch (e) { $('#termView').innerHTML = '<div class="panel err">Die Termine (termine.json) konnten nicht geladen werden. Bitte die Seite neu laden.</div>'; console.error(e); }
+    return;
+  }
   if (MODE === 'faktoren') {
     $('#macroView').hidden = true; $('#factorView').hidden = false;
     document.querySelector('.brand .sub').textContent = 'Carry · Value · Momentum · 8 Währungen';

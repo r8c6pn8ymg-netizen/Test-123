@@ -512,6 +512,12 @@ def main(refresh: bool = True):
         print("Faktor-Portfolio: Long", fo["longs"], "Short", fo["shorts"])
     except Exception as e:  # darf das Makro-Cockpit nicht blockieren
         print(f"  ! Faktor-Portfolio fehlgeschlagen: {e}", file=sys.stderr)
+    # Termine der Woche (US-Daten aus dem FRED-Kalender, Zinsentscheide der 8 Notenbanken)
+    try:
+        import termine
+        termine.main()
+    except Exception as e:
+        print(f"  ! Termine fehlgeschlagen: {e}", file=sys.stderr)
     print("Vergleich FRED vs. ALFRED (Ø DA aller Kandidaten | bestanden | Ø DA Schlusstest):")
     for c in comp:
         print(f"  {c['basis']:9s} FRED {c['da_fred']:5.1f} | {c['pass_fred']:3d} | {c['post_fred']}   "

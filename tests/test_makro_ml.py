@@ -127,3 +127,36 @@ def test_neue_basen_mit_gemessenen_fristen():
     assert b["PCEPILFE"].lag >= 62 and b["RRSFS"].lag >= 40 and b["PPIACO"].lag >= 40
     for k in ("PCEPILFE", "RRSFS", "PPIACO"):
         assert k in P.ALFRED_SERIES
+
+
+# ---------- Termine der Woche ----------
+def test_termine_fred_parser_und_zeitzone():
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import termine
+    page = ('<span style="font-weight: bold;">Wednesday November 25, 2026</span>'
+            '<td nowrap style="x">7:30 am</td><td text-align="left"><a href="/release?rid=53">Gross Domestic Product</a>'
+            '<td nowrap style="x"></td><td text-align="left"><a href="/release?rid=54">Personal Income and Outlays</a>'
+            '<td nowrap style="x">N/A</td><td text-align="left"><a href="/release?rid=9">Advance Monthly Sales for Retail and Food Services</a>')
+    rows = termine.parse_fred_calendar(page)
+    assert [r["rid"] for r in rows] == [53, 54, 9]
+    assert rows[1]["t"] == rows[0]["t"]          # leere Zeit = wie Zeile davor
+    assert rows[2]["t"] is None                  # N/A = ohne Uhrzeit
+    t = termine.build(today=__import__("datetime").date(2026, 11, 23), fred_rows=rows)
+    gdp = next(e for e in t["events"] if "BIP" in e["title"])
+    assert gdp["time"] == "14:30"                # 7:30 Central = 14:30 Berlin (Winterzeit)
+
+
+def test_termine_notenbanken_vollstaendig_und_sortiert():
+    import sys
+    from datetime import date
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "makro_ml"))
+    import termine
+    assert {c[0] for c in termine.CENTRAL_BANKS} == {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
+    for ccy, bank, *_, dates in termine.CENTRAL_BANKS:
+        assert dates == sorted(dates), bank
+    t = termine.build(today=date(2026, 12, 7), fred_rows=[])
+    cb = [e for e in t["events"] if e["kind"] == "cb"]
+    assert any(e["ccy"] == "AUD" and e["date"] == "2026-12-08" and e["time"] == "04:30" for e in cb)  # 14:30 Sydney
+    assert any(e["ccy"] == "USD" and e["time"] == "20:00" for e in cb)                                 # 14:00 New York
+    assert len(t["next_cb"]) == 8

@@ -16,11 +16,12 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `factors.py` | Faktor-Portfolio Carry/Value/Momentum seit 1977, alle 7 Faktor-Auswahlen, Robustheit |
 | `consensus.py` | Konsens-Test (Makro + Faktor + CFTC, gegen USD und relativ) – nur Forschung, nicht im Cockpit |
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
+| `termine.py` | Termine der Woche: US-Datentermine (FRED-Kalender, täglich) + Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `data_sources.py` | Abruf FRED, ALFRED (ohne Key), BIS, EZB, SIPRI, CFTC; Cache in `cache/` |
-| `cockpit.html` | Oberfläche; lädt `data_fred.json`, `data_alfred.json`, `factors.json` |
+| `cockpit.html` | Oberfläche; lädt `data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json` (4. Reiter „Termine“) |
 | `../tests/test_makro_ml.py` | Selbsttests (Lecks, Fristen, Euro ab 1999, Kosten, Phantom-Monat) |
 
-Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min.), danach Cockpit mit den drei JSON-Dateien veröffentlichen.
+Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min.), danach Cockpit mit den vier JSON-Dateien veröffentlichen.
 Tests: `python3 -m pytest tests/test_makro_ml.py -q`
 
 ## Ergebnisse (nach allen Korrekturen)
@@ -48,6 +49,9 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q`
 4. Ergebnisse ehrlich berichten, auch wenn sie schlechter werden.
 
 ## Offen / mögliche nächste Schritte
+
+- **Notenbank-Termine** in `termine.py` sind abgeschrieben und reichen bis Ende 2027; die Pipeline warnt 60 Tage vorher. RBNZ-Seite blockt Abrufe (403).
+- **Kalender mit Prognosen:** kostenlos und erlaubt gibt es keinen. Günstigste saubere Option: financecalendar.com Starter (9,99 $/Jahr, Prognosen 10 Länder, US-Konsens 12 Reihen). High Yield bewusst weggelassen (FRED nur 3 Jahre).
 
 - Optionsdaten (Risk Reversals) und Konsensprognosen (Überraschungs-Indizes) wären die nächsten Datenquellen, sind aber kostenpflichtig.
 - OECD-Revisionsdatenbank für Länderdaten vor 2018 (optional, geringer Nutzen erwartet).
