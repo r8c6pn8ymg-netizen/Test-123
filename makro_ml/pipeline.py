@@ -39,7 +39,7 @@ warnings.filterwarnings("ignore")
 OUT = Path(__file__).parent / "output"
 OUT.mkdir(exist_ok=True)
 
-HORIZONS = list(range(10, 91, 5))
+HORIZONS = list(range(10, 101, 5)) + [120, 150, 180, 240, 300]
 OOS_START = pd.Timestamp("2008-01-04")
 REFIT_WEEKS = 26
 MIN_TRAIN = 260  # Wochen
@@ -98,6 +98,21 @@ def load_fx(refresh: bool) -> dict[str, pd.Series]:
     return px
 
 
+def pricing(refresh: bool) -> dict[str, pd.Series]:
+    """Eingepreiste Zinsaenderung (Prozentpunkte): Marktrendite minus aktueller Leitzins.
+
+    Frei verfuegbarer Ersatz fuer OIS-Kurven / FedWatch / ECB-Watch mit langer Historie.
+    """
+    dff, dfr = ds.fred("DFF", refresh), ds.fred("ECBDFR", refresh)
+    out = {}
+    for k, y in [("US1", ds.fred("DGS1", refresh)), ("US2", ds.fred("DGS2", refresh))]:
+        out[k] = (y - dff.reindex(y.index, method="ffill")).dropna()
+    for k, key in [("EZ1", "SR_1Y"), ("EZ2", "SR_2Y")]:
+        y = ds.ecb("YC", f"B.U2.EUR.4F.G_N_A.SV_C_YM.{key}", refresh)
+        out[k] = (y - dfr.reindex(y.index, method="ffill")).dropna()
+    return out
+
+
 def us_bases(refresh: bool) -> list[Basis]:
     f = lambda i: ds.fred(i, refresh)
     return [
@@ -113,6 +128,10 @@ def us_bases(refresh: bool) -> list[Basis]:
         Basis("OPHNFB", "US Produktivität je Stunde YoY", yoy(quarterly_to_monthly(f("OPHNFB")), 12), 130, "Wachstum"),
         Basis("UMCSENT", "US Verbraucherstimmung (Michigan)", monthly(f("UMCSENT")), 30, "Stimmung"),
         Basis("BOPGSTB", "US Handelsbilanz (Mrd USD)", monthly(f("BOPGSTB")) / 1000, 65, "Handel"),
+        Basis("FF-PRICED-1Y", "US Zinseinpreisung 12M: 1J-Rendite minus Fed Funds (OIS-Proxy)",
+              (monthly(f("DGS1")) - monthly(f("DFF"))).dropna(), 3, "Zinseinpreisung"),
+        Basis("FF-PRICED-2Y", "US Zinseinpreisung 24M: 2J-Rendite minus Fed Funds (OIS-Proxy)",
+              (monthly(f("DGS2")) - monthly(f("DFF"))).dropna(), 3, "Zinseinpreisung"),
     ]
 
 
@@ -314,6 +333,10 @@ def main(refresh: bool = True):
     for code, (cb, co, sn, _, _) in ASSETS.items():
         cc = country_series(cb, co, sn, sipri, refresh)
         bases_by_asset[code] = list(ub) + diff_bases(cc, us_cc)
+    pr = pricing(refresh)
+    bases_by_asset["EUR"].append(Basis(
+        "ECB-PRICED-Diff", "Zinseinpreisung EZB minus Fed (1J-Rendite minus Leitzins, Differenz)",
+        (monthly(pr["EZ1"]) - monthly(pr["US1"])).dropna(), 3, "Zinseinpreisung"))
 
     tasks, meta_bases = [], {}
     for asset, bases in bases_by_asset.items():
@@ -384,6 +407,13 @@ def main(refresh: bool = True):
     for m in sel:
         m.pop("_hist")
 
+    priced = {}
+    for k, lab in [("US1", "Fed · 12 Monate"), ("US2", "Fed · 24 Monate"), ("EZ1", "EZB · 12 Monate"), ("EZ2", "EZB · 24 Monate")]:
+        s = pr[k].dropna()
+        m1 = s[s.index <= s.index[-1] - pd.Timedelta(days=30)]
+        w = s[s.index >= s.index[-1] - pd.Timedelta(days=365)].resample("W-FRI").last().dropna()
+        priced[k] = dict(label=lab, bp=round(float(s.iloc[-1]) * 100), chg=round(float(s.iloc[-1] - m1.iloc[-1]) * 100),
+                         d=str(s.index[-1].date()), spark=[round(float(v) * 100) for v in w.values])
     latest = {}
     for b in ub:
         s = b.series.dropna()
@@ -400,7 +430,7 @@ def main(refresh: bool = True):
                fx_through=str(min(p.index[-1] for p in px.values()).date()),
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,
                bases=meta_bases, latest=latest, milex=milex, history=history,
-               fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
+               priced=priced, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
     (OUT / "data.json").write_text(json.dumps(out, ensure_ascii=False))
     print("Kandidaten je Waehrung (A=signifikant, B=robust):")
     for a in ASSET_ORDER:
