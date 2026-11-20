@@ -544,6 +544,7 @@ def main(refresh: bool = True):
 def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     print("Lade Daten ...")
     px = load_fx(refresh)
+    px, _live = ds.live_prices(px)  # aktuelle Kurse: Fed-Historie + neueste EZB-Tage (verkettet)
     sipri = ds.sipri_share_of_gdp(refresh)
     us_cc = country_series("US", "US", "United States of America", sipri, refresh)
     ub = us_bases(refresh)
