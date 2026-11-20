@@ -247,6 +247,15 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
   </section>
 
   <section class="panel">
+    <div class="ph"><span>Statistische Tests · Hypothesen gegen Zufall</span><span class="eyebrow">p &lt; 0,05 = signifikant</span></div>
+    <div class="pb">
+      <div class="note" style="max-width:none"><b>Was sind Zufallsmodelle?</b> Für jede Währung lasse ich zusätzlich 12 „Basen“ aus reinem Zufallsrauschen durch exakt dieselbe Maschine laufen: gleiches Training, gleiche Horizonte, gleiche Auswahl. Sie können nichts wissen. Was sie trotzdem an Trefferquote schaffen, ist reines Glück. Ein echtes Makro-Modell ist nur dann etwas wert, wenn es <b>deutlich besser als diese Glücks-Messlatte</b> ist. Die Tests prüfen jeweils die Nullhypothese H0: „Die echten Modelle sind nicht besser als Zufall.“ Ein kleiner p-Wert (unter 0,05) heißt: H0 wird verworfen, der Vorteil ist sehr wahrscheinlich echt.</div>
+      <div class="scroll-x"><table class="rc" id="stt"></table></div>
+      <div class="note" style="max-width:none"><b>t-Test (Welch)</b> und <b>Mann-Whitney-U</b> vergleichen die Trefferquoten der echten Basen mit denen der Zufallsbasen. Jede Basis zählt einmal, gemittelt über ihre Horizonte, weil 60, 61 und 62 Tage fast dasselbe Modell sind. <b>FDR (Benjamini-Hochberg)</b> korrigiert für die vielen gleichzeitig getesteten Modelle und zählt, wie viele bei einer Falsch-Entdeckungsrate von 10 % übrig bleiben. Bei Zufall sollten es null sein. <b>Newey-West</b> testet, ob die wöchentlichen Erträge der Ensemble-Strategie im Schlusstest über null liegen. Dabei wird berücksichtigt, dass Wochen nicht unabhängig voneinander sind.</div>
+    </div>
+  </section>
+
+  <section class="panel">
     <div class="ph"><span>FRED vs. ALFRED · korrigierte Zahlen oder Echtzeit?</span><span class="eyebrow" id="modeNow"></span></div>
     <div class="pb">
       <div class="note" style="max-width:none">Viele US-Makrozahlen werden nach der Veröffentlichung noch korrigiert. <b>FRED</b> liefert die heutige, korrigierte Fassung. Ein Backtest damit kennt also Zahlen, die damals noch niemand hatte. <b>ALFRED</b> liefert jede Zahl so, wie sie am jeweiligen Tag veröffentlicht war (monatliche Datenstände seit 1998). Diese Tabelle vergleicht beide Varianten über alle Währungen und Horizonte. Mit dem Schalter oben rechts siehst du das ganze Cockpit in der jeweiligen Variante.</div>
@@ -632,6 +641,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     <div><b>Gegen Glückstreffer.</b> <span class="tier A">SIGNIF.</span> heißt: DA ≥ 53 %, in beiden Zeithälften ≥ 51 %, mindestens 2 Punkte besser als die naive Regel und p &lt; 0,05 im Binomialtest. Die Stichprobe wird dabei um überlappende Zeitfenster bereinigt. <span class="tier">ROBUST</span> heißt: DA ≥ 52 %, in beiden Hälften ≥ 50,5 % und mindestens 1 Punkt besser als naiv. Zusätzlich vergleicht der Realitäts-Check jede Währung mit Zufallsmodellen.</div>
     <div><b>Profi-Faktoren.</b> Momentum (eigener Kurstrend 3 und 12 Monate), Bewertung (realer effektiver Wechselkurs der BIS im Vergleich zum 10-Jahres-Schnitt), CFTC-Positionierung (Netto-Position der Spekulanten), Risikostimmung (VIX, Kreditspreads) und Rohstoffe (Öl für CAD, Eisenerz und Kupfer für AUD, Nahrungsmittelindex für NZD). Optionsdaten wie Risk Reversals sind nicht frei verfügbar und deshalb nicht enthalten.</div>
     <div><b>FRED oder ALFRED.</b> Das Cockpit gibt es in zwei Varianten. Bei FRED nutzen die Modelle die heutigen, korrigierten Zahlen mit geschätzter Veröffentlichungsverzögerung. Bei ALFRED nutzen sieben US-Reihen (PAYEMS, UNRATE, CPI, Kern-CPI, Industrieproduktion, Produktivität, Handelsbilanz) exakt den Datenstand, der am jeweiligen Tag öffentlich war. Die ALFRED-Variante ist der strengere und realistischere Test.</div>
+    <div><b>Veröffentlichungsfristen.</b> Jede Datenreihe wird erst ab ihrer Veröffentlichung genutzt. Die Fristen der OECD- und IMF-Reihen wurden mit den ALFRED-Datenständen 2018–2026 gemessen (90 %-Perzentil). Beispiel: Die britische Arbeitslosenquote erscheint dort erst rund 4 Monate nach Monatsende. Quartalswerte (z. B. Inflation in Australien und Neuseeland) gelten erst ab dem Quartalsende plus Frist.</div>
     <div><b>Schlusstest.</b> Auswahl nur mit 2008–2021, Bewertung auf 2022–heute. Zusätzlich gibt es einen Backtest je Zeitraum (2008–12, 2013–17, 2018–21, 2022–heute). Die Live-Auswahl oben nutzt danach den gesamten Zeitraum, damit die neuesten Daten einfließen.</div>
     <div><b>Daten.</b> FRED (Fed St. Louis, inkl. OECD- und IMF-Reihen), CFTC (Commitments of Traders), BIS (Leitzinsen, Inflation, effektive Wechselkurse), EZB (Euro-Renditen, Euribor, Arbeitslosigkeit) und SIPRI (Militärausgaben). Die Wechselkurse stammen aus dem H.10-Bericht der Fed und erscheinen mit rund einer Woche Verzug. Der DXY wird aus diesen Kursen mit der offiziellen ICE-Formel berechnet. Die Zinseinpreisung (Marktrendite 1J/2J minus Leitzins) ersetzt OIS-Kurven, FedWatch und ECB-Watch. Sie hat lange Historie und lässt sich deshalb testen.</div>
     <div><b>Einordnung.</b> Makrodaten erklären Wechselkurse nur zu einem kleinen Teil. Im Schnitt liegen alle Kandidaten nahe 50 %. Der Nutzen entsteht durch die Bündelung vieler kleiner Vorteile zu einem übergeordneten Bias. Keine Anlageberatung.</div>`;
@@ -673,6 +683,24 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     }
     $('#cot').innerHTML = h + '</tbody>';
     $('#cotDate').textContent = 'Stand ' + d0;
+  }
+
+  // ------------------------------------------------ Statistische Tests
+  function drawStats() {
+    const S = D.stat_tests || {};
+    const pv = p => p == null ? '<span class="dim">–</span>' : `<span class="${p < 0.05 ? 'pos' : p < 0.10 ? '' : 'dim'}" style="${p < 0.05 ? 'font-weight:600' : ''}">${p < 0.001 ? '&lt;0,001' : fmt(p, 3)}</span>`;
+    let h = '<thead><tr><th>Asset</th><th>Ø DA echt / Zufall</th><th>t-Test p</th><th>Mann-Whitney p</th><th>Schlusstest echt / Zufall</th><th>t-Test p (Test)</th><th>FDR echt</th><th>FDR Zufall</th><th>Newey-West t (Test)</th><th>p</th><th>Urteil</th></tr></thead><tbody>';
+    for (const a of ASSETS) {
+      const s = S[a]; if (!s) continue;
+      const da = s.da || {}, po = s.post || {}, f = s.fdr || {};
+      const bt = ((((D.validation || {})[a] || {}).backtest || {}).periods || {})['Schlusstest 2022–heute'] || {};
+      const score = (da.p_t < 0.05) + (po.p_t < 0.05) + ((f.real || 0) > (f.noise || 0)) + (bt.p_nw != null && bt.p_nw < 0.10);
+      const u = score >= 3 ? ['hi', 'statistisch belegt'] : score === 2 ? ['mid', 'teilweise belegt'] : ['lo', 'nicht belegt'];
+      h += `<tr><td>${swatch(a)} ${a}</td><td>${da.real != null ? fmt(da.real) + ' / ' + fmt(da.noise) : '–'}</td><td>${pv(da.p_t)}</td><td>${pv(da.p_u)}</td>
+        <td>${po.real != null ? fmt(po.real) + ' / ' + fmt(po.noise) : '–'}</td><td>${pv(po.p_t)}</td><td>${f.real ?? '–'} <span class="dim">/ ${f.n_real ?? ''}</span></td><td class="dim">${f.noise ?? '–'} / ${f.n_noise ?? ''}</td>
+        <td>${bt.t_nw == null ? '–' : fmt(bt.t_nw, 2)}</td><td>${pv(bt.p_nw)}</td><td><span class="q ${u[0]}">${u[1]}</span></td></tr>`;
+    }
+    $('#stt').innerHTML = h + '</tbody>';
   }
 
   // ------------------------------------------------ FRED vs. ALFRED
@@ -749,7 +777,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
   $('#eq').addEventListener('pointerleave', () => { $('#eqTip').hidden = true; const h = $('#eqHi'); if (h) h.innerHTML = ''; });
   $('#vAsset').addEventListener('input', drawEq);
 
-  drawCats(); drawHeatmap(); drawScatter(); drawLeader(); drawTable(); drawPair(); drawRC(); drawHist(); drawCOT(); drawVal(); drawEq(); drawComp();
+  drawCats(); drawHeatmap(); drawScatter(); drawLeader(); drawTable(); drawPair(); drawRC(); drawHist(); drawCOT(); drawVal(); drawEq(); drawComp(); drawStats();
   $('#modeNow').textContent = MODE === 'alfred' ? 'Aktiv: ALFRED · Echtzeit' : 'Aktiv: FRED · korrigiert';
 })();
 </script>

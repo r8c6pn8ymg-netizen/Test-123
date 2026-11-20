@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from scipy.stats import binomtest
+from scipy.stats import binomtest, mannwhitneyu, norm, ttest_ind
 
 import data_sources as ds
 
@@ -77,6 +77,17 @@ def monthly(s: pd.Series, how: str = "mean") -> pd.Series:
 
 def quarterly_to_monthly(s: pd.Series) -> pd.Series:
     return s.resample("MS").ffill()
+
+
+def quarter_end_if_quarterly(s: pd.Series) -> pd.Series:
+    """BIS meldet Quartals-CPI (AU, NZ) als drei gleiche Monatswerte. Damit der Wert nicht
+    schon ab dem ersten Quartalsmonat gilt, wird er auf den letzten Quartalsmonat gelegt."""
+    t = s[s.index >= s.index[-1] - pd.DateOffset(years=3)]
+    if t.nunique() > len(t) * 0.6:
+        return s
+    q = s.resample("QS").last().dropna()
+    q.index = q.index + pd.DateOffset(months=2)
+    return q.resample("MS").ffill()
 
 
 def yoy(s: pd.Series, periods: int = 12) -> pd.Series:
@@ -139,9 +150,9 @@ def pro_bases(asset: str, px: pd.Series, cot_cc: str, refresh: bool) -> list[Bas
     try:
         cot = ds.cftc_net(COT_CODES[asset], refresh)
         res.append(Basis("COT-NET", "CFTC: Netto-Position Spekulanten (Non-Commercials) in % Open Interest",
-                         monthly(cot["net_pct"]), 3, "Positionierung"))
+                         monthly(cot["net_pct"]), 7, "Positionierung"))
         res.append(Basis("COT-COMM", "CFTC: Netto-Position Commercials (Absicherer) in % Open Interest",
-                         monthly(cot["comm_pct"]), 3, "Positionierung"))
+                         monthly(cot["comm_pct"]), 7, "Positionierung"))
     except Exception as e:
         print(f"  ! {asset} COT: {str(e)[:60]}", file=sys.stderr)
     for bid, lab, sid, lag in COMMODITIES.get(asset, []):
@@ -179,9 +190,21 @@ def ensemble_backtest(entries: list[tuple[str, pd.Series]], price: pd.Series) ->
         dd = float((eq / eq.cummax() - 1).min())
         act = pos_.reindex(r.index) != 0
         hit = float((np.sign(ret.reindex(r.index)[act]) == pos_.reindex(r.index)[act]).mean()) if act.any() else None
+        # Newey-West-t-Test (HAC, 4 Lags) auf die woechentlichen Renditen: H0 = Ertrag 0
+        x = r.values - r.values.mean()
+        T = len(x)
+        lrv = x @ x / T
+        for L in range(1, 5):
+            lrv += 2 * (1 - L / 5) * (x[L:] @ x[:-L]) / T
+        t_nw = float(r.mean() / np.sqrt(lrv / T)) if lrv > 0 else None
+        p_nw = float(1 - norm.cdf(t_nw)) if t_nw is not None else None
+        n_act = int(act.sum())
+        p_hit = float(binomtest(int(round(hit * n_act)), n_act, 0.5, alternative="greater").pvalue) if n_act >= 10 else None
         return dict(ret=round(ann * 100, 1), vol=round(vol * 100, 1),
                     sharpe=round(ann / vol, 2) if vol > 0 else None, dd=round(dd * 100, 1),
-                    hit=None if hit is None else round(hit * 100, 1), active=round(float(act.mean()) * 100))
+                    hit=None if hit is None else round(hit * 100, 1), active=round(float(act.mean()) * 100),
+                    t_nw=None if t_nw is None else round(t_nw, 2), p_nw=None if p_nw is None else float(f"{p_nw:.3g}"),
+                    p_hit=None if p_hit is None else float(f"{p_hit:.3g}"), weeks=T)
 
     out = {"periods": {}, "bh": {}}
     for name, a, b in PERIODS + [("Auswahl 2008–2021", "2008-01-01", "2022-01-01"),
@@ -209,10 +232,10 @@ def us_bases(refresh: bool) -> list[Basis]:
         Basis("UNRATE", "US Arbeitslosenquote", monthly(f("UNRATE")), 37, "Arbeitsmarkt"),
         Basis("PAYEMS", "US Beschäftigung (NFP) 3M-Veraenderung", monthly(f("PAYEMS")).diff(3).dropna(), 37, "Arbeitsmarkt"),
         Basis("ICSA", "US Erstanträge Arbeitslosenhilfe", monthly(f("ICSA")), 7, "Arbeitsmarkt"),
-        Basis("INDPRO", "US Industrieproduktion YoY", yoy(monthly(f("INDPRO"))), 47, "Wachstum"),
-        Basis("OPHNFB", "US Produktivität je Stunde YoY", yoy(quarterly_to_monthly(f("OPHNFB")), 12), 130, "Wachstum"),
+        Basis("INDPRO", "US Industrieproduktion YoY", yoy(monthly(f("INDPRO"))), 55, "Wachstum"),
+        Basis("OPHNFB", "US Produktivität je Stunde YoY", yoy(quarterly_to_monthly(f("OPHNFB")), 12), 150, "Wachstum"),
         Basis("UMCSENT", "US Verbraucherstimmung (Michigan)", monthly(f("UMCSENT")), 30, "Stimmung"),
-        Basis("BOPGSTB", "US Handelsbilanz (Mrd USD)", monthly(f("BOPGSTB")) / 1000, 65, "Handel"),
+        Basis("BOPGSTB", "US Handelsbilanz (Mrd USD)", monthly(f("BOPGSTB")) / 1000, 70, "Handel"),
         Basis("VIX", "Volatilitätsindex VIX (Risikostimmung)", monthly(f("VIXCLS")), 3, "Risiko"),
         Basis("CREDIT", "Kreditspread Baa-Anleihen minus 10J-Treasury", monthly(f("BAA10Y")), 3, "Risiko"),
         Basis("FF-PRICED-1Y", "US Zinseinpreisung 12M: 1J-Rendite minus Fed Funds (OIS-Proxy)",
@@ -236,25 +259,27 @@ def country_series(cc_bis: str, cc_oecd: str, sipri_name: str, sipri: pd.DataFra
             print(f"  ! {cc_oecd} {key}: {str(e)[:60]}", file=sys.stderr)
 
     tryset("POL", lambda: monthly(ds.bis("WS_CBPOL", f"M.{cc_bis}", refresh)), 32)
-    tryset("CPI", lambda: ds.bis("WS_LONG_CPI", f"M.{cc_bis}.771", refresh), 50)
+    tryset("CPI", lambda: quarter_end_if_quarterly(ds.bis("WS_LONG_CPI", f"M.{cc_bis}.771", refresh)), 50)
     if cc_oecd == "EZ":
         tryset("Y10", lambda: monthly(ds.ecb("YC", "B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", refresh)), 3)
         tryset("R3M", lambda: ds.ecb("FM", "M.U2.EUR.RT.MM.EURIBOR3MD_.HSTA", refresh), 32)
-        tryset("UNR", lambda: ds.ecb("LFSI", "M.I9.S.UNEHRT.TOTAL0.15_74.T", refresh), 35)
+        tryset("UNR", lambda: ds.ecb("LFSI", "M.I9.S.UNEHRT.TOTAL0.15_74.T", refresh), 45)
     else:
-        tryset("Y10", lambda: ds.fred(f"IRLTLT01{cc_oecd}M156N", refresh), 32)
-        tryset("R3M", lambda: ds.fred(f"IR3TIB01{cc_oecd}M156N", refresh), 32)
+        # Lags gemessen mit ALFRED-Datenstaenden 2018–2026 (90%-Perzentil, gerundet nach oben)
+        tryset("Y10", lambda: ds.fred(f"IRLTLT01{cc_oecd}M156N", refresh), 62)
+        tryset("R3M", lambda: ds.fred(f"IR3TIB01{cc_oecd}M156N", refresh), 65)
         if cc_oecd in ("CH", "NZ"):
-            tryset("UNR", lambda: quarterly_to_monthly(ds.fred(f"LRHUTTTT{cc_oecd}Q156S", refresh)), 140)
+            tryset("UNR", lambda: quarterly_to_monthly(ds.fred(f"LRHUTTTT{cc_oecd}Q156S", refresh)),
+                   210 if cc_oecd == "CH" else 150)
         elif cc_oecd == "US":
             tryset("UNR", lambda: ds.fred("UNRATE", refresh), 37)
         else:
-            tryset("UNR", lambda: ds.fred(f"LRHUTTTT{cc_oecd}M156S", refresh), 45)
+            tryset("UNR", lambda: ds.fred(f"LRHUTTTT{cc_oecd}M156S", refresh), 125 if cc_oecd == "GB" else 65)
         x = lambda: ds.fred(f"XTEXVA01{cc_oecd}M667S", refresh)
         m = lambda: ds.fred(f"XTIMVA01{cc_oecd}M667S", refresh)
-        tryset("TRD", lambda: (100 * (x() - m()) / (x() + m())).dropna(), 60)
-        tryset("EXP", lambda: yoy(x()), 60)
-        tryset("EQ", lambda: yoy(ds.fred(f"SPASTT01{cc_oecd}M661N", refresh)), 32)
+        tryset("TRD", lambda: (100 * (x() - m()) / (x() + m())).dropna(), 95)
+        tryset("EXP", lambda: yoy(x()), 95)
+        tryset("EQ", lambda: yoy(ds.fred(f"SPASTT01{cc_oecd}M661N", refresh)), 35)
     if sipri_name in sipri.columns:
         a = sipri[sipri_name].dropna() * 100
         a.index = pd.to_datetime([f"{y}-01-01" for y in a.index])
@@ -533,6 +558,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
 
     models = []
     bstats: dict = {}
+    tests_raw: dict = {}
     cand = {a: dict(n=0, A=0, B=0, da=[], noise_n=0, noise_A=0, noise_B=0, noise_da=[])
             for a in ASSET_ORDER}
     pre_pool = {a: {"real": [], "noise": []} for a in ASSET_ORDER}
@@ -545,6 +571,11 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
                 pre_pool[asset]["noise" if b.group == "Zufall" else "real"].append(
                     dict(basis=b.id, h=h, tier=tp, da_pre=r["pre"]["da"], post=r["post_da"], hist=r["hist"]))
         c, t = cand[asset], tier(r)
+        kind = "noise" if b.group == "Zufall" else "real"
+        tp_ = tests_raw.setdefault(asset, {"real": {}, "noise": {}})[kind].setdefault(b.id, dict(da=[], post=[], p=[]))
+        tp_["da"].append(r["da"]); tp_["p"].append(r["p"])
+        if r["post_da"] is not None:
+            tp_["post"].append(r["post_da"])
         if b.group == "Zufall":
             c["noise_n"] += 1
             c["noise_da"].append(round(r["da"] * 100, 1))
@@ -589,6 +620,36 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         m.pop("_hist")
 
     # Schlusstest: Auswahl NUR mit 2008–2021, Bewertung 2022–heute (+ Zufalls-Vergleich)
+    # ---- Statistische Tests: echte Modelle vs. Zufallsmodelle -------------
+    def bh_count(pvals, q=0.10):
+        p = np.sort(np.asarray(pvals))
+        m = len(p)
+        ok = np.where(p <= q * np.arange(1, m + 1) / m)[0]
+        return int(ok[-1] + 1) if len(ok) else 0
+
+    stat_tests = {}
+    for a in ASSET_ORDER:
+        tr_ = tests_raw.get(a)
+        if not tr_:
+            continue
+        res = {}
+        for per in ("da", "post"):
+            # Je Basis ein Wert (Mittel ueber Horizonte), weil Horizonte derselben Basis stark korreliert sind
+            R = [np.mean(v[per]) * 100 for v in tr_["real"].values() if v[per]]
+            Nz = [np.mean(v[per]) * 100 for v in tr_["noise"].values() if v[per]]
+            if len(R) >= 3 and len(Nz) >= 3:
+                t = ttest_ind(R, Nz, equal_var=False, alternative="greater")
+                u = mannwhitneyu(R, Nz, alternative="greater")
+                res[per] = dict(real=round(float(np.mean(R)), 2), noise=round(float(np.mean(Nz)), 2),
+                                n_real=len(R), n_noise=len(Nz), t=round(float(t.statistic), 2),
+                                p_t=float(f"{t.pvalue:.3g}"), p_u=float(f"{u.pvalue:.3g}"),
+                                best_real=round(float(max(R)), 1), best_noise=round(float(max(Nz)), 1))
+        allp_r = [p for v in tr_["real"].values() for p in v["p"]]
+        allp_n = [p for v in tr_["noise"].values() for p in v["p"]]
+        res["fdr"] = dict(real=bh_count(allp_r), n_real=len(allp_r), noise=bh_count(allp_n), n_noise=len(allp_n),
+                          raw_real=int(sum(p < 0.05 for p in allp_r)), raw_noise=int(sum(p < 0.05 for p in allp_n)))
+        stat_tests[a] = res
+
     validation = {}
     for a in ASSET_ORDER:
         v = {}
@@ -646,7 +707,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
                fx_through=str(min(p.index[-1] for p in px.values()).date()),
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,
                bases=meta_bases, latest=latest, milex=milex, history=history,
-               priced=priced, validation=validation, cot=cot_view, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
+               priced=priced, validation=validation, stat_tests=stat_tests, cot=cot_view, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
     basis_stats = {k: dict(da=round(float(np.mean(v["da"])) * 100, 1), pass_=v["pass_"], n=len(v["da"]),
                            post=round(float(np.mean(v["post"])) * 100, 1) if v["post"] else None)
                    for k, v in bstats.items()}

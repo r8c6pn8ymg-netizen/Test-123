@@ -156,7 +156,8 @@ def alfred_vintages(series_id: str, vintage_dates: list[pd.Timestamp], refresh: 
             for v in chunk:
                 try:
                     parts.append(pd.read_csv(io.BytesIO(_download(
-                        f"https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={series_id}&vintage_date={v}"))))
+                        f"https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={series_id}&vintage_date={v}",
+                        tries=1))))
                 except Exception:
                     pass
                 time.sleep(0.3)
