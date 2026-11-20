@@ -260,8 +260,12 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
                             p_value=pct_hist(value[c], live_value[c]),
                             p_mom=None if c == "USD" else pct_hist(mom[c], live_mom[c])))
     ranking.sort(key=lambda r: -r["kombi"])
-    longs = [r["cur"] for r in ranking[:N_LS]]
-    shorts = [r["cur"] for r in ranking[-N_LS:]]
+    # Long/Short mit derselben Gleichstands-Regel wie im Backtest (bei Gleichstand an der Grenze stehen beide drin)
+    wl = ls_weights(pd.DataFrame([{c: zl["kombi"][c] for c in CUR}])).iloc[0]
+    longs = [r["cur"] for r in ranking if wl[r["cur"]] > 1e-12]
+    shorts = [r["cur"] for r in ranking if wl[r["cur"]] < -1e-12]
+    for r in ranking:
+        r["weight"] = round(float(wl[r["cur"]]), 3)
     pairs = sorted(((a, b, next(r["kombi"] for r in ranking if r["cur"] == a) - next(r["kombi"] for r in ranking if r["cur"] == b))
                     for a in longs for b in shorts), key=lambda x: -x[2])
 
@@ -280,7 +284,8 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
         sc = sc[sc.index >= start]
         w = ls_weights(sc, n_ls)  # dieselbe Gleichstands-Regel wie im Haupt-Backtest
         gr = (w * excess[cols].reindex(w.index)).sum(axis=1, min_count=1).dropna()
-        return gr - turnover(w).reindex(gr.index).fillna(0.0) * cost
+        net_ = gr - turnover(w).reindex(gr.index).fillna(0.0) * cost
+        return pd.Series(net_.values, index=net_.index + pd.offsets.MonthEnd(1))  # wie im Haupt-Backtest datiert
 
     def shp(r):
         r = r.dropna()

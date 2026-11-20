@@ -101,17 +101,22 @@ def perf(r: pd.Series, pos: pd.DataFrame | None = None) -> dict | None:
     return out
 
 
-def sign_permutation(pos: pd.DataFrame, excess: pd.DataFrame, n: int = 2000, seed: int = 11) -> np.ndarray:
-    """Zufalls-Richtungen bei gleicher Aktivitaet: prueft, ob die RICHTUNG Information enthaelt."""
+def sign_permutation(pos: pd.DataFrame, excess: pd.DataFrame, n: int = 2000, seed: int = 11,
+                     cost: float = COST) -> np.ndarray:
+    """Zufalls-Richtungen bei gleicher Positionsgroesse: prueft, ob die RICHTUNG Information enthaelt.
+    Gleich gerechnet wie portfolio(): Kosten je Umschichtung, dieselben Monate (ohne reine USD-Monate)."""
     rng = np.random.default_rng(seed)
     act = pos.abs().values  # Positionsgroesse bleibt (auch Teilpositionen bei Gleichstand), nur die Richtung wird zufaellig
-    ex = excess.reindex(pos.index)[pos.columns].fillna(0).values
+    exdf = excess.reindex(pos.index)[pos.columns]
+    ex = exdf.fillna(0).values
+    keep = exdf[[c for c in pos.columns if c != "USD"]].notna().any(axis=1).values
     cnt = act.sum(axis=1)
     out = np.empty(n)
     for i in range(n):
         s = rng.choice([-1.0, 1.0], size=act.shape) * act
         w = np.divide(s, cnt[:, None], out=np.zeros_like(s), where=cnt[:, None] > 0)
-        r = (w * ex).sum(axis=1)[:-1]
+        turn = np.abs(np.diff(w, axis=0, prepend=0.0)).sum(axis=1)
+        r = ((w * ex).sum(axis=1) - turn * cost)[keep]
         out[i] = r.mean() / r.std() * np.sqrt(12) if r.std() > 0 else 0
     return out
 
@@ -152,7 +157,7 @@ def run_universe(name: str, sig: dict[str, pd.DataFrame], excess: pd.DataFrame, 
         stats[k] = perf(r)
         if stats[k]:
             stats[k]["sharpe_20bp"] = (perf(rets20[k]) or {}).get("sharpe")
-            stats[k]["positions"] = round(float((pos != 0).sum(axis=1).mean()), 2)
+            stats[k]["positions"] = round(float(pos.abs().sum(axis=1).mean()), 2)  # Teilpositionen anteilig
             ex_ = excess.reindex(pos.index)[pos.columns]
             hit = (np.sign(ex_) == np.sign(pos))[(pos != 0) & (ex_ != 0)].stack().mean()  # Teilpositionen (Gleichstand) zaehlen nach Richtung
             stats[k]["hit"] = round(float(hit) * 100, 1)
@@ -226,7 +231,7 @@ def run_relative(name: str, scores: dict[str, pd.DataFrame], excess: pd.DataFram
         st = perf(r)
         if st:
             st["sharpe_20bp"] = (perf(portfolio(pos, excess, 0.002)) or {}).get("sharpe")
-            st["positions"] = round(float((pos != 0).sum(axis=1).mean()), 2)
+            st["positions"] = round(float(pos.abs().sum(axis=1).mean()), 2)  # Teilpositionen anteilig
             ex_ = excess.reindex(pos.index)[pos.columns]
             hit = (np.sign(ex_) == np.sign(pos))[(pos != 0) & (ex_ != 0)].stack().mean()  # Teilpositionen (Gleichstand) zaehlen nach Richtung
             st["hit"] = round(float(hit) * 100, 1)

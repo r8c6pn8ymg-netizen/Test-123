@@ -117,7 +117,7 @@ def main() -> dict:
     out["T"]["check_lag1"] = round(sharpe(net_of(trend_weights(C, vol, shift_signal=1), ex)), 2)
     perm = wT.copy()
     idx = perm.index[perm.index >= START]
-    perm.loc[idx, CUR7] = perm.loc[idx, CUR7].values[rng.permutation(len(idx))]
+    perm.loc[idx, F.CUR] = perm.loc[idx, F.CUR].values[rng.permutation(len(idx))]  # ganze Zeilen inkl. USD
     out["T"]["check_placebo"] = round(sharpe(net_of(perm, ex)), 2)
 
     # ---- Carry (Basis) und V ----

@@ -237,7 +237,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
       <div class="pb">
         <div class="chks" id="assetChks"></div>
         <div class="chartbox" id="scatterBox"><svg id="scatter" viewBox="0 0 640 420" role="img" aria-label="Streudiagramm: jedes Modell als Punkt, x = Horizont in Tagen, y = Wahrscheinlichkeit für steigenden Kurs"></svg><div class="tip" id="scTip" hidden></div></div>
-        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. Je weiter vom Mittelstrich, desto überzeugter ist das Modell. Überzeugt heißt nicht treffsicher: Die tatsächliche Trefferquote liegt im Schlusstest knapp über 50 %. <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
+        <div class="note">Jeder Punkt ist ein Modell. Oben (grün) = Modell erwartet steigenden Kurs, unten (rot) = fallend. Je weiter vom Mittelstrich, desto überzeugter ist das Modell. <b>Achtung, die Prozentzahl ist keine echte Wahrscheinlichkeit:</b> Die Modelle sind deutlich zu selbstsicher.<span id="calNote"></span> Aussagekräftig ist nur die <b>Richtung</b> (über oder unter 50 %), nicht wie weit ein Punkt vom Mittelstrich entfernt ist. <b>Gefüllt</b> = signifikant, <b>Umriss</b> = robust.</div>
       </div>
     </section>
     <section class="panel">
@@ -261,7 +261,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <th data-k="basis">Basis</th><th data-k="asset">Asset</th><th data-k="h">Horizont</th><th data-k="da" aria-sort="descending">DA</th>
         <th data-k="da2">DA 1./2. Hälfte</th><th data-k="naive">Naiv</th><th data-k="tier">Güte</th><th data-k="prob">P(steigt)</th><th data-k="pred">Prediction</th><th data-k="date">Datum</th>
       </tr></thead><tbody></tbody></table></div>
-      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>Datum</b> = letzter Datenpunkt der Basis.</div>
+      <div class="note"><b>DA</b> = Directional Accuracy, also die Trefferquote der Richtung seit 2008. Jede einzelne Prognose ist out-of-sample, das Modell kannte die Zukunft also nicht. <b>Aber:</b> Die angezeigten Modelle wurden nach genau dieser Trefferquote ausgewählt, deshalb wirkt sie besser, als sie ist.<span id="daBias"></span> <b>1./2. Hälfte</b> = DA getrennt für beide Zeithälften (muss in beiden halten). <b>Naiv</b> = Trefferquote der simplen Regel „immer die häufigste Richtung“. <b>P(steigt)</b> = Ausgabe des Modells. Sie ist zu selbstsicher und keine echte Wahrscheinlichkeit, aussagekräftig ist nur, ob sie über oder unter 50 % liegt (siehe Hinweis beim Scatter). <b>Datum</b> = letzter Datenpunkt der Basis.</div>
     </div>
   </section>
 
@@ -653,13 +653,18 @@ window.renderFactors = async function () {
       const R = W.results, NAME = { new_low: 'neues 52W-Tief', near_low: 'nahe 52W-Tief (≤ 2 %)', new_high: 'neues 52W-Hoch', near_high: 'nahe 52W-Hoch (≤ 2 %)' };
       const WAS = { 5: 'in der Woche danach', 20: 'im Monat danach', 65: 'in den 3 Monaten danach' };
       const passed = Object.keys(R).filter(k => R[k].pass);
+      const per15 = r => { const v = r.periods ? r.periods['2015–heute'] : null; return v == null || isNaN(v) ? null : v; };
       const hint = (st, c) => {
         if (!st) return '<span class="dim">weder nahe am Hoch noch nahe am Tief</span>';
-        const k = passed.find(x => x.startsWith(st + '_'));
-        if (!k) return `<b>${NAME[st]}</b>: <span class="dim">kein verlässliches Muster, danach ging es mal hoch, mal runter (getestet, nicht belegt).</span>`;
-        const d = (R[k].detail || {})[c === 'USD' ? 'DXY' : c], up = st.includes('high'), h = k.split('_').pop();
-        if (!d || !d.n) return `<b>${NAME[st]}</b>`;
-        return `<b>${NAME[st]}.</b> Bei ${c} nach früheren ${up ? 'Hochs' : 'Tiefs'} (${d.n} Fälle seit ${d.since}): ${WAS[h]} in <b>${fmt(d.hit, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}</b> (an einem beliebigen Tag: ${fmt(d.base, 0)} von 100), im Schnitt ${d.move > 0 ? 'um weitere' : 'eher zurück um'} ${fmt(Math.abs(d.move), 2)} %.`;
+        const up = st.includes('high');
+        if (c === 'USD') return `<b>${NAME[st]}</b> <span class="dim">(Dollar ${up ? 'stark' : 'schwach'}). Für den Dollar-Index selbst wurde kein Muster eigens getestet. Das Gegenstück, ${up ? 'die Tiefs' : 'die Hochs'} der anderen Währungen gegen den Dollar, steht in den Zeilen darunter.</span>`;
+        const ks = passed.filter(x => x.startsWith(st + '_'));
+        if (!ks.length) return `<b>${NAME[st]}</b>: <span class="dim">kein verlässliches Muster, danach ging es mal hoch, mal runter (getestet, nicht belegt).</span>`;
+        const parts = ks.map(k => { const d = (R[k].detail || {})[c], h = k.split('_').pop();
+          if (!d || !d.n) return '';
+          return `${WAS[h]} in <b>${fmt(d.hit, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}</b> (an einem beliebigen Tag: ${fmt(d.base, 0)} von 100), im Schnitt ${d.move > 0 ? 'um weitere' : 'eher zurück um'} ${fmt(Math.abs(d.move), 2)} %`; }).filter(Boolean);
+        const d0 = (R[ks[0]].detail || {})[c];
+        return `<b>${NAME[st]}.</b> Bei ${c} nach früheren ${up ? 'Hochs' : 'Tiefs'}${d0 && d0.n ? ` (${d0.n} Fälle seit ${d0.since})` : ''}: ${parts.join('; ')}.`;
       };
       let h = '<thead><tr><th>Währung</th><th>Abstand Hoch</th><th>Abstand Tief</th><th style="text-align:left">Status und was bei dieser Währung früher danach passierte</th></tr></thead><tbody>';
       for (const c of ['USD', 'EUR', 'GBP', 'AUD', 'NZD', 'CAD', 'CHF', 'JPY']) {
@@ -671,8 +676,8 @@ window.renderFactors = async function () {
       // Erklaerung aus den aktuellen Ergebnissen (keine festen Zahlen)
       const ns = passed.flatMap(k => Object.values(R[k].detail || {}).map(d => d.n)).filter(n => n > 0);
       const main = passed.map(k => { const r = R[k], h = k.split('_').pop(), up = k.startsWith('new_high') || k.startsWith('near_high');
-        return `<b>${NAME[k.replace(/_\d+$/, '')]}</b>: ${WAS[h]} in ${fmt(r.hit, 0)} statt ${fmt(r.base, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}, seit 2015 im Schnitt nur noch ${fmt(Math.abs(r.periods['2015–heute']), 2)} %`; });
-      $('#w52Note').innerHTML = `<div><b>So liest du die Tabelle:</b> Bei den 7 Währungen ist der Kassakurs gegen den US-Dollar gemeint (Fed-Tageskurse seit 1971). <b>Tief</b> heißt: Die Währung ist so schwach gegen den Dollar wie seit einem Jahr nicht. Beim <b>USD</b> ist es der Dollar-Index, auf den auch der Dollar-Future DX läuft (Korb aus Euro, Yen, Pfund, CAD, SEK, CHF, offizielle ICE-Formel, Historie ab 1999). „56 von 100 Fällen (an einem beliebigen Tag: 50 von 100)“ heißt: Nach dem Ereignis ging es in 56 von 100 Fällen weiter in dieselbe Richtung, an irgendeinem Tag ohne Ereignis in etwa 50 von 100, das ist Zufall. Abstand = wie weit der letzte Kurs vom Hoch bzw. Tief der 52 Wochen davor entfernt ist.</div>
+        return `<b>${NAME[k.replace(/_\d+$/, '')]}</b>: ${WAS[h]} in ${fmt(r.hit, 0)} statt ${fmt(r.base, 0)} von 100 Fällen weiter ${up ? 'gestiegen' : 'gefallen'}${per15(r) == null ? '' : `, seit 2015 im Schnitt ${per15(r) > 0 ? (per15(r) < r.mean ? 'nur noch' : '') + ' ' + fmt(per15(r), 2) + ' %' : 'sogar in die Gegenrichtung (' + fmt(per15(r), 2) + ' %)'}`}`; });
+      $('#w52Note').innerHTML = `<div><b>So liest du die Tabelle:</b> Bei den 7 Währungen ist der Kassakurs gegen den US-Dollar gemeint (Fed-Tageskurse seit 1971). <b>Tief</b> heißt: Die Währung ist so schwach gegen den Dollar wie seit einem Jahr nicht. Beim <b>USD</b> ist es der Dollar-Index, auf den auch der Dollar-Future DX läuft (Korb aus Euro, Yen, Pfund, CAD, SEK, CHF, offizielle ICE-Formel, Historie ab 1999). ${passed.length ? `„${fmt(R[passed[0]].hit, 0)} von 100 Fällen (an einem beliebigen Tag: ${fmt(R[passed[0]].base, 0)} von 100)“ heißt: Nach dem Ereignis ging es in ${fmt(R[passed[0]].hit, 0)} von 100 Fällen weiter in dieselbe Richtung, an irgendeinem Tag ohne Ereignis in ${fmt(R[passed[0]].base, 0)} von 100.` : ''} Abstand = wie weit der letzte Kurs vom Hoch bzw. Tief der 52 Wochen davor entfernt ist.</div>
         <div><b>Was belegt ist</b> (alle 7 Währungen zusammen, Regeln vorab festgelegt, mit Mehrfachtest-Korrektur, Placebo und Timing-Kontrolle): ${main.length ? main.join('; ') + '.' : 'zurzeit nichts.'} Alle anderen Fälle haben kein verlässliches Muster. Je Währung sind es nur ${ns.length ? Math.min(...ns) + ' bis ' + Math.max(...ns) : 'wenige'} Fälle, die Einzelzahlen schwanken stark. Nur ein Hinweis, kein Signal.</div>`;
       $('#w52Panel').hidden = false;
     } catch (e) { console.warn('52-Wochen-Daten nicht geladen', e); }
@@ -849,6 +854,12 @@ window.renderFactors = async function () {
   const inRange = (m, lo, hi) => m.h >= lo && m.h <= hi;
 
   // ------------------------------------------------------------- Kopf
+  // Kalibrierung: was die Modelle sagten vs. wie oft die Waehrung tatsaechlich stieg (alle echten Kandidaten, OOS)
+  if (D.calibration && D.calibration.rows && D.calibration.rows.length) {
+    const cr = D.calibration.rows, lo = cr[0], hi = cr[cr.length - 1];
+    const f0 = x => Math.round(x).toLocaleString('de-DE');
+    $('#calNote').innerHTML = ` Geprüft an allen ${D.calibration.n.toLocaleString('de-DE')} Prognosen seit 2008 (diese Ansicht, täglich neu): Sagten die Modelle ${f0(lo.lo)}–${f0(lo.hi)} % (Ø ${f0(lo.said)} %), stieg die Währung trotzdem in <b>${f0(lo.rose)} von 100</b> Fällen; sagten sie ${f0(hi.lo)}–${f0(hi.hi)} % (Ø ${f0(hi.said)} %), stieg sie nur in <b>${f0(hi.rose)} von 100</b> Fällen.`;
+  }
   // Auswahl-Effekt ehrlich beziffern: echte Modelle vs. Zufallsmodelle nach derselben Auswahl, dann Schlusstest
   {
     const V = Object.values(D.validation || {}).filter(v => v.real && v.noise && v.real.da_pre != null && v.noise.da_pre != null);

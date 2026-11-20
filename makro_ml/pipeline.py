@@ -404,6 +404,7 @@ def run_model(X: pd.DataFrame, price: pd.Series, h: int, today: pd.Timestamp):
 
     hist = pd.Series(probs, index=dates).dropna()
     return dict(**full, prob=prob_now, oos_from=str(dates[ev][0].date()), hist=hist,
+                cal_p=probs[ev], cal_y=y[ev],  # fuer die Kalibrierung: Prognose und eingetretene Richtung
                 pre=pre, post_da=post_da, n_post=int(post_m.sum()))
 
 
@@ -600,6 +601,21 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     # Auswahlfreier Makro-Score fuer den Konsens-Test: ALLE echten Kandidaten, je Basis eine Stimme,
     # ohne Basen, deren Information schon im Faktor-Portfolio oder im CFTC-Signal steckt.
     OVERLAP = {"CBPOL-Diff", "IR3M-Diff", "REALRATE-Diff", "MOM-12M", "MOM-3M", "REER-GAP", "COT-NET", "COT-COMM"}
+    # Kalibrierung: Wenn die echten Modelle X % sagten, wie oft stieg die Waehrung dann? (alle echten Kandidaten, OOS)
+    cp = [r["cal_p"] for (_, b, _, _, _), r in zip(tasks, results) if r is not None and b.group != "Zufall"]
+    cy = [r["cal_y"] for (_, b, _, _, _), r in zip(tasks, results) if r is not None and b.group != "Zufall"]
+    calibration = None
+    if cp:
+        cp_, cy_ = np.concatenate(cp), np.concatenate(cy)
+        bins = [0, .3, .4, .45, .5, .55, .6, .7, 1.0001]
+        rows_c = []
+        for lo, hi in zip(bins[:-1], bins[1:]):
+            m = (cp_ >= lo) & (cp_ < hi)
+            if m.sum() > 200:
+                rows_c.append(dict(lo=round(lo * 100), hi=round(min(hi, 1) * 100), n=int(m.sum()),
+                                   said=round(float(cp_[m].mean()) * 100, 1), rose=round(float(cy_[m].mean()) * 100, 1)))
+        calibration = dict(rows=rows_c, n=int(len(cp_)), brier=round(float(np.mean((cp_ - cy_) ** 2)), 4),
+                           brier_base=round(float(np.mean((cy_.mean() - cy_) ** 2)), 4))
     votes: dict = {}
     for (asset, b, h, _, _), r in zip(tasks, results):
         if r is None:
@@ -755,7 +771,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
                fx_through=str(min(p.index[-1] for p in px.values()).date()),
                assets=ASSET_ORDER, horizons=HORIZONS, models=sel, candidates=cand,
                bases=meta_bases, latest=latest, milex=milex, history=history,
-               priced=priced, validation=validation, stat_tests=stat_tests, cot=cot_view, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
+               priced=priced, validation=validation, stat_tests=stat_tests, calibration=calibration, cot=cot_view, fx_last={a: round(float(px[a].iloc[-1]), 5) for a in ASSET_ORDER})
     basis_stats = {k: dict(da=round(float(np.mean(v["da"])) * 100, 1), pass_=v["pass_"], n=len(v["da"]),
                            post=round(float(np.mean(v["post"])) * 100, 1) if v["post"] else None)
                    for k, v in bstats.items()}
