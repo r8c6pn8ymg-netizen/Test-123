@@ -118,3 +118,12 @@ def test_curve_lag_ist_maximum_der_eingaenge():
     us = {"Y10": (s, 62), "POL": (s, 32)}
     curve = [b for b in P.diff_bases(cc, us) if b.id == "CURVE-Diff"][0]
     assert curve.lag == 62
+
+
+def test_neue_basen_mit_gemessenen_fristen():
+    """Kern-PCE, realer Einzelhandel, Erzeugerpreise: vorhanden, mit ALFRED-gemessenen Fristen und in der Echtzeit-Variante."""
+    import pipeline as P
+    b = {x.id: x for x in P.us_bases(False)}
+    assert b["PCEPILFE"].lag >= 62 and b["RRSFS"].lag >= 40 and b["PPIACO"].lag >= 40
+    for k in ("PCEPILFE", "RRSFS", "PPIACO"):
+        assert k in P.ALFRED_SERIES

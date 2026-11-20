@@ -235,6 +235,10 @@ def us_bases(refresh: bool) -> list[Basis]:
         Basis("INDPRO", "US Industrieproduktion YoY", yoy(monthly(f("INDPRO"))), 55, "Wachstum"),
         Basis("OPHNFB", "US Produktivität je Stunde YoY", yoy(quarterly_to_monthly(f("OPHNFB")), 12), 150, "Wachstum"),
         Basis("UMCSENT", "US Verbraucherstimmung (Michigan)", monthly(f("UMCSENT")), 30, "Stimmung"),
+        # Ergaenzt 20.11.2026 (Abgleich Zinscapital-Bericht); Fristen mit ALFRED gemessen
+        Basis("PCEPILFE", "US Kern-PCE YoY (Inflationsmass der Fed)", yoy(monthly(f("PCEPILFE"))), 62, "Inflation"),
+        Basis("RRSFS", "US realer Einzelhandelsumsatz YoY", yoy(monthly(f("RRSFS"))), 40, "Wachstum"),
+        Basis("PPIACO", "US Erzeugerpreise YoY", yoy(monthly(f("PPIACO"))), 40, "Inflation"),
         Basis("BOPGSTB", "US Handelsbilanz (Mrd USD)", monthly(f("BOPGSTB")) / 1000, 70, "Handel"),
         Basis("VIX", "Volatilitätsindex VIX (Risikostimmung)", monthly(f("VIXCLS")), 3, "Risiko"),
         Basis("CREDIT", "Kreditspread Baa-Anleihen minus 10J-Treasury", monthly(f("BAA10Y")), 3, "Risiko"),
@@ -447,7 +451,8 @@ def label(prob: float) -> str:
 ALFRED_SERIES = {  # Basis-ID: (FRED-ID, Transformation)
     "PAYEMS": ("PAYEMS", "diff3"), "UNRATE": ("UNRATE", "level"), "CPIAUCSL": ("CPIAUCSL", "yoy"),
     "CPILFESL": ("CPILFESL", "yoy"), "INDPRO": ("INDPRO", "yoy"), "OPHNFB": ("OPHNFB", "yoy_q"),
-    "BOPGSTB": ("BOPGSTB", "k"),
+    "BOPGSTB": ("BOPGSTB", "k"), "PCEPILFE": ("PCEPILFE", "yoy"), "RRSFS": ("RRSFS", "yoy"),
+    "PPIACO": ("PPIACO", "yoy"),
 }
 
 

@@ -355,7 +355,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     <section class="panel">
       <div class="ph"><span>Rangliste heute</span><span class="eyebrow" id="fRankEyebrow">Score = Mittel der gewählten Faktor-Ränge</span></div>
       <div class="pb"><div class="scroll-x"><table class="rc" id="fRank"></table></div>
-        <div class="note" style="max-width:none"><b>Carry</b> = Leitzins minus US-Leitzins. <b>Value</b> = Abweichung des realen effektiven Wechselkurses vom 10-Jahres-Schnitt (negativ = billig, wegen Veröffentlichung 2 Monate alt). <b>Momentum</b> = Kursentwicklung gegen USD. Die Zahl in Klammern ist der Faktor-Score: positiv heißt kaufen, negativ verkaufen. <b>L/S je Faktor</b> zeigt, ob die Währung bei diesem Faktor unter den 3 stärksten (Long) oder 3 schwächsten (Short) ist. <b>Hist.</b> = wo der heutige Wert im Vergleich zur eigenen Historie seit 1977 liegt (100 = höchster Wert je, beim USD für Carry und Momentum nicht sinnvoll). Die Rangliste nutzt die aktuellsten Kurse, das Portfolio wird jeweils zum Monatsende umgeschichtet.</div></div>
+        <div class="note" style="max-width:none"><b>Carry</b> = Leitzins minus US-Leitzins. <b>Value</b> = Abweichung des realen effektiven Wechselkurses vom 10-Jahres-Schnitt (negativ = billig, wegen Veröffentlichung 2 Monate alt). <b>Momentum</b> = Kursentwicklung gegen USD. Die Zahl in Klammern ist der Faktor-Score: positiv heißt kaufen, negativ verkaufen. <b>L/S je Faktor</b> zeigt, ob die Währung bei diesem Faktor unter den 3 stärksten (Long) oder 3 schwächsten (Short) ist. <b>Hist.</b> = wo der heutige Wert im Vergleich zur eigenen Historie seit 1977 liegt (100 = höchster Wert je, beim USD für Carry und Momentum nicht sinnvoll). Leitzinsen sind tagesaktuell (BIS), das Datum in Klammern zeigt den Stand. Die Rangliste nutzt die aktuellsten Kurse, das Portfolio wird jeweils zum Monatsende umgeschichtet.</div></div>
     </section>
 
     <section class="panel">
@@ -500,7 +500,7 @@ window.renderFactors = async function () {
     let h = '<thead><tr><th>Rang</th><th style="text-align:left">Währung</th><th style="text-align:left">Score (Auswahl)</th><th>Carry: Zinsdiff.</th><th>Value: ggü. Schnitt</th><th>Momentum 3M / 12M</th><th>Position</th></tr></thead><tbody>';
     ranked.forEach((r, i) => {
       const pos = longs.includes(r.cur) ? '<span class="q hi">LONG</span>' : shorts.includes(r.cur) ? '<span class="q lo">SHORT</span>' : '<span class="dim">–</span>';
-      h += `<tr><td>${i + 1}</td><td style="text-align:left"><b>${r.cur}</b> <span class="dim">· Leitzins ${fmt(r.rate, 2)}%</span></td><td style="text-align:left">${zb(r.sc)} <span style="margin-left:6px" class="${r.sc >= 0 ? 'pos' : 'negv'}">${sgn(r.sc, 2)}</span></td>
+      h += `<tr><td>${i + 1}</td><td style="text-align:left"><b>${r.cur}</b> <span class="dim">· Leitzins ${fmt(r.rate, 2)}%${r.rate_date ? ' (' + (r.rate_date.length > 7 ? r.rate_date.slice(8, 10) + '.' + r.rate_date.slice(5, 7) + '.' : r.rate_date) + ')' : ''}</span></td><td style="text-align:left">${zb(r.sc)} <span style="margin-left:6px" class="${r.sc >= 0 ? 'pos' : 'negv'}">${sgn(r.sc, 2)}</span></td>
         <td>${sgn(r.carry, 2)} Pkt. ${zc(r.z_carry)}<div style="margin-top:4px">${ls('C', r.cur)} ${ph(r.p_carry)}</div></td>
         <td>${sgn(r.value_gap)}% ${zc(r.z_value)}<div style="margin-top:4px">${ls('V', r.cur)} ${ph(r.p_value)}</div></td>
         <td>${sgn(r.mom3)}% / ${sgn(r.mom12)}% ${zc(r.z_mom)}<div style="margin-top:4px">${ls('M', r.cur)} ${ph(r.p_mom)}</div></td><td>${pos}</td></tr>`;

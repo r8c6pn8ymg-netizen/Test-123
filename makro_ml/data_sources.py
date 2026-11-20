@@ -69,6 +69,18 @@ def bis(flow: str, key: str, refresh: bool = False) -> pd.Series:
     return s.dropna().sort_index()
 
 
+def bis_daily_recent(flow: str, key: str, days: int = 400) -> pd.Series:
+    """Tageswerte der letzten ``days`` Tage (z. B. Leitzinsen), immer frisch geladen, Cache als Rueckfall."""
+    start = (pd.Timestamp.today() - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
+    raw = _cached(f"bis_{flow}_{key}_recent.csv",
+                  f"https://stats.bis.org/api/v2/data/dataflow/BIS/{flow}/1.0/{key}?format=csv&startPeriod={start}",
+                  True)
+    df = pd.read_csv(io.BytesIO(raw))
+    s = pd.Series(pd.to_numeric(df["OBS_VALUE"], errors="coerce").values,
+                  index=pd.to_datetime(df["TIME_PERIOD"]), name=f"{flow}.{key}")
+    return s.dropna().sort_index()
+
+
 def ecb(flow: str, key: str, refresh: bool = False) -> pd.Series:
     raw = _cached(f"ecb_{flow}_{key}.csv",
                   f"https://data-api.ecb.europa.eu/service/data/{flow}/{key}?format=csvdata",

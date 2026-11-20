@@ -208,7 +208,17 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
     last = z["kombi"].dropna(how="all").index[-1]
     live_spot = pd.Series({c: (px[c].dropna().iloc[-1] if c != "USD" else 1.0) for c in CUR})
     live_mom = 0.5 * (live_spot / spot.iloc[-4] - 1) + 0.5 * (live_spot / spot.iloc[-13] - 1)
-    live_carry = carry.iloc[-1]
+    # Leitzinsen fuer die Live-Rangliste tagesaktuell (BIS Tageswerte); Backtest bleibt bei Monatsende-Werten
+    live_rate = rate.iloc[-1].copy()
+    rate_date = {c: str(rate.index[-1].date())[:7] for c in CUR}
+    for c in CUR:
+        try:
+            dser = ds.bis_daily_recent("WS_CBPOL", f"D.{BIS[c]}")
+            if len(dser):
+                live_rate[c] = float(dser.iloc[-1]); rate_date[c] = str(dser.index[-1].date())
+        except Exception as e:  # Rueckfall: Monatswert
+            print(f"  ! Tages-Leitzins {c}: {str(e)[:60]}")
+    live_carry = live_rate - live_rate["USD"]
     live_value = value.iloc[-1]
 
     def pct_hist(hist, v):
@@ -224,7 +234,7 @@ def build(px: dict[str, pd.Series], refresh: bool = False) -> dict:
                             carry=round(float(live_carry[c]), 2), value_gap=round(float(-live_value[c]), 1),
                             mom3=round(float(live_spot[c] / spot[c].iloc[-4] - 1) * 100, 1),
                             mom12=round(float(live_spot[c] / spot[c].iloc[-13] - 1) * 100, 1),
-                            rate=round(float(rate[c].iloc[-1]), 2),
+                            rate=round(float(live_rate[c]), 2), rate_date=rate_date[c],
                             # Einordnung gegen die eigene Historie seit 1977 (Perzentil, 100 = staerkster Wert je)
                             p_carry=None if c == "USD" else pct_hist(carry[c], live_carry[c]),
                             p_value=pct_hist(value[c], live_value[c]),
