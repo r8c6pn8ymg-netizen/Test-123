@@ -238,4 +238,7 @@ def metrics(g: np.ndarray, tt: pd.DatetimeIndex, t0: pd.Timestamp, k: int) -> di
     return {"n": n, "total": e - 1, "cagr": cagr, "vol": sd * math.sqrt(k) if sd is not None else None,
             "sharpe": mean / sd * math.sqrt(k) if sd else None, "sortino": mean / dd * math.sqrt(k) if dd > 0 else None,
             "maxdd": mdd, "dd_days": round(longest), "calmar": cagr / -mdd if mdd < 0 else None, "mean": mean,
-            "t": tstat, "p": float(2 * st.t.sf(abs(tstat), n - 1)) if tstat is not None else None, "years": years}
+            "t": tstat, "p": float(2 * st.t.sf(abs(tstat), n - 1)) if tstat is not None else None, "years": years,
+            "se": sd / math.sqrt(n) if sd else None,
+            "ci_lo": mean - st.norm.ppf(0.975) * sd / math.sqrt(n) if sd else None,
+            "ci_hi": mean + st.norm.ppf(0.975) * sd / math.sqrt(n) if sd else None}

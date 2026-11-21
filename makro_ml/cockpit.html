@@ -1112,7 +1112,7 @@ window.renderStatistik = async function () {
     $('#sSide').innerHTML = `
       <div class="st-head"><div><div class="eyebrow">Sigma je ${IVN[st.iv][0]}</div><div class="st-big">${pct(D.sigma, 2, false)}</div></div>
         <div><small>Mittel ${pct(D.mean, 3)}</small><small>Normal ${normAD ? 'Ja' : 'Nein'}</small><small>n = ${D.n}</small></div></div>
-      ${sec('Verteilung', [row('Mittel', pct(D.mean, 4)), row('Median', pct(D.median, 4)), row('Sigma', pct(D.sigma, 4, false)),
+      ${sec('Verteilung', [row('Mittel', pct(D.mean, 4)), row('Median', pct(D.median, 4)), ...(D.se_mean != null ? [row('Standardfehler Mittel', '± ' + pct(D.se_mean, 4, false), 'Sigma / √N: wie genau der Mittelwert geschätzt ist'), row('95 %-Intervall Mittel', `${pct(D.ci95[0], 3)} … ${pct(D.ci95[1], 3)}`, 'Bereich, in dem der wahre Mittelwert mit 95 % liegt; enthält er 0, ist der Mittelwert nicht von 0 zu unterscheiden')] : []), row('Sigma', pct(D.sigma, 4, false)),
         row('Vola annualisiert', pct(D.ann_vol, 2, false), `Sigma · √${D.k}`), row('Schiefe', nf(D.skew, 3), 'negativ = längeres Verlust-Ende'),
         row('Exzess-Kurtosis', nf(D.kurt, 3), 'Normalverteilung = 0; größer = dickere Enden'),
         row('Beste ' + IVN[st.iv][0], `${pct(D.best)} · ${dDE(D.best_date)}`), row('Schlechteste ' + IVN[st.iv][0], `${pct(D.worst)} · ${dDE(D.worst_date)}`)])}
@@ -1413,7 +1413,7 @@ body{margin:0} .rep{max-width:1200px;margin:0 auto;padding:24px 16px;display:gri
       <div class="st-tbl"><table><thead><tr><th>Kennzahl</th><th>Gesamt</th><th>In-Sample</th><th>Out-of-Sample</th><th>Halten gesamt</th><th>Halten IS</th><th>Halten OOS</th></tr></thead><tbody>
         ${rowM('Gesamtrendite', x => pct(x.total, 1))}${rowM('CAGR', x => pct(x.cagr))}${rowM('Volatilität', x => pct(x.vol, 1, false))}
         ${rowM('Sharpe (rf = 0)', x => nf(x.sharpe, 2))}${rowM('Sortino', x => nf(x.sortino, 2))}${rowM('Max. Drawdown', x => pct(x.maxdd, 1))}
-        ${rowM('Längster Drawdown (Tage)', x => nf(x.dd_days, 0))}${rowM('Calmar', x => nf(x.calmar, 2))}${rowM('t-Wert Ø Tagesrendite', x => nf(x.t, 2))}${rowM('p-Wert', x => pv(x.p))}${rowM('Jahre', x => nf(x.years, 1))}
+        ${rowM('Längster Drawdown (Tage)', x => nf(x.dd_days, 0))}${rowM('Calmar', x => nf(x.calmar, 2))}${rowM('Ø Tagesrendite', x => pct(x.mean, 4))}${rowM('Standardfehler (Tag)', x => '± ' + pct(x.se, 4, false))}${rowM('95 %-Intervall (Tag)', x => `${pct(x.ci_lo, 3)} … ${pct(x.ci_hi, 3)}`)}${rowM('t-Wert Ø Tagesrendite', x => nf(x.t, 2))}${rowM('p-Wert', x => pv(x.p))}${rowM('Jahre', x => nf(x.years, 1))}
       </tbody></table></div>
       <div class="note" style="max-width:none">Trades: ${ts.n} · Treffer ${ts.n ? pct(ts.win, 1, false) : '–'} · Ø Gewinn ${pct(ts.avg_win)} · Ø Verlust ${pct(ts.avg_loss)} · Profit-Faktor ${nf(ts.pf, 2)} · Ø Trade ${pct(ts.avg_ret)} · Ø Haltedauer ${ts.n ? nf(ts.avg_days, 1) : '–'} Kalendertage.</div>
       <div class="grid2b">

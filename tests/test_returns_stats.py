@@ -292,3 +292,13 @@ def test_veraltete_kurse_werden_erkannt():
     assert R.is_stale(pd.Timestamp("2026-11-19"), mo, "yf:BTC-USD", True)
     assert not R.is_stale(pd.Timestamp("2026-11-17"), mo, "fx:DEXUSEU:EUR", False)
     assert R.is_stale(pd.Timestamp("2026-11-13"), mo, "fx:DEXUSEU:EUR", False)  # nur Fed-Stand ohne EZB
+
+
+def test_standardfehler_und_intervall(ra):
+    D = R.describe(ra, 52)["distribution"]
+    se = 0.023191397307857693 / math.sqrt(12)
+    assert D["se_mean"] == pytest.approx(se, abs=1e-12)
+    lo, hi = st.t.interval(0.95, 11, loc=-0.00175, scale=se)
+    assert D["ci95"][0] == pytest.approx(lo, abs=1e-12) and D["ci95"][1] == pytest.approx(hi, abs=1e-12)
+    # t-Test passt dazu: t = Mittel / SE
+    assert R.describe(ra, 52)["tests"]["ttest"]["t"] == pytest.approx(-0.00175 / se)

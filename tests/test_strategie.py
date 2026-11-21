@@ -105,7 +105,8 @@ def test_js_gleich_python(market, js_results, k):
     assert js["exposure"] == pytest.approx(py["exposure"], abs=1e-12)
     for part, key in (("all", "all"), ("bh", "bh"), ("is", "is"), ("oos", "oos")):
         mj, mp = js["metrics"][part], py[key]
-        for f in ("n", "total", "cagr", "vol", "sharpe", "sortino", "maxdd", "dd_days", "calmar", "t", "years"):
+        for f in ("n", "total", "cagr", "vol", "sharpe", "sortino", "maxdd", "dd_days", "calmar", "t", "years",
+                  "mean", "se", "ci_lo", "ci_hi"):
             if mp[f] is None:
                 assert mj[f] is None, f
             else:

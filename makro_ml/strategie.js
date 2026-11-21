@@ -324,6 +324,9 @@
       n, total, cagr, vol: sd === null ? null : sd * Math.sqrt(k), sharpe: sd ? mean / sd * Math.sqrt(k) : null,
       sortino: dd > 0 ? mean / dd * Math.sqrt(k) : null, maxdd: mdd, dd_days: Math.round(longest),
       calmar: mdd < 0 ? cagr / -mdd : null, mean, t: tstat, p: tstat === null ? null : tTwoSided(tstat, n - 1), years,
+      // Standardfehler der mittleren Tagesrendite, 95-%-Intervall in Normalnaeherung (n = Handelstage, gross)
+      se: sd ? sd / Math.sqrt(n) : null,
+      ci_lo: sd ? mean - 1.959963984540054 * sd / Math.sqrt(n) : null, ci_hi: sd ? mean + 1.959963984540054 * sd / Math.sqrt(n) : null,
     };
   }
 

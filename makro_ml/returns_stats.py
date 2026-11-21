@@ -324,6 +324,10 @@ def describe(r: pd.Series, k: int) -> dict:
     up, dn = int((x > 0).sum()), int((x < 0).sum())
     out = {
         "distribution": {"n": n, "mean": mu, "median": md, "sigma": sd, "ann_vol": sd * math.sqrt(k), "k": k,
+                         # Standardfehler des Mittelwerts und 95-%-Intervall (t-Verteilung, df = N - 1)
+                         "se_mean": sd / math.sqrt(n),
+                         "ci95": [mu - float(st.t.ppf(0.975, n - 1)) * sd / math.sqrt(n),
+                                  mu + float(st.t.ppf(0.975, n - 1)) * sd / math.sqrt(n)],
                          "skew": float(st.skew(x, bias=False)),
                          "kurt": float(st.kurtosis(x, fisher=True, bias=False)),
                          "best": x[ib], "best_date": str(r.index[ib].date()),
