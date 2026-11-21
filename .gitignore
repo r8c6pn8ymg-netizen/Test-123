@@ -1,7 +1,42 @@
-# Python
+# ── Python ──
 __pycache__/
 *.py[cod]
-.pytest_cache/
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# ── Virtuelle Umgebungen ──
 .venv/
 venv/
+env/
+
+# ── Test- und Lint-Caches ──
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ── Jupyter ──
 .ipynb_checkpoints/
+
+# ── Playwright (falls später genutzt) ──
+test-results/
+playwright-report/
+
+# ── Temporäre Dateien / Editor / Betriebssystem ──
+*.tmp
+*.bak
+*.swp
+*~
+~$*
+.~lock.*#
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ── Lokale Geheimnisse ──
+.env

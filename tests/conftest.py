@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-# keine .pyc-Dateien schreiben (die eingecheckten __pycache__-Dateien bleiben unverändert)
+# keine .pyc-Dateien schreiben (__pycache__ ist per .gitignore ausgeschlossen)
 sys.dont_write_bytecode = True
 
 import matplotlib
