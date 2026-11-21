@@ -704,7 +704,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         models.append(dict(basis=b.id, asset=asset, h=h, tier=t, da=round(r["da"] * 100, 1),
                            da1=round(r["da1"] * 100, 1), da2=round(r["da2"] * 100, 1),
                            naive=round(r["naive"] * 100, 1), p=float(f"{r['p']:.2g}"),
-                           n_eff=r["n_eff"], prob=round(p_cal(r["prob"], h), 4), prob_raw=round(r["prob"], 3), pred=label(r["prob"]),
+                           n_eff=r["n_eff"], prob=round(p_cal(r["prob"], h), 6), prob_raw=round(r["prob"], 3), pred=label(r["prob"]),
                            date=str(b.series.index[-1].date()), oos_from=r["oos_from"],
                            _hist=r["hist"]))
     # Top-N je Waehrung: erst signifikante (A), dann robuste (B), jeweils nach DA

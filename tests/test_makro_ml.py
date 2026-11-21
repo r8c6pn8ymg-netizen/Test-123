@@ -356,7 +356,7 @@ def test_kalibrierung_aendert_richtung_nicht_und_ist_nicht_schlechter(mode):
     assert all(v >= 0 for v in list(C["b_train"].values()) + list(C["b_live"].values()))  # nie Richtungsumkehr
     for m in d["models"]:
         assert 0 < m["prob"] < 1
-        if abs(m["prob_raw"] - 0.5) > 0.002:
+        if abs(m["prob_raw"] - 0.5) > 0.002 and m["prob"] != 0.5:  # genau 0,5 = gerundet, keine Umkehr
             assert (m["prob"] > 0.5) == (m["prob_raw"] > 0.5), m
 
 
