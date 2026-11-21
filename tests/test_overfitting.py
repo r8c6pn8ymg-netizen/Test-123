@@ -50,7 +50,7 @@ def sltp_grid_returns(weekly_df):
 
 
 @pytest.mark.quality
-@pytest.mark.xfail(reason="Befund: PBO ≈ 0,8 – die im Raster beste SL/TP-Kombination liegt "
+@pytest.mark.xfail(reason="Befund: PBO ≈ 0,86 – die im Raster beste SL/TP-Kombination liegt "
                           "auf den jeweils anderen Datenhälften meist unter dem Median.",
                    strict=False)
 def test_sltp_grid_probability_of_overfitting(sltp_grid_returns):

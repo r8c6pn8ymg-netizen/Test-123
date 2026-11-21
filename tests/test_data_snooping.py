@@ -11,6 +11,9 @@ fast immer eine Variante, die zufällig gut aussieht.
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import numpy as np
 import pytest
 from scipy import stats
@@ -51,8 +54,12 @@ def test_deflated_sharpe_exposes_best_of_random_strategies():
 
 
 def test_n_trials_matches_significance_script():
-    import significance_tests as st                 # liest nur Daten, schreibt beim Import nichts
-    assert st.N_TESTED == N_TRIALS
+    """Liest N_TESTED direkt aus dem Quelltext. Ein Import von significance_tests würde
+    statsmodels voraussetzen, das für diese Prüfung nicht nötig ist."""
+    tree = ast.parse(Path("significance_tests.py").read_text(encoding="utf-8"))
+    node = next(n.value for n in tree.body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "N_TESTED" for t in n.targets))
+    assert eval(compile(ast.Expression(node), "N_TESTED", "eval"), {"__builtins__": {}}) == N_TRIALS
 
 
 # ───────────────────────── Strategie ─────────────────────────
