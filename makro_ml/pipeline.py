@@ -177,6 +177,9 @@ def ensemble_backtest(entries: list[tuple[str, pd.Series]], price: pd.Series) ->
     idx = score.index
     p = price.reindex(idx, method="ffill")
     ret = (p.shift(-1) / p - 1)
+    # nur volle Wochen: laeuft die Pipeline nicht freitags, waere der letzte Schritt (Freitag -> heute) angebrochen
+    nxt = pd.Series(idx, index=idx).shift(-1)
+    ret[(nxt - pd.Series(idx, index=idx)) < pd.Timedelta(days=7)] = np.nan
     pos = np.sign(score).where(score.abs() >= 0.1, 0.0)
     strat = (pos * ret).dropna()
     bh = ret.reindex(strat.index)
@@ -355,6 +358,14 @@ def _fit_predict(Xtr, ytr, Xte):
         if np.abs(step).max() < 1e-7:
             break
     return 1 / (1 + np.exp(-B1 @ w))
+
+
+def week_dates(price: pd.Series, today: pd.Timestamp) -> pd.DatetimeIndex:
+    """Wochenraster (Freitage) bis heute, dazu heute selbst. Eine laufende Woche (Mo-Do) bekaeme sonst das
+    Etikett des kommenden Freitags, also ein Datum in der Zukunft."""
+    dates = pd.DatetimeIndex(price.resample("W-FRI").last().dropna().index)
+    dates = dates[(dates >= "1999-01-08") & (dates <= today)]
+    return dates.append(pd.DatetimeIndex([today])) if dates[-1] < today else dates
 
 
 def run_model(X: pd.DataFrame, price: pd.Series, h: int, today: pd.Timestamp):
@@ -572,9 +583,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
     tasks, meta_bases = [], {}
     for asset, bases in bases_by_asset.items():
         price = px[asset].dropna()
-        dates = pd.DatetimeIndex(price.resample("W-FRI").last().dropna().index)
-        dates = dates[dates >= "1999-01-08"]
-        dates = dates.append(pd.DatetimeIndex([today])) if dates[-1] < today else dates
+        dates = week_dates(price, today)
         for b in bases:
             age = (today - b.series.index[-1]).days
             if age > STALE_DAYS + b.lag:
@@ -703,7 +712,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         models.append(dict(basis=b.id, asset=asset, h=h, tier=t, da=round(r["da"] * 100, 1),
                            da1=round(r["da1"] * 100, 1), da2=round(r["da2"] * 100, 1),
                            naive=round(r["naive"] * 100, 1), p=float(f"{r['p']:.2g}"),
-                           n_eff=r["n_eff"], prob=round(p_cal(r["prob"], h), 6), prob_raw=round(r["prob"], 3), pred=label(r["prob"]),
+                           n_eff=r["n_eff"], prob=round(p_cal(r["prob"], h), 6), prob_raw=round(r["prob"], 6), pred=label(r["prob"]),
                            date=str(b.series.index[-1].date()), oos_from=r["oos_from"],
                            _hist=r["hist"]))
     # Top-N je Waehrung: erst signifikante (A), dann robuste (B), jeweils nach DA
@@ -720,7 +729,7 @@ def run_mode(mode: str, refresh: bool, today: pd.Timestamp):
         if hs:
             df = pd.concat(hs, axis=1)
             share = df.mean(1)[df.count(1) >= max(3, len(hs) // 4)]
-            share = share[share.index >= "2015-01-01"].resample("W-FRI").last().dropna()
+            share = share[share.index >= "2015-01-01"].dropna()  # echte Daten (Freitage + heute), kein Zukunftsdatum
             p = px[a].reindex(share.index, method="ffill")
             history[a] = dict(d=[str(x.date()) for x in share.index],
                               bull=[round(v * 100, 1) for v in share.values],

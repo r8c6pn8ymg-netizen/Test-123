@@ -120,7 +120,7 @@ def main():
     for m in sample:
         r = rebuild(m["basis"], m["asset"], m["h"], today)
         dd, dp = abs(r["da"] - m["da"]), abs(r["prob_raw"] - m["prob_raw"])
-        ok = dd <= 0.2 and dp <= 0.01
+        ok = dd <= 0.2 + 1e-9 and dp <= 0.01 + 1e-9  # Toleranz inklusive (Gleitkomma)
         bad += not ok
         print(f"{m['asset']+' · '+m['basis']+' · '+str(m['h'])+'d':32s} {m['da']:9.1f}% {r['da']:9.1f}% {m['prob_raw']*100:10.1f}% {r['prob_raw']*100:7.1f}%  {'OK' if ok else 'ABWEICHUNG'}")
     print(f"\nGESAMT: {len(sample) - bad} von {len(sample)} stimmen überein (DA ±0,2 Punkte, Roh-Ausgabe ±1 Punkt)")

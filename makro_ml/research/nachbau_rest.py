@@ -225,7 +225,7 @@ def main():
             if key not in cache:
                 cache[key] = feats_alfred(m["basis"], today) if alfred else feats_from_monthly(*series_for(m["basis"], m["asset"]))
             da, pr = evaluate(cache[key], m["asset"], m["h"], today)
-            ok = abs(da - m["da"]) <= 0.2 and abs(pr - m["prob_raw"]) <= 0.01
+            ok = abs(da - m["da"]) <= 0.2 + 1e-9 and abs(pr - m["prob_raw"]) <= 0.01 + 1e-9  # Toleranz inklusive (Gleitkomma)
         except Exception as e:
             da, pr, ok = float("nan"), float("nan"), False
             print("   Fehler im Nachbau:", m["basis"], m["asset"], type(e).__name__, str(e)[:80])

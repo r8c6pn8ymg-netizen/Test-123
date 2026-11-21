@@ -358,6 +358,11 @@ def test_kalibrierung_aendert_richtung_nicht_und_ist_nicht_schlechter(mode):
         assert 0 < m["prob"] < 1
         if abs(m["prob_raw"] - 0.5) > 0.002 and m["prob"] != 0.5:  # genau 0,5 = gerundet, keine Umkehr
             assert (m["prob"] > 0.5) == (m["prob_raw"] > 0.5), m
+        # Einordnung passt zur gespeicherten Roh-Ausgabe (ab 6 Nachkommastellen; ältere Ausgaben mit 3 Stellen
+        # konnten 0,5198 als 0,520 zeigen, obwohl das Modell korrekt "Neutral" war)
+        if m["prob_raw"] != round(m["prob_raw"], 3):
+            want = "Bullish" if m["prob_raw"] >= 0.52 else "Bearish" if m["prob_raw"] <= 0.48 else "Neutral"
+            assert m["pred"] == want, m
 
 
 def test_cockpit_ohne_javascript_fehler():
@@ -382,3 +387,56 @@ def test_ezb_verlaengerung_aendert_fed_historie_nicht():
     assert abs(out["2026-11-16"] - 1.12 * 1.13 / 1.115) < 1e-12 and last == "2026-11-20"
     same, none = ds.live_extend(fed, ecb[ecb.index <= "2026-11-13"])   # keine neuen EZB-Tage -> unveraendert
     assert none is None and same.equals(fed)
+
+
+def test_alfred_heutiger_stand_heisst_wie_letzte_veroeffentlichung(tmp_path, monkeypatch):
+    """ALFRED benennt den heutigen Datenstand nach dem letzten Veroeffentlichungstag (z. B. 20261120 bei Abfrage am
+    21.11.). Der heutige Stand darf dann nicht wegfallen (sonst Rueckfall auf das letzte Monatsende)."""
+    import data_sources as ds
+    monkeypatch.setattr(ds, "CACHE", tmp_path)
+
+    def fake(url, tries=4):
+        dates = url.split("vintage_date=")[1].split(",")
+        cols = ["X_20261120" if d == "2026-11-21" else "X_" + d.replace("-", "") for d in dates]
+        rows = ["observation_date," + ",".join(cols), "2026-09-01," + ",".join("1" for _ in cols),
+                "2026-10-01," + ",".join("" if d == "2026-10-31" else "2" for d in dates)]
+        return "\n".join(rows).encode()
+    monkeypatch.setattr(ds, "_download", fake)
+    monkeypatch.setattr(ds.time, "sleep", lambda s: None)
+    V = ds.alfred_vintages("X", [pd.Timestamp("2026-10-31"), pd.Timestamp("2026-11-21")])
+    assert list(V.columns) == ["2026-10-31", "2026-11-21"]
+    assert V.loc["2026-10-01", "2026-11-21"] == 2          # Stand vom 20.11. (Oktober-Wert bekannt)
+    assert pd.isna(V.loc["2026-10-01", "2026-10-31"])      # Monatsende davor: Oktober noch unbekannt
+
+
+def test_ensemble_zaehlt_keine_angebrochene_woche():
+    """Laeuft die Pipeline nicht freitags, ist der letzte Schritt (Freitag -> heute) keine volle Woche."""
+    import pipeline as P
+    idx = pd.DatetimeIndex(list(pd.date_range("2020-01-03", periods=60, freq="W-FRI")) + [pd.Timestamp("2021-02-23")])
+    hst = pd.Series(0.6, index=idx)
+    price = pd.Series(np.linspace(1.0, 1.5, len(idx)), index=idx)
+    price.iloc[-1] = price.iloc[-2] * 0.5                     # Kurssturz am Dienstag darf nicht als Woche zaehlen
+    out = P.ensemble_backtest([("A", hst)], price)
+    alle = out["periods"]["2018–2021"]
+    assert alle["weeks"] == 59 and alle["hit"] == 100.0
+
+
+def test_bias_verlauf_ohne_zukunftsdatum():
+    import json
+    for mode in ("fred", "alfred"):
+        f = Path(__file__).resolve().parents[1] / "makro_ml" / "output" / f"data_{mode}.json"
+        if not f.exists():
+            pytest.skip("Pipeline-Ausgabe fehlt")
+        d = json.loads(f.read_text())
+        tag = d["generated"][:10]
+        assert all(max(h["d"]) <= tag for h in d["history"].values()), mode
+
+
+def test_wochenraster_ohne_zukunftsdatum():
+    """Lauf am Mittwoch: die laufende Woche heisst 'heute', nicht 'kommender Freitag'."""
+    import pipeline as P
+    price = pd.Series(1.0, index=pd.bdate_range("2026-01-01", "2026-11-18"))   # Kurse bis Mittwoch
+    d = P.week_dates(price, pd.Timestamp("2026-11-18"))
+    assert d[-1] == pd.Timestamp("2026-11-18") and d[-2] == pd.Timestamp("2026-11-13")
+    d = P.week_dates(price[:"2026-11-13"], pd.Timestamp("2026-11-13"))            # Lauf am Freitag
+    assert d[-1] == pd.Timestamp("2026-11-13") and d[-2] == pd.Timestamp("2026-11-06")

@@ -267,4 +267,12 @@ def alfred_vintages(series_id: str, vintage_dates: list[pd.Timestamp], refresh: 
         time.sleep(0.5)
     have = have.reindex(sorted(have.columns), axis=1)
     have.to_csv(path)
-    return have[[c for c in want if c in have.columns]]
+    # ALFRED benennt einen Datenstand nach dem letzten Veroeffentlichungstag <= Abfragedatum (heute z. B. 2026-11-20
+    # statt 2026-11-21). Fehlt ein gewuenschtes Datum, gilt daher der juengste vorhandene Stand davor (nie danach).
+    cols = list(have.columns)
+    out = {}
+    for w in want:
+        prev = [c for c in cols if c <= w]
+        if prev:
+            out[w] = have[w] if w in have.columns else have[prev[-1]]
+    return pd.DataFrame(out, index=have.index)

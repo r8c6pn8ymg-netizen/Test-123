@@ -965,7 +965,7 @@ window.renderFactors = async function () {
     const t = M_LABEL(m.basis);
     return `<div class="t">${swatch(m.asset)}${esc(m.asset)} · ${esc(m.basis)}</div><div class="r" style="margin-bottom:4px"><span>${esc(t)}</span></div>
       <div class="r"><span>Horizont</span><b>${m.h} Tage</b></div><div class="r"><span>Prognose</span><b class="${PRED[m.pred]}">${m.pred}</b></div>
-      <div class="r"><span>P(steigt), kalibriert</span><b>${fmt(m.prob * 100, 2)}%</b></div><div class="r"><span>Roh-Ausgabe Modell</span><b>${m.prob_raw != null ? fmt(m.prob_raw * 100) + '%' : '–'}</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
+      <div class="r"><span>P(steigt), kalibriert</span><b>${fmt(m.prob * 100, 2)}%</b></div><div class="r"><span>Roh-Ausgabe Modell</span><b>${m.prob_raw != null ? fmt(m.prob_raw * 100, 2) + '%' : '–'}</b></div><div class="r"><span>DA (OOS)</span><b>${fmt(m.da)}%</b></div>
       <div class="r"><span>Güte</span><b>${m.tier === 'A' ? 'Signifikant' : 'Robust'}</b></div>`;
   }
   const M_LABEL = id => (D.bases[id] || {}).label || id;
