@@ -1040,6 +1040,7 @@ window.renderStatistik = async function () {
     if (!c) return;
     const r = svg.getBoundingClientRect(), k = c.W / r.width, x = (ev.clientX - r.left) * k;
     if (x < c.L || x > c.W - c.R) { lcHide(svg); return; }
+    if (c.hist) { lcHistHover(svg, c, x, k); return; }
     const t = c.t0 + (x - c.L) / (c.W - c.L - c.R) * (c.t1 - c.t0);
     let tx = null, rows = '', dots = '';
     for (const se of c.series) {
@@ -1062,9 +1063,30 @@ window.renderStatistik = async function () {
     const bw = box.clientWidth, w = tip.offsetWidth; let left = lx / k + 14; if (left + w > bw) left = lx / k - w - 14;
     tip.style.left = Math.max(4, left) + 'px'; tip.style.top = '8px';
   }
+  function lcHistHover(svg, c, x, k) {
+    const v = c.x0 + (x - c.L) / (c.W - c.L - c.R) * (c.x1 - c.x0);
+    let i = -1; for (let j = 0; j < c.cnt.length; j++) if (v >= c.e[j] && v < c.e[j + 1]) { i = j; break; }
+    if (i < 0) { lcHide(svg); return; }
+    const a = c.X(c.e[i]), b = c.X(c.e[i + 1]), y = c.Y(c.cnt[i]), cx = ((a + b) / 2).toFixed(1);
+    svg.querySelector('g.lc-x').innerHTML = `<line x1="${cx}" x2="${cx}" y1="${c.T}" y2="${c.H - c.B}" stroke="${C('fg-2')}" stroke-dasharray="3 3"/>`
+      + `<rect x="${a.toFixed(1)}" y="${Math.min(y, c.H - c.B - 1).toFixed(1)}" width="${Math.max(1, b - a).toFixed(1)}" height="${Math.max(1, c.H - c.B - y).toFixed(1)}" fill="none" stroke="${C('fg')}" stroke-width="1.2"/>`;
+    const box = svg.parentElement;
+    let tip = box.querySelector(':scope > .lc-tip');
+    if (!tip) { tip = document.createElement('div'); tip.className = 'tip lc-tip'; box.appendChild(tip); }
+    const ex = c.exp[i];
+    tip.innerHTML = `<div class="t">${pct(c.e[i], 2)} bis ${pct(c.e[i + 1], 2)}</div>`
+      + `<div class="r"><span>Anzahl ${esc(c.unit)}</span><b>${nf(c.cnt[i], 0)}</b></div>`
+      + `<div class="r"><span>Anteil</span><b>${nf(c.cnt[i] / c.n * 100, 2)} %</b></div>`
+      + (ex != null ? `<div class="r"><span>Normal erwartet</span><b>${nf(ex, 1)}</b></div>` : '');
+    tip.hidden = false;
+    const bw = box.clientWidth, w = tip.offsetWidth; let left = cx / k + 14; if (left + w > bw) left = cx / k - w - 14;
+    tip.style.left = Math.max(4, left) + 'px'; tip.style.top = '8px';
+  }
   $('#statView').addEventListener('pointermove', lcHover);
   $('#statView').addEventListener('pointerdown', lcHover);
-  $('#statView').addEventListener('pointerout', ev => { const svg = ev.target.closest && ev.target.closest('svg'); if (svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) lcHide(svg); });
+  // Maus: beim Verlassen ausblenden. Touch: stehen lassen (Loslassen meldet auch "verlassen"), erst beim Tippen woanders ausblenden.
+  $('#statView').addEventListener('pointerout', ev => { if (ev.pointerType === 'touch') return; const svg = ev.target.closest && ev.target.closest('svg'); if (svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) lcHide(svg); });
+  document.addEventListener('pointerdown', ev => { const own = ev.target.closest && ev.target.closest('svg'); document.querySelectorAll('#statView svg').forEach(svg => { if (svg !== own && svg.querySelector('g[data-lc]')) lcHide(svg); }); });
 
   // ------------------------------------------------------------------ Histogramm / Q-Q
   function histogramSvg(c, h, lr, live) {
@@ -1098,6 +1120,11 @@ window.renderStatistik = async function () {
     s += vline(D.mean, C('fg-2'), 'Mittel ' + pct(D.mean), 0, '2 3');
     s += vline(-ve.var_hist, C('bear'), `VaR ${st.cl === '0.95' ? 95 : 99} % ` + pct(-ve.var_hist), 1);
     s += vline(lr.r, C('accent'), (live ? IVN[st.iv][2] : 'Letzte ' + IVN[st.iv][0]) + ' ' + pct(lr.r), 2, '6 3');
+    // Antippen/Wischen: Balken mit Bereich, Anzahl und Normal-Erwartung (nur Anzeige der vorhandenen Werte)
+    const id = 'hb' + (++lcSeq);
+    LC.set(id, { hist: true, W, H, L, R, T, B, x0, x1, X, Y, e, cnt, exp: h.expected || [], n: D.n, unit: IVN[st.iv][1] });
+    if (LC.size > 80) LC.delete(LC.keys().next().value);
+    s += `<g data-lc="${id}"></g><g class="lc-x" pointer-events="none"></g>`;
     return s;
   }
   function qqSvg(c) {
