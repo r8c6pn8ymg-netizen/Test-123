@@ -11,7 +11,8 @@ Regeln (wie im Pine-Code):
     am Vorabend (22:00/23:00 UTC) öffnen
   * Positionsgröße: 100 % des Kapitals, abgerundet auf die Mengenschrittweite
     (bei CAPITALCOM:SPX500 0,1 Kontrakte), Pyramiding 1
-  * Keine Provision, keine Slippage, Hebel 1x
+  * Hebel 1x. Standard ohne Provision und Slippage; über Settings.commission_pct
+    (% je Order) und Settings.slippage_ticks (Ticks je Order) zuschaltbar
 
 Aufruf:
   python friday_rush_backtest.py DATEN.csv [--start 2010-01-01] [--end 2026-10-30]
@@ -39,8 +40,9 @@ class Settings:
     initial_capital: float = 10_000.0  # strategy(initial_capital)
     pct_of_equity: float = 100.0       # default_qty_value (percent_of_equity)
     qty_step: float = 0.1              # Mengenschrittweite des Symbols
-    commission_pct: float = 0.0
-    slippage_ticks: int = 0
+    commission_pct: float = 0.0        # % des Ordervolumens je Order (Ein- und Ausstieg)
+    slippage_ticks: int = 0            # Ticks gegen die Position je Order
+    tick: float = 0.1                  # Tickgröße (syminfo.mintick, CAPITALCOM:SPX500 = 0,1)
     exchange_tz: str = "America/New_York"  # Zeitzone, in der timestamp() die Datums-Inputs liest
     sma_len: int = 0                   # Trendfilter: nur Einstieg, wenn Close > SMA(sma_len); 0 = aus
 
@@ -62,6 +64,7 @@ class Trade:
     ret_pct: float = 0.0
     run_up: float = 0.0
     drawdown: float = 0.0
+    commission: float = 0.0            # Summe der Provisionen (in pnl bereits abgezogen)
     _hi: float = field(default=-math.inf, repr=False)
     _lo: float = field(default=math.inf, repr=False)
 
@@ -93,6 +96,7 @@ def run_backtest(df: pd.DataFrame, s: Settings) -> tuple[list[Trade], pd.Series]
     entry_bar = -1
     equity = s.initial_capital         # realisiertes Kapital
     equity_curve = []
+    slip = s.slippage_ticks * s.tick
 
     sma = df["close"].rolling(s.sma_len).mean() if s.sma_len > 0 else None
 
@@ -123,11 +127,13 @@ def run_backtest(df: pd.DataFrame, s: Settings) -> tuple[list[Trade], pd.Series]
 
         if exit_now:
             t = open_tr
-            t.exit_time, t.exit_day, t.exit_price = bar.time, trade_day, c
+            fill = c - sign * slip                       # Slippage gegen die Position
+            t.exit_time, t.exit_day, t.exit_price = bar.time, trade_day, fill
             t.exit_signal = "Exit Freitag" if is_friday else "Exit Ersatztag"
             t.bars = i - entry_bar
-            t.pnl = sign * (c - t.entry_price) * t.qty
-            t.ret_pct = sign * (c / t.entry_price - 1) * 100
+            t.commission += s.commission_pct / 100 * fill * t.qty
+            t.pnl = sign * (fill - t.entry_price) * t.qty - t.commission
+            t.ret_pct = sign * (fill / t.entry_price - 1) * 100
             if is_long:
                 t.run_up = max(0.0, (t._hi - t.entry_price) * t.qty)
                 t.drawdown = min(0.0, (t._lo - t.entry_price) * t.qty)
@@ -141,11 +147,14 @@ def run_backtest(df: pd.DataFrame, s: Settings) -> tuple[list[Trade], pd.Series]
         if enter_now:
             qty = floor_step(equity * s.pct_of_equity / 100 / c, s.qty_step)
             if qty > 0:
-                open_tr = Trade(len(trades) + 1, s.direction, bar.time, trade_day, c, qty)
+                fill = c + sign * slip
+                open_tr = Trade(len(trades) + 1, s.direction, bar.time, trade_day, fill, qty,
+                                commission=s.commission_pct / 100 * fill * qty)
                 entry_bar = i
 
         # Equity zum Schlusskurs (für Drawdown "Schlusskurs zu Schlusskurs")
-        mtm = equity + (sign * (c - open_tr.entry_price) * open_tr.qty if open_tr else 0.0)
+        mtm = equity + (sign * (c - open_tr.entry_price) * open_tr.qty - open_tr.commission
+                        if open_tr else 0.0)
         equity_curve.append((trade_day, mtm))
 
     curve = pd.Series([v for _, v in equity_curve], index=[d for d, _ in equity_curve])

@@ -102,4 +102,5 @@ def test_single_instrument_selection_bias_is_documented():
         "rückblickend außergewöhnlich gut lief. Ergebnisse sind nicht auf andere Märkte oder "
         "Einzelaktien übertragbar, ohne dort erneut (inkl. delisteter Titel) zu testen.",
         SelectionBiasWarning,
+        stacklevel=2,
     )

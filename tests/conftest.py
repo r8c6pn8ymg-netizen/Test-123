@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-# keine .pyc-Dateien schreiben (die eingecheckten __pycache__-Dateien bleiben unverändert)
+# keine .pyc-Dateien schreiben (__pycache__/ ist zusätzlich in .gitignore ausgeschlossen)
 sys.dont_write_bytecode = True
 
 import matplotlib
@@ -42,7 +42,7 @@ REALISTIC_COSTS = bc.CostModel(spread_points=0.5, slippage_ticks=1, tick=0.1, co
 # ───────────────────────── Schutz vor Überschreiben ─────────────────────────
 def _snapshot() -> dict[str, str]:
     files = [p for d in ("data", "reports") for p in (ROOT / d).rglob("*") if p.is_file()]
-    files += list(ROOT.glob("*.py")) + list((ROOT / "__pycache__").glob("*"))
+    files += list(ROOT.glob("*.py"))
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
 
 
