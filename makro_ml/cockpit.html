@@ -521,7 +521,7 @@ textarea { width: 100%; resize: vertical; }
             <button type="button" data-v="hist">Histogramm</button><button type="button" data-v="qq">Q-Q</button></div></div>
           <div class="fld"><label>Y-Achse</label><div class="seg" id="sY" role="group" aria-label="Y-Achse">
             <button type="button" data-v="lin">Linear</button><button type="button" data-v="log">Log</button></div></div>
-          <div class="fld"><label>&nbsp;</label><button type="button" class="linkbtn" id="sCsv" title="Alle Kennzahlen dieser Ansicht als CSV-Datei">Kennzahlen als CSV</button></div>
+          <div class="fld"><label>&nbsp;</label><div><button type="button" class="linkbtn" id="sHtml" title="Diese Ansicht mit allen Grafiken, Kennzahlen und Tabellen als HTML-Datei">Herunterladen (HTML)</button></div></div>
         </div>
         <div class="st-info" id="sInfo1"></div>
         <div class="st-info" id="sInfo2"></div>
@@ -1195,31 +1195,41 @@ window.renderStatistik = async function () {
     $('#ovlSel').addEventListener('change', e => { st.ovl = e.target.value; save(); drawTab(); });
   }
 
-  $('#sCsv').addEventListener('click', () => {
-    const c = CUR; if (!c || !J) return;
-    const D = c.distribution, rows = [['Instrument', J.meta.name], ['Ticker', J.meta.ticker], ['Intervall', st.iv], ['Rendite', st.rt], ['Zeitraum', `${D.start} bis ${D.end}`], ['N', D.n]];
-    for (const k of ['mean', 'median', 'sigma', 'ann_vol', 'skew', 'kurt', 'best', 'best_date', 'worst', 'worst_date', 'up', 'down', 'zero']) rows.push([k, D[k]]);
-    for (const [q, v] of Object.entries(c.quantiles)) rows.push([`quantil_${q}_beob`, v.obs], [`quantil_${q}_normal`, v.normal]);
-    for (const [cl, v] of Object.entries(c.var_es)) for (const [k, x] of Object.entries(v)) rows.push([`${k}_${cl}`, x]);
-    for (const [k, v] of Object.entries(c.tails)) rows.push([`jenseits_${k}sigma`, v.count], [`jenseits_${k}sigma_normal_pct`, v.normal_pct]);
-    const T = c.tests; rows.push(['jarque_bera', T.jarque_bera.stat], ['jarque_bera_p', T.jarque_bera.p], ['shapiro_w', T.shapiro.w], ['shapiro_p', T.shapiro.p], ['ad_a2', T.anderson.a2], ['ad_a2_star', T.anderson.a2_star], ['ad_p', T.anderson.p], ['t', T.ttest.t], ['t_p', T.ttest.p]);
-    const h = c.hist[st.bins].chi2; rows.push(['chi2', h.chi2], ['chi2_ndf', h.ndf], ['chi2_p', h.p]);
-    saveCsv(`kennzahlen_${J.meta.id}_${st.iv}_${st.rt}_${st.per}.csv`, rows, '#sCsv');
-  });
 
   await draw();
 
   // Download ueber die Plattform (Artifact-Faehigkeit "downloads"); Excel-freundlich: Semikolon, Dezimalkomma
   let DL = null;
   const dlReady = (async () => { try { DL = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { DL = null; } })();
-  async function saveCsv(filename, rows, btnSel) {
+
+  // Bericht als eigenstaendige HTML-Datei: Cockpit-Stil + aktuelle Grafiken und Tabellen (nur Kopie der Anzeige)
+  function reportHtml(title, sub, parts) {
+    const css = [...document.querySelectorAll('style')].map(s => s.textContent).find(x => x.includes('--bg:')) || '';
+    const body = parts.map(h => { const d = document.createElement('div'); d.innerHTML = h;
+      d.querySelectorAll('button, input, select, textarea, .seg, .filters').forEach(x => { if (!x.closest('table')) x.remove(); });
+      return d.innerHTML; }).join('');
+    return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<style>${css}
+body{margin:0} .rep{max-width:1200px;margin:0 auto;padding:24px 16px;display:grid;gap:14px} .rep h1{font-size:20px;margin:0} .rep .sub{color:var(--muted);font-size:12px}
+.st-tbl{max-height:none} .st-main{grid-template-columns:minmax(0,65fr) minmax(0,35fr)} @media(max-width:900px){.st-main{grid-template-columns:1fr}}</style></head>
+<body><div class="rep"><div><h1>${esc(title)}</h1><div class="sub">${esc(sub)}</div></div>${body}
+<div class="note" style="max-width:none">Erstellt mit dem Makro ML Cockpit. Kurse: Yahoo Finance bzw. Fed/EZB (Tagesschlüsse). Keine Anlageberatung.</div></div></body></html>`;
+  }
+  async function saveHtml(filename, html) {
     await dlReady;
-    const btn = $(btnSel), cell = v => (typeof v === 'number' ? String(v).replace('.', ',') : String(v ?? '').replace(/;/g, ','));
-    const csv = '\ufeff' + rows.map(r => r.map(cell).join(';')).join('\r\n');
-    if (!DL) { if (btn) btn.title = 'Herunterladen ist in dieser Ansicht nicht verfügbar'; return; }
-    try { await DL.save({ filename, data: csv }); }
+    if (!DL) return;
+    try { await DL.save({ filename, data: html }); }
     catch (e) { if (e && e.code !== 'declined') console.warn('Download nicht möglich', e); }
   }
+  $('#sHtml').addEventListener('click', () => {
+    if (!CUR || !J) return;
+    const stamp = new Date().toLocaleString('de-DE');
+    const html = reportHtml($('#sTitle').textContent, `${$('#sAsOf').textContent} · Intervall ${IVN[st.iv][0]} · ${st.rt === 'log' ? 'Log' : 'einfache'} Renditen · Konfidenz ${Math.round(st.cl * 100)} % · erstellt ${stamp}`, [
+      `<section class="panel"><div class="pb"><div class="st-info">${$('#sInfo1').innerHTML}</div><div class="st-info">${$('#sInfo2').innerHTML}</div><div class="note" style="max-width:none">${$('#sNote').innerHTML}</div>
+       <div class="st-main"><div class="st-left"><div class="chartbox">${$('#sChart').outerHTML}</div><div class="st-legend">${$('#sLegend').innerHTML}</div></div><aside class="st-side">${$('#sSide').innerHTML}</aside></div></div></section>`,
+      `<section class="panel"><div class="ph"><span>${esc($('#sTab [aria-pressed="true"]')?.textContent || '')}</span></div><div class="pb">${$('#sTabBody').innerHTML}</div></section>`]);
+    saveHtml(`bericht_${J.meta.id}_${st.iv}_${st.rt}_${st.per}.html`, html);
+  });
 
   // ================================================================== Strategie-Tester
   const CT = {
@@ -1342,15 +1352,16 @@ window.renderStatistik = async function () {
   $('#btRun').addEventListener('click', runBt);
   let LAST = null;
   $('#btOut').addEventListener('click', e => {
-    if (e.target.id !== 'btCsvOut' || !LAST) return;
-    const { res, cfg, meta } = LAST, m = res.metrics, K = ['total', 'cagr', 'vol', 'sharpe', 'sortino', 'maxdd', 'dd_days', 'calmar', 't', 'p', 'years'];
-    const rows = [['Instrument', meta.name], ['Zeitraum', `${res.range.start} bis ${res.range.end}`], ['IS/OOS-Grenze', res.range.split], ['Regeln', JSON.stringify(cfg)], [],
-      ['Kennzahl', 'Gesamt', 'In-Sample', 'Out-of-Sample', 'Halten gesamt', 'Halten IS', 'Halten OOS']];
-    for (const k of K) rows.push([k, ...['all', 'is', 'oos', 'bh', 'bh_is', 'bh_oos'].map(x => (m[x] ? m[x][k] : ''))]);
-    rows.push([], ['Jahr', 'Strategie', 'Halten']); for (const y of res.yearly) rows.push([y.year, y.strat, y.bh]);
-    rows.push([], ['Einstieg', 'Ausstieg', 'Richtung', 'Kurs ein', 'Kurs aus', 'Rendite', 'Tage', 'Grund']);
-    for (const tr of res.trades) rows.push([tr.entry, tr.exit, tr.dir > 0 ? 'Long' : 'Short', tr.entryPx, tr.exitPx, tr.ret, tr.days, tr.reason]);
-    saveCsv(`backtest_${meta.id || 'eigene'}_${res.range.start}_${res.range.end}.csv`, rows, '#btCsvOut');
+    if (e.target.id === 'btHtmlOut' && LAST) {
+      const { res, cfg, meta } = LAST;
+      const cn = cfg.conds.map(c => CT[c.type].l + (c.n ? ` n=${c.n}` : '') + (c.a ? ` ${c.a}/${c.b}` : '') + (c.op ? (c.op === 'gt' ? ' >' : ' <') : '') + (c.th != null && c.type !== 'calendar' ? ` ${c.th}` : '')).join(' UND ');
+      const rules = `Richtung ${cfg.dir} · Signal-Intervall ${IVN[cfg.interval][0]} · Einstieg: ${cn || 'immer'} · Ausstieg: ${[cfg.exit.signal ? 'Signal weg' : '', cfg.exit.maxHold ? `max. ${cfg.exit.maxHold} Perioden` : '', cfg.exit.sl ? `Stop ${cfg.exit.sl} %` : '', cfg.exit.tp ? `Ziel ${cfg.exit.tp} %` : '', cfg.exit.trail ? `Trailing ${cfg.exit.trail} %` : ''].filter(Boolean).join(', ') || 'keiner'} · Größe ${cfg.size * 100} % × Hebel ${cfg.lev} · Kosten: Gebühr ${cfg.cost.fee_bp} Bp, Spread ${cfg.cost.spread_bp} Bp, Slippage ${cfg.cost.slip_bp} Bp, Finanzierung ${cfg.cost.fin_pa} % p. a. · Ausführung ${cfg.lag ? 'nächster Tagesschluss' : 'gleicher Schluss'}`;
+      const html = reportHtml(`Backtest · ${meta.name}`, `${res.range.start} – ${res.range.end} · IS/OOS-Grenze ${res.range.split} · erstellt ${new Date().toLocaleString('de-DE')}`,
+        [`<section class="panel"><div class="pb"><div class="note" style="max-width:none"><b>Regeln:</b> ${esc(rules)}</div>${$('#btOut').innerHTML}</div></section>`,
+         `<section class="panel"><div class="ph"><span>Alle ${res.trades.length} Trades</span></div><div class="pb"><div class="st-tbl"><table><thead><tr><th>Nr.</th><th>Einstieg</th><th>Ausstieg</th><th>Richtung</th><th>Kurs ein</th><th>Kurs aus</th><th>Rendite</th><th>Tage</th><th>Grund</th></tr></thead><tbody>${res.trades.map((x, i) => `<tr><td>${i + 1}</td><td>${dDE(x.entry)}</td><td>${dDE(x.exit)}</td><td>${x.dir > 0 ? 'Long' : 'Short'}</td><td>${nf(x.entryPx, 2)}</td><td>${nf(x.exitPx, 2)}</td><td class="${x.ret >= 0 ? 'pos' : 'negv'}">${pct(x.ret, 2)}</td><td>${x.days}</td><td>${x.reason}</td></tr>`).join('')}</tbody></table></div></div></section>`]);
+      saveHtml(`backtest_${meta.id || 'eigene'}_${res.range.start}_${res.range.end}.html`, html);
+      return;
+    }
   });
 
   function renderBt(res, pl, cfg, meta, M) {
@@ -1381,7 +1392,7 @@ window.renderStatistik = async function () {
     LAST = { res, cfg, meta };
     $('#btOut').innerHTML = `
       ${warn.length ? `<div class="warnbox">${warn.join('<br>')}</div>` : ''}
-      <div><button type="button" class="linkbtn" id="btCsvOut">Ergebnis als CSV (Kennzahlen, Jahre, Trades)</button></div>
+      <div><button type="button" class="linkbtn" id="btHtmlOut">Ergebnis herunterladen (HTML mit Grafiken und allen Trades)</button></div>
       <div class="kpis">
         ${kpi('CAGR', pct(a.cagr), `Kauf und Halten ${pct(b.cagr)}`, sgn(a.cagr))}
         ${kpi('Sharpe', nf(a.sharpe, 2), `Kauf und Halten ${nf(b.sharpe, 2)}`)}
