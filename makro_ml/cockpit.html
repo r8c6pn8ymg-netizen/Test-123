@@ -948,6 +948,7 @@ window.renderStatistik = async function () {
   const save = () => store.set('state', st);
   $('#stamp').innerHTML = `${window.freshPill(IDX.generated)}<span class="pill">${IDX.instruments.length} Instrumente</span>`;
   if (IDX.failed && IDX.failed.length) $('#stamp').innerHTML += `<span class="pill" style="color:var(--warn)" title="Diese Instrumente konnten beim letzten Lauf nicht geladen werden">Fehlt: ${esc(IDX.failed.join(', '))}</span>`;
+  if (IDX.stale && IDX.stale.length) $('#stamp').innerHTML += `<span class="pill" style="color:var(--warn)" title="Abruf fehlgeschlagen, es wird der letzte gespeicherte Stand gezeigt">Kurse veraltet: ${esc(IDX.stale.join(', '))}</span>`;
 
   const options = sel => GROUPS.map(g => {
     const it = IDX.instruments.filter(i => i.group === g);
@@ -1094,6 +1095,7 @@ window.renderStatistik = async function () {
       `Normal erwartet ${nf(lr.normal_expect, 1)}`, live ? `Stand ${dDE(J.live[st.iv].date)}` : ''].filter(Boolean).map(x => `<span>${x}</span>`).join('');
     const rank = down ? `Nur <b>${lr.worse_count}</b> ${IVN[st.iv][1]} waren schlechter als diese in den letzten ${lr.years} Jahren.` : `Nur <b>${lr.better_count}</b> ${IVN[st.iv][1]} waren besser als diese in den letzten ${lr.years} Jahren.`;
     const notes = [rank];
+    if ((byId[st.id] || {}).stale) notes.push(`<span style="color:var(--warn)"><b>Kurse veraltet:</b> letzter Kurs vom ${dDE(m.data_as_of)}, der Abruf ist fehlgeschlagen.</span>`);
     if (m.note) notes.push(esc(m.note) + '.');
     if (!m.investable) notes.push('Nicht direkt handelbar.');
     if (m.quality && m.quality.length) notes.push(`<span style="color:var(--warn)" title="${esc(m.quality.slice(0, 12).map(q => dDE(q[0]) + ' ' + pct(q[1], 1)).join(', '))}">Datenqualität: ${m.quality.length} auffällige Tagesbewegungen (nicht gelöscht)</span>`);

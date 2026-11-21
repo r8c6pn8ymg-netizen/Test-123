@@ -76,7 +76,8 @@ INSTRUMENTS = [
     ("USDJPY", "USD/JPY", "Währungen", "fx:DEXJPUS:JPY", "Fed H.10 (12 Uhr New York), verlängert mit EZB-Kursen"),
     ("USDCHF", "USD/CHF", "Währungen", "fx:DEXSZUS:CHF", "Fed H.10 (12 Uhr New York), verlängert mit EZB-Kursen"),
     ("USDCAD", "USD/CAD", "Währungen", "fx:DEXCAUS:CAD", "Fed H.10 (12 Uhr New York), verlängert mit EZB-Kursen"),
-    ("DXY", "US-Dollar-Index", "Währungen", "yf:DX-Y.NYB", ""),
+    ("DXY", "US-Dollar-Index", "Währungen", "yf:DX-Y.NYB",
+     "gehandelter ICE-Index (Yahoo); in den anderen Reitern aus Fed-Kursen berechnet, leichte Abweichungen möglich"),
     ("BTC_USD", "Bitcoin", "Krypto", "yf:BTC-USD", "Handel an 7 Tagen"),
     ("ETH_USD", "Ethereum", "Krypto", "yf:ETH-USD", "Handel an 7 Tagen"),
     ("VIX", "VIX (Volatilitätsindex)", "Volatilität", "yf:^VIX", "nicht direkt handelbar"),
@@ -528,6 +529,17 @@ def macro_overlay(refresh: bool) -> dict:
     return out
 
 
+def is_stale(last: pd.Timestamp, today: pd.Timestamp, source: str, crypto: bool) -> bool:
+    """Letzter Kurs zu alt? Faellt ein Abruf aus, wird still der Cache genutzt -> das muss auffallen.
+    Erlaubt sind Wochenende und Feiertage: Boerse bis 3 Werktage dazwischen, Waehrungen (Fed + EZB) bis 4,
+    Krypto (7 Tage Handel) bis 2 Kalendertage."""
+    last, today = pd.Timestamp(last).normalize(), pd.Timestamp(today).normalize()
+    if crypto:
+        return (today - last).days > 2
+    gap = int(np.busday_count((last + pd.Timedelta(days=1)).date(), today.date()))
+    return gap > (4 if source.startswith("fx:") else 3)
+
+
 def main(refresh: bool = True) -> int:
     today = pd.Timestamp.now(tz="Europe/Berlin").tz_localize(None).normalize()
     (OUT / "stats").mkdir(parents=True, exist_ok=True)
@@ -535,7 +547,7 @@ def main(refresh: bool = True) -> int:
         ecb = ds.ecb_fx_daily()
     except Exception:
         ecb = None
-    index, failed = [], []
+    index, failed, stale = [], [], []
     for cid, name, group, source, note in INSTRUMENTS:
         try:
             px = load_instrument(source, cid, refresh, ecb)
@@ -544,20 +556,24 @@ def main(refresh: bool = True) -> int:
             pay = instrument_payload(cid, name, group, source, note, px, today)
             (OUT / "stats" / f"{cid}.json").write_text(ds.to_json(round_sig(pay)), encoding="utf-8")
             m = pay["meta"]
+            old = is_stale(px.index[-1], today, source, m["crypto"])
+            if old:
+                stale.append(cid)
             index.append({k: m[k] for k in ("id", "name", "group", "ticker", "note", "crypto", "investable",
-                                             "start", "end")} | {"n_quality": len(m["quality"])})
-            print(f"OK     {cid:9s} {m['start']} – {m['end']}  {len(pay['combos'])} Varianten")
+                                             "start", "end")} | {"n_quality": len(m["quality"]), "stale": old})
+            print(f"{'VERALTET' if old else 'OK':8s} {cid:9s} {m['start']} – {m['end']}  {len(pay['combos'])} Varianten")
         except Exception as e:
             failed.append(cid)
-            print(f"FEHLER {cid:9s} {type(e).__name__}: {e}")
+            print(f"FEHLER   {cid:9s} {type(e).__name__}: {e}")
         if source.startswith("yf:") and refresh:
             time.sleep(0.5)  # Yahoo bremst bei schnellen Abfragen (429)
     payload = {"generated": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ"),
-               "today": str(today.date()), "instruments": index, "failed": failed,
+               "today": str(today.date()), "instruments": index, "failed": failed, "stale": stale,
                "macro": macro_overlay(refresh), "defaults": {"wf": WF_DEFAULT}}
     (OUT / "stats_index.json").write_text(ds.to_json(payload), encoding="utf-8")
-    print(f"{len(index)} Instrumente, {len(failed)} Fehler" + (f": {', '.join(failed)}" if failed else ""))
-    return 1 if failed else 0
+    print(f"{len(index)} Instrumente, {len(failed)} Fehler" + (f": {', '.join(failed)}" if failed else "")
+          + f", {len(stale)} mit veralteten Kursen" + (f": {', '.join(stale)}" if stale else ""))
+    return 1 if failed or stale else 0
 
 
 if __name__ == "__main__":

@@ -281,3 +281,14 @@ def test_live_periode_nicht_in_historie():
     rstar = per.iloc[-1] / per.iloc[-2] - 1
     assert c["live_rank"]["r"] == pytest.approx(rstar)
     assert c["live_rank"]["live"] is True
+
+
+def test_veraltete_kurse_werden_erkannt():
+    mo, fr = pd.Timestamp("2026-11-23"), pd.Timestamp("2026-11-20")   # Montag / Freitag davor
+    assert not R.is_stale(fr, mo, "yf:SPY", False)                    # normales Wochenende
+    assert not R.is_stale(pd.Timestamp("2026-12-24"), pd.Timestamp("2026-12-29"), "yf:SPY", False)  # Feiertage
+    assert R.is_stale(pd.Timestamp("2026-11-13"), mo, "yf:SPY", False)  # eine Woche alt
+    assert not R.is_stale(pd.Timestamp("2026-11-22"), mo, "yf:BTC-USD", True)
+    assert R.is_stale(pd.Timestamp("2026-11-19"), mo, "yf:BTC-USD", True)
+    assert not R.is_stale(pd.Timestamp("2026-11-17"), mo, "fx:DEXUSEU:EUR", False)
+    assert R.is_stale(pd.Timestamp("2026-11-13"), mo, "fx:DEXUSEU:EUR", False)  # nur Fed-Stand ohne EZB
