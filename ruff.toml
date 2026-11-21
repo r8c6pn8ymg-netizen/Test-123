@@ -1,0 +1,40 @@
+# Ruff-Konfiguration
+#
+# Zwei Stufen:
+#
+#   1. Echte Probleme – muss ohne Befund durchlaufen:
+#        ruff check .
+#
+#   2. Stilhinweise – nur zur Information, Exit-Code immer 0, ändert nichts:
+#        ruff check . --select E,W,I,UP,C4,SIM,PD,PT --exit-zero --statistics
+#
+# Automatische Korrekturen (--fix) bitte nur gezielt einsetzen; der bestehende
+# Code ist mit TradingView abgeglichen und soll nicht kosmetisch umgebaut werden.
+
+target-version = "py313"
+line-length = 120
+
+[lint]
+select = [
+    "F",       # Pyflakes: undefinierte Namen, ungenutzte Importe/Variablen, Tippfehler
+    "E9",      # Syntax- und IO-Fehler
+    "E722",    # nacktes 'except:' (fängt auch KeyboardInterrupt/SystemExit)
+    "B",       # Bugbear: veränderliche Default-Argumente, verschluckte Exceptions u. Ä.
+    "PLE",     # Pylint-Fehler (z. B. falsche Format-Strings, return in __init__)
+    "NPY",     # NumPy: veraltete Aliase, NumPy-2-Inkompatibilitäten, globaler Zufallsgenerator
+    "DTZ",     # Datumswerte ohne Zeitzone (wichtig: Kerzenzeiten in UTC vs. New York)
+    "PD002",   # pandas inplace=True (häufige Ursache stiller Fehler)
+    "PLW0602", "PLW0603",  # globale Variablen werden verändert
+]
+ignore = [
+    # Die Hilfsfunktionen hit_sl/hit_tp in monthly_mid_weekly_backtest werden in derselben
+    # Schleifeniteration aufgerufen, in der sie definiert werden -> kein Fehler.
+    "B023",
+    # zip(a, a[1:]) wird absichtlich mit ungleich langen Listen verwendet.
+    "B905",
+]
+
+[lint.per-file-ignores]
+# Bekannte, harmlose Fundstellen im geprüften Strategie-Code (bewusst nicht geändert):
+"friday_rush_backtest.py" = ["F841"]   # 'o' wird mitentpackt, aber nicht benötigt
+"daily_stop_backtest.py" = ["B007"]    # Schleifenvariable 'mon' wird nicht verwendet
