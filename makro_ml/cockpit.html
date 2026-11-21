@@ -78,6 +78,7 @@ label.chk svg { flex: none; }
 label.chk.off { opacity: .45; }
 .chartbox { position: relative; }
 .chartbox svg { width: 100%; height: auto; display: block; }
+#statView .chartbox svg { touch-action: pan-y; }
 .tip { position: absolute; pointer-events: none; background: #1a1f26; border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px;
   font-size: 12px; color: var(--fg); min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.4); z-index: 5; }
 .tip .t { font-weight: 600; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
@@ -1015,8 +1016,55 @@ window.renderStatistik = async function () {
       s += `<path d="${d}" fill="none" stroke="${se.color}" stroke-width="${se.w || 1.5}"${se.dash ? ` stroke-dasharray="${se.dash}"` : ''}/>`;
     }
     for (const m of o.markers || []) { if (m.t < o.t0 || m.t > o.t1) continue; const x = X(m.t), y = m.y != null ? Y(m.y) : H - B - 4; s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${m.r || 2.6}" fill="${m.color}"><title>${esc(m.title || '')}</title></circle>`; }
+    // Linie zum Antippen/Wischen: Daten merken, Zeichnung erst beim Zeigen (lcHover)
+    const id = 'lc' + (++lcSeq);
+    LC.set(id, { W, H, L, R, T, B, t0: o.t0, t1: o.t1, X, Y, fmt: o.tipFmt || (v => nf(v, Math.abs(v) < 10 ? 4 : 2)),
+                 series: o.series.map(se => ({ t: se.t, y: se.y, color: se.color, name: se.name || '' })) });
+    if (LC.size > 80) LC.delete(LC.keys().next().value);
+    s += `<g data-lc="${id}"></g><g class="lc-x" pointer-events="none"></g>`;
     return s;
   }
+  const LC = new Map(); let lcSeq = 0;
+  function lcNear(ts, t) {  // Index des naechsten Zeitpunkts (ts aufsteigend)
+    let lo = 0, hi = ts.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (ts[m] < t) lo = m + 1; else hi = m; }
+    return lo > 0 && Math.abs(ts[lo - 1] - t) <= Math.abs(ts[lo] - t) ? lo - 1 : lo;
+  }
+  function lcHide(svg) {
+    const g = svg && svg.querySelector('g.lc-x'); if (g) g.innerHTML = '';
+    const tip = svg && svg.parentElement.querySelector(':scope > .lc-tip'); if (tip) tip.hidden = true;
+  }
+  function lcHover(ev) {
+    const svg = ev.target.closest ? ev.target.closest('svg') : null;
+    const g = svg && svg.querySelector('g[data-lc]'); const c = g && LC.get(g.dataset.lc);
+    if (!c) return;
+    const r = svg.getBoundingClientRect(), k = c.W / r.width, x = (ev.clientX - r.left) * k;
+    if (x < c.L || x > c.W - c.R) { lcHide(svg); return; }
+    const t = c.t0 + (x - c.L) / (c.W - c.L - c.R) * (c.t1 - c.t0);
+    let tx = null, rows = '', dots = '';
+    for (const se of c.series) {
+      if (!se.t.length) continue;
+      const i = lcNear(se.t, t), v = se.y[i];
+      if (se.t[i] < c.t0 || se.t[i] > c.t1) continue;
+      if (tx == null) tx = se.t[i];
+      const ok = v != null && isFinite(v);
+      rows += `<div class="r"><span><span style="color:${se.color}">&#9679;</span> ${esc(se.name)}</span><b>${ok ? c.fmt(v) : '–'}</b></div>`;
+      if (ok) dots += `<circle cx="${c.X(se.t[i]).toFixed(1)}" cy="${c.Y(v).toFixed(1)}" r="3.2" fill="${se.color}" stroke="${C('bg')}" stroke-width="1.2"/>`;
+    }
+    if (tx == null) { lcHide(svg); return; }
+    const lx = c.X(tx).toFixed(1);
+    svg.querySelector('g.lc-x').innerHTML = `<line x1="${lx}" x2="${lx}" y1="${c.T}" y2="${c.H - c.B}" stroke="${C('fg-2')}" stroke-dasharray="3 3"/>` + dots;
+    const box = svg.parentElement;
+    let tip = box.querySelector(':scope > .lc-tip');
+    if (!tip) { tip = document.createElement('div'); tip.className = 'tip lc-tip'; box.appendChild(tip); }
+    tip.innerHTML = `<div class="t">${dDE(new Date(tx).toISOString().slice(0, 10))}</div>` + rows;
+    tip.hidden = false;
+    const bw = box.clientWidth, w = tip.offsetWidth; let left = lx / k + 14; if (left + w > bw) left = lx / k - w - 14;
+    tip.style.left = Math.max(4, left) + 'px'; tip.style.top = '8px';
+  }
+  $('#statView').addEventListener('pointermove', lcHover);
+  $('#statView').addEventListener('pointerdown', lcHover);
+  $('#statView').addEventListener('pointerout', ev => { const svg = ev.target.closest && ev.target.closest('svg'); if (svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) lcHide(svg); });
 
   // ------------------------------------------------------------------ Histogramm / Q-Q
   function histogramSvg(c, h, lr, live) {
@@ -1160,8 +1208,8 @@ window.renderStatistik = async function () {
         <div class="st-tbl"><table><thead><tr><th>Niveau</th><th>Verletzungen</th><th>Erwartet</th><th>Quote</th><th>Soll</th><th>Kupiec LR</th><th>p</th><th>Ergebnis</th></tr></thead><tbody>${sum}</tbody></table></div>
         <div class="note" style="max-width:none">Stabilität der Schätzung über ${w.steps.length} Schritte: Mittel ${pct(w.stability.mu_mean, 3)} (Spannweite ${pct(w.stability.mu_range, 3, false)}), Sigma ${pct(w.stability.sigma_mean, 2, false)} (Spannweite ${pct(w.stability.sigma_range, 2, false)}). Kupiec-Test: p &lt; 0,05 heißt, die Zahl der Verletzungen passt nicht zum Niveau.</div>
         <div style="display:grid;gap:12px">
-          <div><div class="eyebrow">Kauf und Halten nur über die Out-of-Sample-Blöcke</div><div class="chartbox"><svg viewBox="0 0 860 240">${lineChart({ t0, t1, logY: true, yFmt: v => nf(v, v < 10 ? 1 : 0), series: [{ t: tt, y: w.chart.equity, color: C('fg') }] })}</svg></div></div>
-          <div><div class="eyebrow">Rollierende Vola (annualisiert) · Punkte = VaR-Verletzungen (gelb 95 %, rot 99 %)</div><div class="chartbox"><svg viewBox="0 0 860 240">${lineChart({ t0, t1, yFmt: v => nf(v * 100, 0) + '%', yZero: true, series: [{ t: tt, y: w.chart.roll_vol, color: C('warn') }], markers: [...mk('0.95', C('warn')), ...mk('0.99', C('bear'))] })}</svg></div></div>
+          <div><div class="eyebrow">Kauf und Halten nur über die Out-of-Sample-Blöcke</div><div class="chartbox"><svg viewBox="0 0 860 240">${lineChart({ t0, t1, logY: true, yFmt: v => nf(v, v < 10 ? 1 : 0), tipFmt: v => nf(v, 3), series: [{ t: tt, y: w.chart.equity, color: C('fg'), name: 'Kapital (Start 1)' }] })}</svg></div></div>
+          <div><div class="eyebrow">Rollierende Vola (annualisiert) · Punkte = VaR-Verletzungen (gelb 95 %, rot 99 %)</div><div class="chartbox"><svg viewBox="0 0 860 240">${lineChart({ t0, t1, yFmt: v => nf(v * 100, 0) + '%', yZero: true, tipFmt: v => nf(v * 100, 1) + ' %', series: [{ t: tt, y: w.chart.roll_vol, color: C('warn'), name: 'Vola p. a.' }], markers: [...mk('0.95', C('warn')), ...mk('0.99', C('bear'))] })}</svg></div></div>
         </div>
         <div class="eyebrow">Schritte · VaR ${Math.round(cl * 100)} % ${st.wfmeth === 'hist' ? 'historisch' : 'normal'}</div>
         <div class="st-tbl"><table><thead><tr><th>Out-of-Sample</th><th>In-Sample</th><th>IS Mittel</th><th>IS Sigma</th><th>VaR</th><th>ES</th><th>OOS Mittel</th><th>OOS Sigma</th><th>Verletzt</th><th>Quote</th><th>OOS-ES</th></tr></thead><tbody>${steps}</tbody></table></div>`;
@@ -1176,7 +1224,7 @@ window.renderStatistik = async function () {
     if (st.tab === 'px') {
       $('#sTabNote').textContent = `${J.meta.name} · Tagesschlüsse · Zeitraum wie oben`;
       body.innerHTML = `<div class="filters"><div class="fld"><label>Skala</label><div class="seg" id="pxS"><button type="button" data-v="true">Log</button><button type="button" data-v="false">Linear</button></div></div></div>
-        <div class="chartbox"><svg viewBox="0 0 860 300">${lineChart({ H: 300, t0: s.t[thin[0]], t1: tEnd, logY: st.pxlog === true || st.pxlog === 'true', series: [{ t: thin.map(i => s.t[i]), y: thin.map(i => s.c[i]), color: C('fg') }] })}</svg></div>`;
+        <div class="chartbox"><svg viewBox="0 0 860 300">${lineChart({ H: 300, t0: s.t[thin[0]], t1: tEnd, logY: st.pxlog === true || st.pxlog === 'true', series: [{ t: thin.map(i => s.t[i]), y: thin.map(i => s.c[i]), color: C('fg'), name: 'Kurs' }] })}</svg></div>`;
       seg('#pxS', 'pxlog', drawTab);
       return;
     }
@@ -1191,8 +1239,8 @@ window.renderStatistik = async function () {
     else {
       const mt = M.d.map(d => Date.parse(d + 'T00:00:00Z'));
       const t0 = Math.max(s.t[thin[0]], mt[0]), t1 = Math.max(tEnd, mt[mt.length - 1]);
-      body.innerHTML = sel + `<div class="eyebrow">${esc(J.meta.name)} (log)</div><div class="chartbox"><svg viewBox="0 0 860 200">${lineChart({ H: 200, t0, t1, logY: true, series: [{ t: thin.map(i => s.t[i]), y: thin.map(i => s.c[i]), color: C('fg') }] })}</svg></div>
-        <div class="eyebrow">${esc(M.label)}</div><div class="chartbox"><svg viewBox="0 0 860 200">${lineChart({ H: 200, t0, t1, series: [{ t: mt, y: M.v, color: C('warn') }] })}</svg></div>`;
+      body.innerHTML = sel + `<div class="eyebrow">${esc(J.meta.name)} (log)</div><div class="chartbox"><svg viewBox="0 0 860 200">${lineChart({ H: 200, t0, t1, logY: true, series: [{ t: thin.map(i => s.t[i]), y: thin.map(i => s.c[i]), color: C('fg'), name: 'Kurs' }] })}</svg></div>
+        <div class="eyebrow">${esc(M.label)}</div><div class="chartbox"><svg viewBox="0 0 860 200">${lineChart({ H: 200, t0, t1, series: [{ t: mt, y: M.v, color: C('warn'), name: M.label }] })}</svg></div>`;
     }
     $('#ovlSel').addEventListener('change', e => { st.ovl = e.target.value; save(); drawTab(); });
   }
@@ -1407,8 +1455,8 @@ body{margin:0} .rep{max-width:1200px;margin:0 auto;padding:24px 16px;display:gri
       </div>
       <div class="note" style="max-width:none">${esc(meta.name)} · ${dDE(res.range.start)} – ${dDE(res.range.end)} · In-Sample bis ${dDE(res.range.split)}, danach Out-of-Sample. Zufallsvergleich: 200 Strategien mit gleicher Zahl, Dauer und Richtung der Trades zu zufälligen Zeitpunkten (fester Startwert); p = Anteil, der mindestens so gut war. Kosten je Seite ${nf(((cfg.cost.fee_bp || 0) + (cfg.cost.spread_bp || 0) / 2 + (cfg.cost.slip_bp || 0)) * cfg.size * cfg.lev, 1)} Bp, ${res.sides} Seiten.</div>
       <div class="grid2b">
-        <div><div class="eyebrow">Kapital (log) · Strategie <span style="color:var(--accent)">●</span> · Kauf und Halten <span style="color:var(--muted)">●</span></div><div class="chartbox"><svg viewBox="0 0 860 260">${lineChart({ H: 260, t0, t1, logY: true, yFmt: v => nf(v, v < 10 ? 1 : 0), vlines: [{ t: splitT, label: 'OOS', color: C('warn') }], series: [{ t: pick(res.series.t), y: pick(res.series.bh), color: C('muted'), w: 1.2 }, { t: pick(res.series.t), y: pick(res.series.eq), color: C('accent'), w: 1.8 }] })}</svg></div></div>
-        <div><div class="eyebrow">Drawdown der Strategie</div><div class="chartbox"><svg viewBox="0 0 860 260">${lineChart({ H: 260, t0, t1, yZero: true, yFmt: v => nf(v * 100, 0) + '%', series: [{ t: pick(res.series.t), y: pick(dd), color: C('bear'), w: 1.2, area: true }] })}</svg></div></div>
+        <div><div class="eyebrow">Kapital (log) · Strategie <span style="color:var(--accent)">●</span> · Kauf und Halten <span style="color:var(--muted)">●</span></div><div class="chartbox"><svg viewBox="0 0 860 260">${lineChart({ H: 260, t0, t1, logY: true, yFmt: v => nf(v, v < 10 ? 1 : 0), vlines: [{ t: splitT, label: 'OOS', color: C('warn') }], tipFmt: v => nf(v, 3), series: [{ t: pick(res.series.t), y: pick(res.series.bh), color: C('muted'), w: 1.2, name: 'Kauf und Halten' }, { t: pick(res.series.t), y: pick(res.series.eq), color: C('accent'), w: 1.8, name: 'Strategie' }] })}</svg></div></div>
+        <div><div class="eyebrow">Drawdown der Strategie</div><div class="chartbox"><svg viewBox="0 0 860 260">${lineChart({ H: 260, t0, t1, yZero: true, yFmt: v => nf(v * 100, 0) + '%', tipFmt: v => nf(v * 100, 1) + ' %', series: [{ t: pick(res.series.t), y: pick(dd), color: C('bear'), w: 1.2, area: true, name: 'Drawdown' }] })}</svg></div></div>
       </div>
       <div class="st-tbl"><table><thead><tr><th>Kennzahl</th><th>Gesamt</th><th>In-Sample</th><th>Out-of-Sample</th><th>Halten gesamt</th><th>Halten IS</th><th>Halten OOS</th></tr></thead><tbody>
         ${rowM('Gesamtrendite', x => pct(x.total, 1))}${rowM('CAGR', x => pct(x.cagr))}${rowM('Volatilität', x => pct(x.vol, 1, false))}
