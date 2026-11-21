@@ -46,7 +46,7 @@ def analyse(start, end, sl, tp):
     c = curve[(curve.index >= s0) & (curve.index <= s1)]
     strat = c.pct_change().dropna()
     mkt = wk.close.reindex(c.index).pct_change().dropna()
-    strat, mkt = strat.loc[mkt.index], mkt
+    strat = strat.loc[mkt.index]
     years = len(strat) / 52
     sharpe = strat.mean() / strat.std() * np.sqrt(52)
     sharpe_t = sharpe * np.sqrt(years)

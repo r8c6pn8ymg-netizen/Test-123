@@ -1,0 +1,44 @@
+# Ruff-Konfiguration für die Backtest-Skripte
+#
+#   ruff check .            -> nur echte/wahrscheinliche Fehler (muss sauber sein)
+#   ruff check . --extend-select I,C4,UP,SIM,RUF,PT,E702,B007,B028,B905 --exit-zero
+#                           -> zusätzlich reine Stilhinweise (informativ, kein Fehler)
+#
+# Formatierung (ruff format) wird bewusst NICHT erzwungen, damit funktionierender
+# Code nicht nur aus Stilgründen umgeschrieben wird.
+
+target-version = "py313"
+line-length = 120
+extend-exclude = ["data", "reports"]
+
+[lint]
+select = [
+    "F",          # Pyflakes: undefinierte Namen, unbenutzte Importe/Variablen, Tippfehler
+    "E4",         # Import-Fehler (z. B. Importe nicht am Dateianfang)
+    "E7",         # Anweisungsfehler (z. B. "== None", bare except, Vergleich mit True)
+    "E9",         # Syntax- und Laufzeitfehler beim Parsen
+    "B",          # flake8-bugbear: typische Logikfallen (veränderliche Defaults, Schleifenvariablen in Closures …)
+    "PLE",        # Pylint: Fehler
+    "PLW",        # Pylint: Warnungen (Selbstzuweisung, überschriebene Schleifenvariablen …)
+    "NPY",        # NumPy: veraltete oder entfernte APIs (z. B. np.random.seed statt Generator)
+    "PD002",      # pandas: inplace=True (häufige Quelle für stille Fehler)
+    "RUF006",     # verlorene asyncio-Tasks
+    "RUF013",     # implizites Optional
+]
+ignore = [
+    "E741",       # Variablenname "l" (Low) ist hier fachlich eindeutig: o, h, l, c
+    "E731",       # lambda-Zuweisung: Stilfrage
+    "PLW2901",    # Schleifenvariable überschrieben: in den Skripten bewusst so genutzt
+    "E702",       # mehrere Anweisungen mit ";" in einer Zeile: Stilfrage
+    "B007",       # unbenutzte Schleifenvariable: Stilfrage
+    "B028",       # warnings.warn ohne stacklevel: Stilfrage
+    "B905",       # zip() ohne strict=: Längen sind hier durch die Konstruktion gleich
+]
+
+[lint.per-file-ignores]
+# hit_sl/hit_tp werden innerhalb derselben Schleifeniteration definiert und sofort
+# aufgerufen; die gebundenen Werte sl/tp sind deshalb immer die aktuellen (B023 ist
+# hier ein Fehlalarm).
+"monthly_mid_weekly_backtest.py" = ["B023"]
+# conftest muss sys.path/Arbeitsverzeichnis setzen, bevor die Projektmodule importiert werden.
+"tests/conftest.py" = ["E402"]
