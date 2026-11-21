@@ -205,7 +205,8 @@ x_j = Schlusskurs am Periodenende j, r_j = x_j/x_{j−1} − 1. Fehlen Daten fü
 ## 8. Betrieb
 - `python3 returns_stats.py` (aus `makro_ml/`) lädt/aktualisiert und schreibt die JSON-Dateien; `--cache` ohne Download.
 - Veröffentlichen: `cockpit.html` mit `files` zusätzlich `strategie.js`, `stats_index.json` und `stats/<id>.json`.
-- Tägliche Aktualisierung: erst nach deiner Freigabe in die geplante Aufgabe aufnehmen.
+- Tägliche Aktualisierung: seit 21.11. Teil der geplanten Aufgabe (Mo–Fr 07:47, nach `pipeline.py`).
+- Download: „Herunterladen (HTML)“ im Statistik-Teil und „Ergebnis herunterladen“ im Strategie-Tester erzeugen eine eigenständige HTML-Datei (Cockpit-Stil, Grafiken, alle Kennzahlen, alle Trades) über die Artifact-Fähigkeit `downloads`.
 
 ## 9. Abweichungen vom ursprünglichen Prompt (mit Begründung)
 1. Kein FastAPI/React/Plotly: Cockpit ist eine statische Seite (Abschnitt 1). API-Tests → JSON-Schema-Tests.
@@ -216,3 +217,5 @@ x_j = Schlusskurs am Periodenende j, r_j = x_j/x_{j−1} − 1. Fehlen Daten fü
 5. Strategie-Tester rechnet im Browser (freie Regeln ohne Server), abgesichert durch Python-Gegenrechnung.
 6. CL im UI: 0.95/0.99; alle Werte sind für beide Niveaus vorberechnet.
 7. Makro-Overlay ohne Normierung: Kurs und Makroreihe in zwei übereinanderliegenden Feldern mit gleicher Zeitachse.
+8. Download als HTML-Bericht (mit Grafiken, Kennzahlen und Trades) statt CSV + PNG, auf Wunsch des Nutzers.
+9. Datenquelle yfinance (inoffiziell, kostenlos) ausdrücklich vom Nutzer freigegeben; kein kostenpflichtiger Anbieter.

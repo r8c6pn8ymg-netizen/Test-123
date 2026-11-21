@@ -31,7 +31,7 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 
 Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min., Exit-Code 1 = ein Teil ist fehlgeschlagen und zeigt den alten Stand).
 Danach `cockpit.html` veröffentlichen mit `files` = {`data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`, `research_52w.json`} jeweils aus `output/`.
-Reiter Statistik (Entwurf 21.11., noch **nicht** in der täglichen Aufgabe): `python3 returns_stats.py`, dann zusätzlich `strategie.js`, `stats_index.json`, `stats/<id>.json` veröffentlichen.
+Reiter Statistik (seit 21.11. live und Teil der täglichen Aufgabe): nach der Pipeline `python3 returns_stats.py`, dann zusätzlich `strategie.js`, `stats_index.json`, `stats/<id>.json` veröffentlichen (ca. 50 MB, Grenze je Veröffentlichung 64 MB). Das Artifact hat die Fähigkeit `downloads` (HTML-Bericht); sie bleibt bei jeder Veröffentlichung ohne `capabilities` erhalten.
 Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pipeline-Lauf, sonst werden sie mangels Cache übersprungen („skipped“ heißt nicht bestanden).
 
 ## Ergebnisse (nach allen Korrekturen)
@@ -81,7 +81,7 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
 - **Wendepunkte:** mit keinem Signal vorhersagbar (Vorhersage 49–52 %). Gute Treffer an Wenden (CFTC, umgedrehtes Momentum) sind Rückblick-Effekte.
   Optimieren auf einen Wendepunkt: 100 % dort, 51 % anderswo → Überoptimierung.
 
-- **Reiter Statistik (Entwurf 21.11.):** SPY Weekly seit 1993 passt zum Vorbild-Screenshot (Sigma 2,36 %, Vola 17,0 %,
+- **Reiter Statistik (21.11.):** SPY Weekly seit 1993 passt zum Vorbild-Screenshot (Sigma 2,36 %, Vola 17,0 %,
   beste/schlechteste Woche 28.11.08 / 10.10.08, Schiefe −0,58, Kurtosis 6,5). Walk-Forward-VaR (156/52 Wochen, rollierend):
   95 %-VaR 102 Verletzungen statt 80 erwartet, 99 % 38 statt 16 (Kupiec p 0,017 / < 0,001) → die Normal-/Historien-VaR
   unterschätzt das Risiko. Unabhängige Gegenrechnung des Strategie-Testers (JS vs. Python) in 9 Regel-Kombinationen identisch.
