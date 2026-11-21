@@ -204,7 +204,7 @@ def test_termine_notenbanken_vollstaendig_und_sortiert():
     from datetime import date
     t = _termine()
     assert {c[0] for c in t.CENTRAL_BANKS} == {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
-    for ccy, bank, *_, dates in t.CENTRAL_BANKS:
+    for _ccy, bank, *_, dates in t.CENTRAL_BANKS:
         assert dates == sorted(dates), bank
     out = t.build(today=date(2026, 12, 7), fred_rows=[], pages={"Census": [], "BEA": [], "Fed-G.17": []}, get=_fake_get)
     cb = [e for e in out["events"] if e["kind"] == "cb"]

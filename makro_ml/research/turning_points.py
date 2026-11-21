@@ -28,7 +28,7 @@ def load(fn, inv):
         d = pd.DataFrame({"open": 1 / d.open, "high": 1 / d.low, "low": 1 / d.high, "close": 1 / d.close}, index=d.index)
     return d
 import json
-from scipy.stats import mannwhitneyu, fisher_exact
+from scipy.stats import mannwhitneyu
 import pipeline as P, factors as Fm, data_sources as ds
 px = P.load_fx(False); core = Fm.core(px); Z = core["z"]
 OUT = str(__import__("pathlib").Path(__file__).resolve().parents[1] / "output") + "/"
@@ -101,7 +101,7 @@ def perm_p(k, n=2000):
     sims = []
     for _ in range(n):
         hits = []
-        for (nm, kk), (at, ev) in series_store.items():
+        for (_nm, kk), (at, ev) in series_store.items():
             if kk != k: continue
             valid = at.dropna(); 
             if len(valid) < 60: continue

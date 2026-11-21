@@ -21,11 +21,10 @@ Gegen "positive Varianz" (Glueckstreffer) muss ein Modell bestehen:
 """
 from __future__ import annotations
 
-import json
 import sys
 import warnings
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -491,7 +490,7 @@ def realtime_features(sid: str, how: str, today: pd.Timestamp, refresh: bool) ->
 
 
 def main(refresh: bool = True):
-    today = pd.Timestamp(date.today())
+    today = pd.Timestamp(datetime.now(timezone.utc).date())  # Kalendertag in UTC (wie bisher auf dem Server)
     outs, stats = {}, {}
     for mode in ("fred", "alfred"):
         print(f"===== Variante {mode.upper()} =====")

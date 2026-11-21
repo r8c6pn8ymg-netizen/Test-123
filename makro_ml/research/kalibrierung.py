@@ -65,7 +65,6 @@ def oos(X, price, h, lam):
 
 
 def main():
-    today = pd.Timestamp(pd.Timestamp.today().date())
     px = P.load_fx(False)
     sipri = P.ds.sipri_share_of_gdp(False)
     us_cc = P.country_series("US", "US", "United States of America", sipri, False)

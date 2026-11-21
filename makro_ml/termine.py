@@ -18,7 +18,6 @@ Quellen (kostenlos, ohne Key, ohne Prognosewerte):
 from __future__ import annotations
 
 import html
-import json
 import re
 import urllib.request
 from datetime import date, datetime, time, timedelta, timezone
@@ -165,7 +164,7 @@ def _fetch(name: str, url: str, must: str) -> str:
         path.write_text(raw, encoding="utf-8")
         return raw
     except Exception:
-        if path.exists() and (datetime.now().timestamp() - path.stat().st_mtime) < 40 * 86400:
+        if path.exists() and (datetime.now(timezone.utc).timestamp() - path.stat().st_mtime) < 40 * 86400:
             return path.read_text(encoding="utf-8")
         raise
 
@@ -175,7 +174,7 @@ def parse_fred_calendar(page: str) -> list[dict]:
     rows, day = [], None
     for m in _ROW.finditer(page):
         if m.group(1):
-            day = datetime.strptime(m.group(1), "%A %B %d, %Y").date()
+            day = datetime.strptime(m.group(1), "%A %B %d, %Y").replace(tzinfo=timezone.utc).date()
         elif day is not None:
             rows.append(dict(day=day, rid=int(m.group(3)), name=html.unescape(m.group(4)).strip()))
     return rows
@@ -210,7 +209,7 @@ def parse_census(page: str) -> list[tuple[date, str]]:
     for m in re.finditer(r"A(\d{12}) A\d{5,6}", x):
         before = x[max(0, m.start() - 260):m.start()]
         before = re.split(r"A\d{12} A\d{5,6}", before)[-1]
-        out.append((datetime.strptime(m.group(1)[:8], "%Y%m%d").date(), before.strip()))
+        out.append((datetime.strptime(m.group(1)[:8], "%Y%m%d").replace(tzinfo=timezone.utc).date(), before.strip()))
     return out
 
 
@@ -221,7 +220,7 @@ def parse_bea(page: str, today: date) -> list[tuple[date, str]]:
     pat = re.compile(rf"({MONTHS}) (\d{{1,2}}) (\d{{1,2}}:\d\d [AP]M) [A-Z] ?(?:ews|rticle|ata)\s+(.+?)"
                      rf"(?= View| (?:{MONTHS}) \d{{1,2}} \d{{1,2}}:\d\d| Quick Links|$)")
     for m in pat.finditer(x):
-        mon = datetime.strptime(m.group(1), "%B").month
+        mon = datetime.strptime(m.group(1), "%B").replace(tzinfo=timezone.utc).month
         cands = [date(y, mon, int(m.group(2))) for y in (today.year - 1, today.year, today.year + 1)]
         d = min(cands, key=lambda c: abs((c - today).days))
         out.append((d, m.group(4).strip()))
@@ -229,7 +228,7 @@ def parse_bea(page: str, today: date) -> list[tuple[date, str]]:
 
 
 def parse_g17(page: str) -> list[date]:
-    return [datetime.strptime(f"{d}-{mo}-{y}", "%d-%B-%Y").date()
+    return [datetime.strptime(f"{d}-{mo}-{y}", "%d-%B-%Y").replace(tzinfo=timezone.utc).date()
             for d, mo, y in re.findall(rf"(\d{{1,2}})-({MONTHS})-(\d{{4}})", _text(page))]
 
 
@@ -281,7 +280,7 @@ def _fred_fresh(sid: str) -> pd.Series:
     """FRED-Reihe einmal je Lauf frisch laden (die gestrigen Veroeffentlichungen sollen drin sein).
     Klappt der Download nicht, liefert der Cache den alten Stand; das wird vermerkt und angezeigt."""
     if sid not in _FRESH:
-        t0 = datetime.now().timestamp()
+        t0 = datetime.now(timezone.utc).timestamp()
         _FRESH[sid] = fred(sid, refresh=True)
         path = CACHE / f"fred_{sid}.csv"
         if not path.exists() or path.stat().st_mtime < t0 - 60:

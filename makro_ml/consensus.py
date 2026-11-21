@@ -242,7 +242,7 @@ def run_relative(name: str, scores: dict[str, pd.DataFrame], excess: pd.DataFram
         stats[k] = st
     ps = sorted(((s_["p"], k) for k, s_ in stats.items() if s_), key=lambda x: x[0])
     m = len(ps)
-    for i, (p, k) in enumerate(ps):
+    for i, (_p, k) in enumerate(ps):
         stats[k]["p_holm"] = float(f"{min(1.0, max(pp * (m - j) for j, (pp, _) in enumerate(ps[:i + 1]))):.3g}")
     blocks = {}
     for k, r in rets.items():

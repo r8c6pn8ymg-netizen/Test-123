@@ -12,7 +12,7 @@ import json
 import re
 import sys
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -20,7 +20,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 import termine  # nur fuer die Listen, die geprueft werden
 
-TODAY = date.today()
+TODAY = datetime.now(ZoneInfo("Europe/Berlin")).date()  # wie termine.py
 Y0, Y1 = TODAY.year, TODAY.year + 1
 URLS = {"ecb": "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html",
         "boe": "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates",
@@ -58,7 +58,7 @@ def between(x: str, a: str, b: str) -> str:
 def official_cb() -> dict:
     off = {}
     x = page("ecb")
-    off["EUR"] = {datetime.strptime(d, "%d/%m/%Y").date() for d in
+    off["EUR"] = {datetime.strptime(d, "%d/%m/%Y").replace(tzinfo=timezone.utc).date() for d in
                   re.findall(r"(\d\d/\d\d/\d{4}) Governing Council of the ECB: monetary policy meeting[^()]*\(Day 2\)", x)}
     x = page("boe")
     off["GBP"] = set()
@@ -72,7 +72,7 @@ def official_cb() -> dict:
         off["JPY"] |= {date(y, BOJ_M[m], int(d2)) for m, d1, d2 in
                        re.findall(r"(Jan|Feb|Mar|Apr|May|June|July|Aug|Sept|Oct|Nov|Dec)\.? (\d{1,2}) \(\w+\.\), (\d{1,2}) \(", seg)}
     x = page("snb")
-    off["CHF"] = {datetime.strptime(d, "%d.%m.%Y").date() for d in
+    off["CHF"] = {datetime.strptime(d, "%d.%m.%Y").replace(tzinfo=timezone.utc).date() for d in
                   re.findall(r"(\d\d\.\d\d\.\d{4}) \d\d:\d\d Monetary policy assessment of [^(]*\(press release\)", x)}
     x = page("boc")
     off["CAD"] = set()
@@ -89,7 +89,7 @@ def official_cb() -> dict:
     off["USD"] = set()
     for y, end in ((Y0, f"{Y0 - 1} FOMC Meetings"), (Y1, f"{Y0} FOMC Meetings")):
         seg = between(x, f"{y} FOMC Meetings", end).split("Note:")[0]  # Hinweis auf Termine im Folgejahr ignorieren
-        for m1, m2, d1, d2 in re.findall(rf"({MN})(?:/({MN}))? (\d{{1,2}})-(\d{{1,2}})", seg):
+        for m1, m2, _d1, d2 in re.findall(rf"({MN})(?:/({MN}))? (\d{{1,2}})-(\d{{1,2}})", seg):
             off["USD"].add(date(y, M[m2 or m1], int(d2)))
     return off
 
@@ -98,7 +98,7 @@ def main() -> bool:
     ok = True
     off = official_cb()
     print(f"=== Notenbanken: Cockpit-Liste gegen offizielle Seite (ab {TODAY}) ===")
-    for ccy, bank, t, tz, src, dates in termine.CENTRAL_BANKS:
+    for ccy, bank, _t, _tz, _src, dates in termine.CENTRAL_BANKS:
         mine = [date.fromisoformat(d) for d in dates if d >= TODAY.isoformat()]
         if ccy == "NZD":
             print(f"{bank:16s} nicht prüfbar (Seite sperrt Abruf) – Liste: {dates}")
@@ -119,15 +119,15 @@ def main() -> bool:
             continue  # Liste fuers naechste Jahr evtl. noch nicht veroeffentlicht
         for m in re.finditer(r"A(\d{8})(\d{4}) A\d{5,6}", x):
             name = re.split(r"A\d{12} A\d{5,6}", x[max(0, m.start() - 250):m.start()])[-1]
-            cen.append((datetime.strptime(m.group(1), "%Y%m%d").date(), f"{m.group(2)[:2]}:{m.group(2)[2:]}", name))
+            cen.append((datetime.strptime(m.group(1), "%Y%m%d").replace(tzinfo=timezone.utc).date(), f"{m.group(2)[:2]}:{m.group(2)[2:]}", name))
 
     def near(mo, d):
         c = [date(y, M[mo], int(d)) for y in (Y0 - 1, Y0, Y1)]
         return min(c, key=lambda z: abs((z - TODAY).days))
-    bea = [(near(mo, d), datetime.strptime(tm, "%I:%M %p").strftime("%H:%M"), nm) for mo, d, tm, nm in
+    bea = [(near(mo, d), datetime.strptime(tm, "%I:%M %p").replace(tzinfo=timezone.utc).strftime("%H:%M"), nm) for mo, d, tm, nm in
            re.findall(rf"({MN}) (\d{{1,2}}) (\d{{1,2}}:\d\d [AP]M) [A-Z] ?(?:ews|rticle|ata)\s+(.+?)(?= View| (?:{MN}) \d| Quick)",
                       page("bea"))]
-    g17 = [datetime.strptime(s, "%d-%B-%Y").date() for s in re.findall(r"\d{1,2}-[A-Z][a-z]+-\d{4}", page("g17"))]
+    g17 = [datetime.strptime(s, "%d-%B-%Y").replace(tzinfo=timezone.utc).date() for s in re.findall(r"\d{1,2}-[A-Z][a-z]+-\d{4}", page("g17"))]
     NY, BER = ZoneInfo("America/New_York"), ZoneInfo("Europe/Berlin")
 
     def ber(d, hhmm):

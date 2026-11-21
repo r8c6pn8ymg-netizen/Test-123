@@ -213,7 +213,7 @@ def main():
         by = {}
         for m in pool:
             by.setdefault(m["basis"], []).append(m)
-        for b, lst in sorted(by.items()):
+        for _b, lst in sorted(by.items()):
             for i in rng.choice(len(lst), size=min(2, len(lst)), replace=False):
                 jobs.append((name, lst[i], alfred))
     print(f"{'Bereich':28s} {'Modell':30s} {'DA Cockpit':>10s} {'Nachbau':>8s} {'Roh C':>7s} {'Nachbau':>8s}  Ergebnis")
