@@ -1,9 +1,9 @@
 """Transaktionskosten und Slippage.
 
-Wichtig: Alle bestehenden Backtests rechnen ohne Kosten. In friday_rush_backtest.Settings
-gibt es zwar commission_pct und slippage_ticks, sie werden in run_backtest aber nicht
-verwendet. Die Kosten werden deshalb hier nachträglich mit backtest_checks.apply_costs
-angerechnet (Annahmen: conftest.REALISTIC_COSTS).
+Die Backtests rechnen standardmäßig ohne Kosten (wie die Pine-Strategien).
+friday_rush_backtest.Settings wendet commission_pct und slippage_ticks an, wenn sie gesetzt
+werden (Handrechnung: tests/test_signals.py). Für die Weekly-Strategie werden die Kosten
+hier nachträglich mit backtest_checks.apply_costs angerechnet (Annahmen: conftest.REALISTIC_COSTS).
 """
 
 from __future__ import annotations
@@ -49,10 +49,8 @@ def test_slippage_hits_both_entry_and_exit():
 
 
 # ───────────────────────── Bestehender Code ─────────────────────────
-@pytest.mark.quality
-@pytest.mark.xfail(reason="Befund: Settings.commission_pct / slippage_ticks werden in "
-                          "friday_rush_backtest.run_backtest nicht angewendet.", strict=False)
 def test_daily_settings_costs_are_applied(daily_df):
+    """Behoben: Settings.commission_pct / slippage_ticks wurden früher stillschweigend ignoriert."""
     base, _ = daily.run_backtest(daily_df, daily.Settings())
     costly, _ = daily.run_backtest(daily_df, daily.Settings(commission_pct=0.1, slippage_ticks=5))
     assert sum(t.pnl for t in costly) < sum(t.pnl for t in base)
