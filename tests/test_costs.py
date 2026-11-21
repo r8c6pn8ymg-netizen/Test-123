@@ -49,13 +49,54 @@ def test_slippage_hits_both_entry_and_exit():
 
 
 # ───────────────────────── Bestehender Code ─────────────────────────
-@pytest.mark.quality
-@pytest.mark.xfail(reason="Befund: Settings.commission_pct / slippage_ticks werden in "
-                          "friday_rush_backtest.run_backtest nicht angewendet.", strict=False)
 def test_daily_settings_costs_are_applied(daily_df):
+    """Früher ein Befund (Kosten-Settings wurden ignoriert), seit dem Fix ein Regressionstest."""
     base, _ = daily.run_backtest(daily_df, daily.Settings())
     costly, _ = daily.run_backtest(daily_df, daily.Settings(commission_pct=0.1, slippage_ticks=5))
     assert sum(t.pnl for t in costly) < sum(t.pnl for t in base)
+    assert [t.entry_time for t in costly] == [t.entry_time for t in base]
+
+
+def _one_trade_df():
+    """Do 100 -> Fr 110 (Kerzen öffnen 22:00 UTC am Vorabend, wie Capital.com)."""
+    import pandas as pd
+    times = pd.to_datetime(["2024-01-02 22:00", "2024-01-03 22:00", "2024-01-04 22:00"], utc=True)
+    df = pd.DataFrame({"time": times,
+                       "open": [99.0, 100.0, 101.0], "high": [101.0, 102.0, 111.0],
+                       "low": [98.0, 99.0, 100.0], "close": [100.0, 100.0, 110.0]})
+    df["trading_day"] = (df["time"] + pd.Timedelta(hours=6)).dt.normalize()
+    return df
+
+
+def test_daily_costs_hand_calculation():
+    """Long, Einstieg Do-Close 100, Ausstieg Fr-Close 110, Kapital 1000 -> 10 Kontrakte.
+    Slippage 2 Ticks à 0,1 = 0,2 Punkte je Order: Einstieg 100,2, Ausstieg 109,8.
+    Provision 0,1 % je Order: 0,1 % * (100,2 + 109,8) * 10 = 2,10.
+    G&V = (109,8 - 100,2) * 10 - 2,10 = 93,90 (ohne Kosten 100)."""
+    df = _one_trade_df()
+    s0 = daily.Settings(start="2024-01-01", end="2024-12-31", initial_capital=1000)
+    (t0,), _ = daily.run_backtest(df, s0)
+    assert (t0.qty, t0.entry_price, t0.exit_price, t0.pnl) == (pytest.approx(10), 100, 110, pytest.approx(100))
+    s = daily.Settings(start="2024-01-01", end="2024-12-31", initial_capital=1000,
+                       commission_pct=0.1, slippage_ticks=2, tick=0.1)
+    (t,), curve = daily.run_backtest(df, s)
+    assert t.qty == pytest.approx(10)
+    assert t.entry_price == pytest.approx(100.2)
+    assert t.exit_price == pytest.approx(109.8)
+    assert t.commission == pytest.approx(2.10)
+    assert t.pnl == pytest.approx(93.90)
+    assert curve.iloc[-1] == pytest.approx(1093.90)
+
+
+def test_daily_costs_short_slippage_direction():
+    """Short: Slippage verschlechtert Einstieg nach unten und Ausstieg nach oben."""
+    df = _one_trade_df()
+    s = daily.Settings(direction="Short", start="2024-01-01", end="2024-12-31",
+                       initial_capital=1000, slippage_ticks=1, tick=0.1)
+    (t,), _ = daily.run_backtest(df, s)
+    assert t.entry_price == pytest.approx(99.9)
+    assert t.exit_price == pytest.approx(110.1)
+    assert t.pnl == pytest.approx((99.9 - 110.1) * t.qty)
 
 
 # ───────────────────────── Strategien nach Kosten ─────────────────────────
