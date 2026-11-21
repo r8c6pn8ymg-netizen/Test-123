@@ -191,6 +191,47 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
 .rk { display: inline-block; min-width: 26px; text-align: center; font: 600 12px var(--mono); padding: 4px 0; border-radius: 5px; }
 .err { padding: 40px; text-align: center; color: var(--bear); }
 @media (prefers-reduced-motion: no-preference) { .lbi, .seg button, .tabs button { transition: border-color .15s, background .15s, color .15s; } }
+
+/* Reiter Statistik & Strategie-Tester */
+.st-info { display: flex; flex-wrap: wrap; gap: 6px 16px; font: 500 12px var(--mono); color: var(--fg-2); }
+.st-info b { color: var(--fg); font-weight: 600; }
+.st-info .live { color: var(--warn); font-weight: 600; }
+.st-main { display: grid; grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .st-main { grid-template-columns: minmax(0, 1fr); } }
+.st-left { min-width: 0; display: grid; gap: 6px; }
+.st-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 11.5px var(--mono); color: var(--muted); }
+.st-legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+.st-side { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.st-head { display: flex; justify-content: space-between; align-items: end; gap: 10px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.st-big { font: 700 28px var(--mono); color: var(--warn); letter-spacing: -.02em; }
+.st-head small { display: block; font: 500 11px var(--mono); color: var(--muted); text-align: right; }
+.st-sec { display: grid; gap: 2px; }
+.st-sec h4 { margin: 0 0 3px; font: 600 10.5px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.st-row { display: flex; justify-content: space-between; gap: 10px; font: 500 12px var(--mono); color: var(--fg-2); padding: 1px 0; }
+.st-row b { color: var(--fg); font-weight: 600; text-align: right; white-space: nowrap; }
+.st-row .dim { font-weight: 500; }
+.st-tbl { overflow: auto; max-height: 420px; border: 1px solid var(--line); border-radius: 10px; }
+.st-tbl table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 640px; }
+.st-tbl th { position: sticky; top: 0; background: var(--panel-2); font: 600 10.5px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 7px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.st-tbl td { font: 500 12px var(--mono); padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; color: var(--fg); }
+.st-tbl th:first-child, .st-tbl td:first-child { text-align: left; }
+.bt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; }
+.bt-box { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 12px 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.bt-cond { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; padding: 8px; border: 1px dashed var(--line-2); border-radius: 8px; }
+.bt-cond .x { margin-left: auto; color: var(--bear); }
+.bt-cond .months { display: flex; flex-wrap: wrap; gap: 4px; }
+.bt-cond .months label.chk { padding: 2px 6px; font-size: 11px; }
+input[type=date], textarea { background: var(--panel); color: var(--fg); border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 8px; font: 500 12.5px var(--mono); min-width: 0; color-scheme: dark; }
+textarea { width: 100%; resize: vertical; }
+.st-run { background: var(--accent); color: #0b0d12; border: 0; border-radius: 8px; padding: 9px 18px; font: 700 13px var(--sans); cursor: pointer; }
+.st-run:disabled { opacity: .5; cursor: wait; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.warnbox { border: 1px solid rgba(224,168,58,.45); background: rgba(224,168,58,.08); color: var(--warn); border-radius: 9px; padding: 9px 12px; font-size: 12.5px; }
+.warnbox b { color: var(--fg); }
+#statView .pb > *, #statView .grid2b > *, #statView .st-left > * { min-width: 0; }
+.st-tabs { margin-top: 10px; }
+.st-tabs > .ph { padding: 8px 10px; }
+.st-tabs > .pb { padding: 12px; }
 </style>
 
 <div class="wrap" id="app">
@@ -205,6 +246,7 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
         <button type="button" data-m="alfred" aria-pressed="false" title="Makro ML mit Makrozahlen, wie sie am jeweiligen Tag veröffentlicht waren">Makro ML · ALFRED</button>
         <button type="button" data-m="faktoren" aria-pressed="false" title="Carry, Value, Momentum: Rangliste der 8 Währungen">Faktor-Portfolio</button>
         <button type="button" data-m="termine" aria-pressed="false" title="US-Datentermine und Zinsentscheide der 8 Notenbanken">Termine</button>
+        <button type="button" data-m="statistik" aria-pressed="false" title="Rendite-Statistik, Walk-Forward und Strategie-Tester für Aktien, Anleihen, Rohstoffe, Währungen, Krypto">Statistik</button>
       </div>
       <div class="stamp" id="stamp"><span class="pill">Lade Daten …</span></div>
     </div>
@@ -456,6 +498,99 @@ label.cat.on { border-color: var(--accent); color: var(--fg); background: var(--
     <section class="panel">
       <div class="ph"><span>Woher die Termine kommen</span></div>
       <div class="pb note" style="max-width:none;display:grid;gap:8px" id="tNote"></div>
+    </section>
+  </div>
+
+  <div id="statView" class="view" hidden>
+    <section class="panel">
+      <div class="ph"><span id="sTitle">Historisches Rendite-Histogramm</span><span class="eyebrow" id="sAsOf"></span></div>
+      <div class="pb">
+        <div class="filters">
+          <div class="fld"><label for="sInst">Instrument</label><select id="sInst"></select></div>
+          <div class="fld"><label>Intervall</label><div class="seg" id="sIv" role="group" aria-label="Intervall">
+            <button type="button" data-v="1d">Tag</button><button type="button" data-v="1wk">Woche</button><button type="button" data-v="1mo">Monat</button></div></div>
+          <div class="fld"><label>Zeitraum</label><div class="seg" id="sPer" role="group" aria-label="Zeitraum">
+            <button type="button" data-v="max">Max</button><button type="button" data-v="20y">20J</button><button type="button" data-v="10y">10J</button><button type="button" data-v="5y">5J</button><button type="button" data-v="1y">1J</button></div></div>
+          <div class="fld"><label>Rendite</label><div class="seg" id="sRt" role="group" aria-label="Rendite-Typ">
+            <button type="button" data-v="simple">Einfach</button><button type="button" data-v="log">Log</button></div></div>
+          <div class="fld"><label>Bins</label><div class="seg" id="sBins" role="group" aria-label="Bins">
+            <button type="button" data-v="auto">Auto</button><button type="button" data-v="50">50</button></div></div>
+          <div class="fld"><label>Konfidenz</label><div class="seg" id="sCl" role="group" aria-label="Konfidenzniveau">
+            <button type="button" data-v="0.95">95 %</button><button type="button" data-v="0.99">99 %</button></div></div>
+          <div class="fld"><label>Ansicht</label><div class="seg" id="sView" role="group" aria-label="Ansicht">
+            <button type="button" data-v="hist">Histogramm</button><button type="button" data-v="qq">Q-Q</button></div></div>
+          <div class="fld"><label>Y-Achse</label><div class="seg" id="sY" role="group" aria-label="Y-Achse">
+            <button type="button" data-v="lin">Linear</button><button type="button" data-v="log">Log</button></div></div>
+          <div class="fld"><label>&nbsp;</label><button type="button" class="linkbtn" id="sCsv" title="Alle Kennzahlen dieser Ansicht als CSV-Datei">Kennzahlen als CSV</button></div>
+        </div>
+        <div class="st-info" id="sInfo1"></div>
+        <div class="st-info" id="sInfo2"></div>
+        <div class="note" id="sNote" style="max-width:none"></div>
+        <div class="st-main">
+          <div class="st-left">
+            <div class="chartbox"><svg id="sChart" viewBox="0 0 860 400" role="img" aria-label="Histogramm der Periodenrenditen mit Normalverteilung"></svg></div>
+            <div class="st-legend" id="sLegend"></div>
+            <div class="panel st-tabs">
+              <div class="ph"><div class="tabs" id="sTab" role="group" aria-label="Zusatzansicht">
+                <button type="button" data-v="wf">Walk-Forward (VaR-Test)</button><button type="button" data-v="px">Kursverlauf</button><button type="button" data-v="macro">Makro-Overlay</button></div>
+                <span class="eyebrow" id="sTabNote"></span></div>
+              <div class="pb" id="sTabBody"></div>
+            </div>
+          </div>
+          <aside class="st-side" id="sSide"></aside>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="panel" id="btPanel">
+      <div class="ph"><span>Strategie-Tester · deine Regeln, mit Kosten, IS/OOS und Zufallsvergleich</span><span class="eyebrow" id="btVar"></span></div>
+      <div class="pb">
+        <div class="note" style="max-width:none">Du legst Einstieg, Ausstieg, Größe und Kosten fest. Gerechnet wird auf Tagesschlüssen. Das Signal entsteht am Schluss der Signal-Periode und wird standardmäßig <b>am nächsten Handelstag</b> ausgeführt (kein Blick in die Zukunft). Ein technisch korrekter Backtest ist <b>noch keine belastbare Strategie</b>: Entscheidend sind Out-of-Sample, Kosten und der Zufallsvergleich.</div>
+        <div class="bt-form">
+          <div class="bt-box"><div class="eyebrow">Markt &amp; Zeit</div>
+            <div class="filters">
+              <div class="fld"><label for="btInst">Instrument</label><select id="btInst"></select></div>
+              <div class="fld"><label for="btIv">Signal-Intervall</label><select id="btIv"><option value="1d">Tag</option><option value="1wk">Woche</option><option value="1mo">Monat</option></select></div>
+              <div class="fld"><label for="btStart">Von</label><input type="date" id="btStart"></div>
+              <div class="fld"><label for="btEnd">Bis</label><input type="date" id="btEnd"></div>
+              <div class="fld"><label for="btSplit" title="Ab diesem Datum zählt der Zeitraum als Out-of-Sample">IS/OOS-Grenze</label><input type="date" id="btSplit"></div>
+            </div>
+          </div>
+          <div class="bt-box"><div class="eyebrow">Einstieg · alle Bedingungen müssen gelten</div>
+            <div class="filters"><div class="fld"><label for="btDir">Richtung</label><select id="btDir"><option value="long">Long</option><option value="short">Short</option><option value="ls">Long, sonst Short</option></select></div></div>
+            <div id="btConds" style="display:grid;gap:8px"></div>
+            <div><button type="button" class="linkbtn" id="btAdd">+ Bedingung</button></div>
+          </div>
+          <div class="bt-box"><div class="eyebrow">Ausstieg · was zuerst eintritt</div>
+            <div class="filters">
+              <label class="chk"><input type="checkbox" id="btExSig"> Bedingung nicht mehr erfüllt</label>
+              <div class="fld"><label for="btHold">Max. Haltedauer (Perioden)</label><input type="number" id="btHold" min="0" step="1"></div>
+              <div class="fld"><label for="btSl">Stop-Loss %</label><input type="number" id="btSl" min="0" step="0.5"></div>
+              <div class="fld"><label for="btTp">Take-Profit %</label><input type="number" id="btTp" min="0" step="0.5"></div>
+              <div class="fld"><label for="btTr">Trailing-Stop %</label><input type="number" id="btTr" min="0" step="0.5"></div>
+            </div>
+          </div>
+          <div class="bt-box"><div class="eyebrow">Größe, Kosten, Ausführung</div>
+            <div class="filters">
+              <div class="fld"><label for="btSize">Anteil Kapital %</label><input type="number" id="btSize" min="1" max="100" step="5"></div>
+              <div class="fld"><label for="btLev">Hebel</label><input type="number" id="btLev" min="0.1" max="20" step="0.5"></div>
+              <div class="fld"><label for="btFee" title="Gebühr je Kauf oder Verkauf in Basispunkten (1 Bp = 0,01 %)">Gebühr Bp/Seite</label><input type="number" id="btFee" min="0" step="0.5"></div>
+              <div class="fld"><label for="btSpread" title="Volle Geld-Brief-Spanne in Bp; je Seite wird die Hälfte belastet">Spread Bp</label><input type="number" id="btSpread" min="0" step="0.5"></div>
+              <div class="fld"><label for="btSlip" title="Schlechtere Ausführung je Seite in Bp">Slippage Bp/Seite</label><input type="number" id="btSlip" min="0" step="0.5"></div>
+              <div class="fld"><label for="btFin" title="Finanzierung, Swap oder Leihgebühr in % pro Jahr auf die Positionsgröße">Finanzierung % p. a.</label><input type="number" id="btFin" min="0" step="0.25"></div>
+              <div class="fld"><label for="btLag">Ausführung</label><select id="btLag"><option value="1">Nächster Tagesschluss</option><option value="0">Gleicher Schluss (optimistisch)</option></select></div>
+            </div>
+          </div>
+          <details class="bt-box"><summary class="eyebrow" style="cursor:pointer">Eigene Kursdaten einfügen (CSV)</summary>
+            <div class="note">Je Zeile <b>Datum;Kurs</b>, z. B. <code>2024-01-31;4845,65</code> oder <code>31.01.2024;4845.65</code>. Tagesdaten, älteste zuerst oder ungeordnet.</div>
+            <textarea id="btCsv" rows="5" spellcheck="false" placeholder="2024-01-02;100&#10;2024-01-03;101,5"></textarea>
+            <div><button type="button" class="linkbtn" id="btCsvUse">Diese Daten verwenden</button> <span class="note" id="btCsvMsg"></span></div>
+          </details>
+        </div>
+        <div><button type="button" class="st-run" id="btRun">Backtest starten</button> <span class="note" id="btMsg"></span></div>
+        <div id="btOut"></div>
+      </div>
     </section>
   </div>
 </div>
@@ -788,13 +923,479 @@ window.renderFactors = async function () {
 };
 </script>
 
+<script src="strategie.js"></script>
+<script>
+// Reiter "Statistik": zeigt nur vorab berechnete Werte aus returns_stats.py (stats_index.json, stats/<id>.json).
+// Gerechnet wird hier nichts ausser Formatierung; der Strategie-Tester nutzt strategie.js (gegen Python geprueft).
+window.renderStatistik = async function () {
+  const $ = s => document.querySelector(s);
+  const S = window.Strategie;
+  const IDX = await (await fetch('stats_index.json', { cache: 'no-store' })).json();
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nf = (v, d = 2) => (v == null || !isFinite(v) ? '–' : Number(v).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }));
+  const pct = (v, d = 2, sign = true) => (v == null || !isFinite(v) ? '–' : (sign && v > 0 ? '+' : '') + nf(v * 100, d) + ' %');
+  const pv = p => (p == null ? '–' : p < 0.001 ? '<0,001' : nf(p, 3));
+  const dDE = s => (s ? s.split('-').reverse().join('.') : '–');
+  const store = { get(k, d) { try { const v = localStorage.getItem('mlc_st_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+                  set(k, v) { try { localStorage.setItem('mlc_st_' + k, JSON.stringify(v)); } catch (e) {} } };
+  const cssv = getComputedStyle(document.documentElement);
+  const C = n => cssv.getPropertyValue('--' + n).trim();
+  const IVN = { '1d': ['Tag', 'Tage', 'Tag bis jetzt', 'Tagesrendite', 'Handelstage'], '1wk': ['Woche', 'Wochen', 'Woche bis heute', 'Wochenrendite', 'Wochen'], '1mo': ['Monat', 'Monate', 'Monat bis heute', 'Monatsrendite', 'Monate'] };
+  const GROUPS = ['Aktien', 'Anleihen', 'Rohstoffe', 'Währungen', 'Krypto', 'Volatilität'];
+  const byId = Object.fromEntries(IDX.instruments.map(i => [i.id, i]));
+  const st = Object.assign({ id: 'SPY', iv: '1wk', per: 'max', rt: 'simple', bins: 'auto', cl: '0.95', view: 'hist', y: 'lin', tab: 'wf', wfm: 'rolling', wfmeth: 'hist', ovl: 'DGS10', pxlog: true }, store.get('state', {}));
+  if (!byId[st.id]) st.id = byId.SPY ? 'SPY' : IDX.instruments[0].id;
+  const save = () => store.set('state', st);
+  $('#stamp').innerHTML = `${window.freshPill(IDX.generated)}<span class="pill">${IDX.instruments.length} Instrumente</span>`;
+  if (IDX.failed && IDX.failed.length) $('#stamp').innerHTML += `<span class="pill" style="color:var(--warn)" title="Diese Instrumente konnten beim letzten Lauf nicht geladen werden">Fehlt: ${esc(IDX.failed.join(', '))}</span>`;
+
+  const options = sel => GROUPS.map(g => {
+    const it = IDX.instruments.filter(i => i.group === g);
+    return it.length ? `<optgroup label="${g}">${it.map(i => `<option value="${i.id}"${i.id === sel ? ' selected' : ''}>${esc(i.name)} · ${esc(i.ticker)}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+  $('#sInst').innerHTML = options(st.id);
+  $('#sInst').addEventListener('change', e => { st.id = e.target.value; save(); draw(); });
+
+  const cache = new Map();
+  const inst = id => { if (!cache.has(id)) cache.set(id, fetch(`stats/${id}.json`, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(id); return r.json(); })); return cache.get(id); };
+
+  function seg(id, key, cb) {
+    const el = $(id);
+    const upd = () => el.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(st[key]))));
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st[key] = b.dataset.v; save(); upd(); cb(); }));
+    upd();
+  }
+  seg('#sIv', 'iv', draw); seg('#sPer', 'per', draw); seg('#sRt', 'rt', draw); seg('#sBins', 'bins', draw);
+  seg('#sCl', 'cl', draw); seg('#sView', 'view', draw); seg('#sY', 'y', draw); seg('#sTab', 'tab', drawTab);
+
+  // ------------------------------------------------------------------ SVG-Hilfen
+  function ticks(min, max, n = 5) {
+    const span = max - min; if (!(span > 0)) return [min];
+    const s0 = span / n, mag = 10 ** Math.floor(Math.log10(s0)), e = s0 / mag;
+    const step = (e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1) * mag;
+    const out = []; for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) out.push(+v.toFixed(12) || 0);  // kein "-0"
+    return out;
+  }
+  function logTicks(min, max) {
+    const out = []; for (let k = Math.floor(Math.log10(min)); k <= Math.ceil(Math.log10(max)); k++) for (const m of [1, 2, 5]) { const v = m * 10 ** k; if (v >= min * 0.999 && v <= max * 1.001) out.push(v); }
+    return out;
+  }
+  function yearTicks(t0, t1) {
+    const y0 = new Date(t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear(), span = y1 - y0;
+    const step = span > 60 ? 10 : span > 30 ? 5 : span > 12 ? 2 : 1;
+    const out = []; for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const t = Date.UTC(y, 0, 1); if (t >= t0 && t <= t1) out.push([t, String(y)]); }
+    if (out.length < 2 && span <= 2) { for (let m = 0; m < 12 * (span + 1); m += 3) { const t = Date.UTC(y0, m, 1); if (t >= t0 && t <= t1) out.push([t, new Date(t).toLocaleDateString('de-DE', { month: 'short', year: '2-digit', timeZone: 'UTC' })]); } }
+    return out;
+  }
+  const axisText = (x, y, s, anchor = 'middle', cls = '') => `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${C('muted')}" font-family="var(--mono)" font-size="11" ${cls}>${esc(s)}</text>`;
+
+  // Linien-Diagramm ueber der Zeit (t in ms)
+  function lineChart(o) {
+    const W = o.W || 860, H = o.H || 240, L = 58, R = 14, T = 14, B = 26;
+    const all = o.series.flatMap(s => s.y.filter((v, i) => v != null && isFinite(v) && (!o.logY || v > 0) && s.t[i] >= o.t0 && s.t[i] <= o.t1));
+    if (!all.length) return `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="${C('muted')}">keine Daten</text>`;
+    let lo = Math.min(...all), hi = Math.max(...all);
+    if (o.yZero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    if (lo === hi) { lo -= 1; hi += 1; }
+    const f = o.logY ? Math.log : v => v;
+    const pad = (f(hi) - f(lo)) * 0.05; const a = f(lo) - pad, b = f(hi) + pad;
+    const X = t => L + (t - o.t0) / (o.t1 - o.t0) * (W - L - R);
+    const Y = v => T + (1 - (f(v) - a) / (b - a)) * (H - T - B);
+    let s = '';
+    const yt = o.logY ? logTicks(Math.exp(a), Math.exp(b)) : ticks(lo, hi, 4);
+    for (const v of (yt.length > 1 ? yt : ticks(lo, hi, 4))) { const y = Y(v); if (y < T - 1 || y > H - B + 1) continue; s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${C('line')}"/>` + axisText(L - 6, y + 4, (o.yFmt || nf)(v), 'end'); }
+    for (const [t, lab] of yearTicks(o.t0, o.t1)) { const x = X(t); s += `<line x1="${x}" x2="${x}" y1="${T}" y2="${H - B}" stroke="${C('line')}" stroke-dasharray="2 4"/>` + axisText(x, H - 8, lab); }
+    if (o.yZero && !o.logY) s += `<line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="${C('line-2')}"/>`;
+    for (const vl of o.vlines || []) { const x = X(vl.t); s += `<line x1="${x}" x2="${x}" y1="${T}" y2="${H - B}" stroke="${vl.color}" stroke-dasharray="4 3"/>` + `<text x="${x + 4}" y="${T + 10}" fill="${vl.color}" font-family="var(--mono)" font-size="10.5">${esc(vl.label)}</text>`; }
+    for (const se of o.series) {
+      let d = '', pen = false;
+      se.t.forEach((t, i) => { const v = se.y[i]; if (t < o.t0 || t > o.t1 || v == null || !isFinite(v) || (o.logY && v <= 0)) { pen = false; return; } d += (pen ? 'L' : 'M') + X(t).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; });
+      if (se.area && !o.logY) s += `<path d="${d}L${X(se.t[se.t.length - 1]).toFixed(1)} ${Y(0)}L${X(se.t[0]).toFixed(1)} ${Y(0)}Z" fill="${se.color}" opacity=".18"/>`;
+      s += `<path d="${d}" fill="none" stroke="${se.color}" stroke-width="${se.w || 1.5}"${se.dash ? ` stroke-dasharray="${se.dash}"` : ''}/>`;
+    }
+    for (const m of o.markers || []) { if (m.t < o.t0 || m.t > o.t1) continue; const x = X(m.t), y = m.y != null ? Y(m.y) : H - B - 4; s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${m.r || 2.6}" fill="${m.color}"><title>${esc(m.title || '')}</title></circle>`; }
+    return s;
+  }
+
+  // ------------------------------------------------------------------ Histogramm / Q-Q
+  function histogramSvg(c, h, lr, live) {
+    const W = 860, H = 400, L = 52, R = 14, T = 30, B = 38;
+    const D = c.distribution, ve = c.var_es[st.cl];
+    const e = h.edges, cnt = h.counts;
+    const marks = [D.mean, -c.var_es['0.95'].var_hist, -c.var_es['0.99'].var_hist, lr.r];
+    let x0 = Math.min(e[0], ...marks), x1 = Math.max(e[e.length - 1], ...marks);
+    const px = (x1 - x0) * 0.02; x0 -= px; x1 += px;
+    const X = v => L + (v - x0) / (x1 - x0) * (W - L - R);
+    const logY = st.y === 'log';
+    const cmax = Math.max(...cnt, ...h.normal_curve_y);
+    const ylo = logY ? 0.7 : 0, yhi = logY ? cmax * 1.6 : cmax * 1.1;
+    const f = logY ? Math.log : v => v;
+    const Y = v => T + (1 - (f(Math.max(v, ylo)) - f(ylo)) / (f(yhi) - f(ylo))) * (H - T - B);
+    let s = '';
+    const yt = logY ? logTicks(1, yhi) : ticks(0, yhi, 5);
+    for (const v of yt) { const y = Y(v); s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${C('line')}"/>` + axisText(L - 6, y + 4, nf(v, 0), 'end'); }
+    for (const v of ticks(x0, x1, 8)) { const x = X(v); s += axisText(x, H - 20, nf(v * 100, Math.abs(x1 - x0) < 0.05 ? 1 : 0) + '%'); s += `<line x1="${x}" x2="${x}" y1="${H - B}" y2="${H - B + 4}" stroke="${C('line-2')}"/>`; }
+    s += axisText((L + W - R) / 2, H - 4, IVN[st.iv][3] + ' (%)');
+    s += `<text transform="translate(12 ${(T + H - B) / 2}) rotate(-90)" text-anchor="middle" fill="${C('muted')}" font-family="var(--mono)" font-size="11">Anzahl${logY ? ' (log)' : ''}</text>`;
+    for (let i = 0; i < cnt.length; i++) {
+      if (!cnt[i]) continue;
+      const a = X(e[i]), b = X(e[i + 1]), y = Y(cnt[i]);
+      s += `<rect x="${(a + 0.4).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0.8, b - a - 0.8).toFixed(1)}" height="${(H - B - y).toFixed(1)}" fill="${h.colors[i] === 'neg' ? C('bear') : C('bull')}" opacity=".82"><title>${pct(e[i], 2, false)} bis ${pct(e[i + 1], 2, false)}: ${cnt[i]} ${IVN[st.iv][1]}</title></rect>`;
+    }
+    const curve = h.normal_curve_x.map((x, i) => [x, h.normal_curve_y[i]]).filter(([, y]) => !logY || y >= ylo);
+    s += `<path d="${curve.map(([x, y], i) => (i ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(y).toFixed(1)).join('')}" fill="none" stroke="${C('warn')}" stroke-width="1.8"/>`;
+    s += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="${C('line-2')}"/>`;
+    const vline = (v, col, lab, row, dash = '5 4') => { const x = X(v); return `<line x1="${x}" x2="${x}" y1="${T - 2}" y2="${H - B}" stroke="${col}" stroke-dasharray="${dash}" stroke-width="1.2"/><text x="${x + (x > W * 0.8 ? -4 : 4)}" y="${T - 16 + row * 12}" text-anchor="${x > W * 0.8 ? 'end' : 'start'}" fill="${col}" font-family="var(--mono)" font-size="10.5">${esc(lab)}</text>`; };
+    s += vline(D.mean, C('fg-2'), 'Mittel ' + pct(D.mean), 0, '2 3');
+    s += vline(-ve.var_hist, C('bear'), `VaR ${st.cl === '0.95' ? 95 : 99} % ` + pct(-ve.var_hist), 1);
+    s += vline(lr.r, C('accent'), (live ? IVN[st.iv][2] : 'Letzte ' + IVN[st.iv][0]) + ' ' + pct(lr.r), 2, '6 3');
+    return s;
+  }
+  function qqSvg(c) {
+    const W = 860, H = 400, L = 58, R = 14, T = 18, B = 38, q = c.qq, D = c.distribution;
+    const xs = q.x, ys = q.y;
+    const x0 = Math.min(...xs) - 0.2, x1 = Math.max(...xs) + 0.2;
+    const lineY = [D.mean + D.sigma * x0, D.mean + D.sigma * x1];
+    const y0 = Math.min(...ys, ...lineY), y1 = Math.max(...ys, ...lineY), py = (y1 - y0) * 0.05;
+    const X = v => L + (v - x0) / (x1 - x0) * (W - L - R), Y = v => T + (1 - (v - (y0 - py)) / (y1 - y0 + 2 * py)) * (H - T - B);
+    let s = '';
+    for (const v of ticks(y0, y1, 6)) { const y = Y(v); s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${C('line')}"/>` + axisText(L - 6, y + 4, nf(v * 100, 0) + '%', 'end'); }
+    for (const v of ticks(x0, x1, 8)) s += axisText(X(v), H - 20, nf(v, 0) + 'σ');
+    s += axisText((L + W - R) / 2, H - 4, 'Theoretische Quantile der Normalverteilung');
+    s += `<line x1="${X(x0)}" y1="${Y(lineY[0])}" x2="${X(x1)}" y2="${Y(lineY[1])}" stroke="${C('fg-2')}" stroke-dasharray="5 4"/>`;
+    xs.forEach((x, i) => { s += `<circle cx="${X(x).toFixed(1)}" cy="${Y(ys[i]).toFixed(1)}" r="2.4" fill="${ys[i] < 0 ? C('bear') : C('bull')}" opacity=".85"><title>${pct(ys[i])} · Normal erwartet ${pct(D.mean + D.sigma * x)}</title></circle>`; });
+    return s;
+  }
+
+  // ------------------------------------------------------------------ Hauptansicht
+  let J = null, CUR = null;
+  async function draw() {
+    try { J = await inst(st.id); } catch (e) { $('#sNote').innerHTML = `<span class="negv">Daten für ${esc(st.id)} fehlen.</span>`; return; }
+    const m = J.meta, key = `${st.iv}|${st.rt}|${st.per}`, c = J.combos[key];
+    CUR = c;
+    $('#sTitle').textContent = `Historisches Rendite-Histogramm · ${m.ticker} · ${m.name}`;
+    if (!c) {
+      $('#sInfo1').innerHTML = ''; $('#sInfo2').innerHTML = ''; $('#sSide').innerHTML = ''; $('#sChart').innerHTML = ''; $('#sLegend').innerHTML = '';
+      $('#sNote').innerHTML = `<span class="negv">Zu wenig Daten (weniger als 30 ${IVN[st.iv][1]}) für diesen Zeitraum.</span>`;
+      drawTab(); return;
+    }
+    const D = c.distribution, T = c.tests, ad = T.anderson, h = c.hist[st.bins], ch = h.chi2, lr = c.live_rank, ve = c.var_es[st.cl];
+    const live = !!lr.live;
+    const normAD = ad.normal[st.cl], normChi = ch.p == null ? null : ch.p >= 1 - +st.cl;
+    $('#sAsOf').textContent = `Daten bis ${dDE(m.data_as_of)} · ${D.n} ${IVN[st.iv][1]} · ${dDE(D.start)} – ${dDE(D.end)}`;
+    $('#sInfo1').innerHTML = [`Mittel <b>${pct(D.mean, 4)}</b>`, `Sigma <b>${pct(D.sigma, 4, false)}</b>`, `A*² <b>${nf(ad.a2_star, 2)}</b>`, `p <b>${pv(ad.p)}</b>`,
+      `Normalverteilt (${Math.round(st.cl * 100)} %) <b class="${normAD ? 'pos' : 'negv'}">${normAD ? 'Ja' : 'Nein'}</b>`,
+      `Chi²/ndf <b>${nf(ch.chi2, 1)} / ${ch.ndf}</b>`, `Beobachtungen <b>${D.n}</b>`].map(x => `<span>${x}</span>`).join('');
+    const down = lr.r < D.mean;
+    const ord = Math.max(1, Math.ceil(lr.percentile));
+    const cnt = down ? `${lr.at_least_as_bad} von ${lr.n + 1} mindestens so tief` : `${lr.at_least_as_good} von ${lr.n + 1} mindestens so hoch`;
+    const head = live ? `<span class="live">● Live</span> ${IVN[st.iv][2]}` : `Letzte ${IVN[st.iv][0]} (abgeschlossen, ${dDE(lr.date)})`;
+    $('#sInfo2').innerHTML = [`${head} <b class="${lr.r < 0 ? 'negv' : 'pos'}">${pct(lr.r)}</b>`, `${ord}. Perzentil`, `${lr.z > 0 ? '+' : ''}${nf(lr.z, 2)}σ`, cnt,
+      `Normal erwartet ${nf(lr.normal_expect, 1)}`, live ? `Stand ${dDE(J.live[st.iv].date)}` : ''].filter(Boolean).map(x => `<span>${x}</span>`).join('');
+    const rank = down ? `Nur <b>${lr.worse_count}</b> ${IVN[st.iv][1]} waren schlechter als diese in den letzten ${lr.years} Jahren.` : `Nur <b>${lr.better_count}</b> ${IVN[st.iv][1]} waren besser als diese in den letzten ${lr.years} Jahren.`;
+    const notes = [rank];
+    if (m.note) notes.push(esc(m.note) + '.');
+    if (!m.investable) notes.push('Nicht direkt handelbar.');
+    if (m.quality && m.quality.length) notes.push(`<span style="color:var(--warn)" title="${esc(m.quality.slice(0, 12).map(q => dDE(q[0]) + ' ' + pct(q[1], 1)).join(', '))}">Datenqualität: ${m.quality.length} auffällige Tagesbewegungen (nicht gelöscht)</span>`);
+    if (st.rt === 'log') notes.push('Log-Renditen: alle Kennzahlen auf ln(P<sub>t</sub>/P<sub>t−1</sub>).');
+    $('#sNote').innerHTML = notes.join(' · ');
+    $('#sChart').innerHTML = st.view === 'qq' ? qqSvg(c) : histogramSvg(c, h, lr, live);
+    $('#sLegend').innerHTML = st.view === 'qq'
+      ? `<span><i style="background:var(--fg-2)"></i>Normalverteilung (Gerade)</span><span>Punkte unter der Geraden links = dickere Verlust-Enden</span>`
+      : `<span><i style="background:var(--bear)"></i>Verlust</span><span><i style="background:var(--bull)"></i>Gewinn</span><span><i style="background:var(--warn)"></i>Normalverteilung (gleiches Mittel/Sigma)</span><span><i style="background:var(--accent)"></i>${live ? 'Laufende' : 'Letzte'} ${IVN[st.iv][0]}</span><span>${h.counts.length} Bins · Breite ${pct(h.width, 3, false)}</span>`;
+    const row = (l, v, t = '') => `<div class="st-row"${t ? ` title="${esc(t)}"` : ''}><span>${l}</span><b>${v}</b></div>`;
+    const sec = (title, rows) => `<div class="st-sec"><h4>${title}</h4>${rows.join('')}</div>`;
+    const Q = c.quantiles, tl = c.tails, cl = Math.round(st.cl * 100);
+    const v95 = c.var_es['0.95'], v99 = c.var_es['0.99'];
+    $('#sSide').innerHTML = `
+      <div class="st-head"><div><div class="eyebrow">Sigma je ${IVN[st.iv][0]}</div><div class="st-big">${pct(D.sigma, 2, false)}</div></div>
+        <div><small>Mittel ${pct(D.mean, 3)}</small><small>Normal ${normAD ? 'Ja' : 'Nein'}</small><small>n = ${D.n}</small></div></div>
+      ${sec('Verteilung', [row('Mittel', pct(D.mean, 4)), row('Median', pct(D.median, 4)), row('Sigma', pct(D.sigma, 4, false)),
+        row('Vola annualisiert', pct(D.ann_vol, 2, false), `Sigma · √${D.k}`), row('Schiefe', nf(D.skew, 3), 'negativ = längeres Verlust-Ende'),
+        row('Exzess-Kurtosis', nf(D.kurt, 3), 'Normalverteilung = 0; größer = dickere Enden'),
+        row('Beste ' + IVN[st.iv][0], `${pct(D.best)} · ${dDE(D.best_date)}`), row('Schlechteste ' + IVN[st.iv][0], `${pct(D.worst)} · ${dDE(D.worst_date)}`)])}
+      ${sec('Normalverteilung?', [row('Anderson-Darling A²', nf(ad.a2, 3)), row('A*² (korrigiert)', nf(ad.a2_star, 3)), row('A-D p-Wert', pv(ad.p), "D'Agostino/Stephens"),
+        row('Chi² / ndf', ch.chi2_ndf == null ? 'n/a' : `${nf(ch.chi2, 2)} / ${ch.ndf}`), row('Chi² p-Wert', pv(ch.p)),
+        row(`Normal bei ${cl} %`, `${normAD ? 'Ja' : 'Nein'} (A-D) · ${normChi == null ? 'n/a' : normChi ? 'Ja' : 'Nein'} (χ²)`),
+        row('Jarque-Bera / p', `${nf(T.jarque_bera.stat, 2)} / ${pv(T.jarque_bera.p)}`),
+        row('Shapiro-Wilk W / p', T.shapiro.w == null ? T.shapiro.na : `${nf(T.shapiro.w, 4)} / ${pv(T.shapiro.p)}`)])}
+      ${sec('Ausreißer · beobachtet · normal', ['1', '2', '3'].map(k => row(`Jenseits ±${k}σ`, `${tl[k].count} (${nf(tl[k].pct, 1)} %) · ${nf(tl[k].normal_pct, 2)} %`)))}
+      ${sec('Quantile · beobachtet · normal', [['0.01', '1 %'], ['0.05', '5 %'], ['0.95', '95 %'], ['0.99', '99 %']].map(([k, l]) => row(`${l}-Quantil`, `${pct(Q[k].obs)} · ${pct(Q[k].normal)}`)))}
+      ${sec('Verlustrisiko · historisch | normal', [row('VaR 95 %', `${pct(v95.var_hist, 2, false)} | ${pct(v95.var_param, 2, false)}`, 'Verlust, der in 95 % der Perioden nicht überschritten wurde'),
+        row('VaR 99 %', `${pct(v99.var_hist, 2, false)} | ${pct(v99.var_param, 2, false)}`),
+        row('ES 95 %', `${pct(v95.es_hist, 2, false)} | ${pct(v95.es_param, 2, false)}`, 'Expected Shortfall: Ø Verlust in den schlechtesten 5 %'),
+        row('ES 99 %', `${pct(v99.es_hist, 2, false)} | ${pct(v99.es_param, 2, false)}`)])}
+      ${sec('Stichprobe & Tests', [row('Beobachtungen', D.n), row('Zeitraum', `${dDE(D.start)} – ${dDE(D.end)}`),
+        row('Steigend / fallend', `${D.up} (${nf(D.up_pct, 0)} %) / ${D.down}${D.zero ? ` · ${D.zero} unverändert` : ''}`),
+        row('Bins', `${h.counts.length} (${st.bins === 'auto' ? 'auto' : 'fest'})`),
+        row('t-Test Mittel ≠ 0', `t = ${nf(T.ttest.t, 2)} · p ${pv(T.ttest.p)}`),
+        row('Rang aktuell', down ? `${lr.worse_count} ${IVN[st.iv][1]} schlechter` : `${lr.better_count} ${IVN[st.iv][1]} besser`)])}`;
+    drawTab();
+  }
+
+  // ------------------------------------------------------------------ Zusatz-Reiter
+  function drawTab() {
+    const body = $('#sTabBody'); const c = CUR;
+    if (!J) return;
+    if (st.tab === 'wf') {
+      $('#sTabNote').textContent = 'Prüft, ob der VaR aus der Vergangenheit die Zukunft richtig eingeschätzt hat';
+      const wfc = J.combos[`${st.iv}|${st.rt}|max`];
+      const w = wfc && wfc.wf && wfc.wf[st.wfm];
+      if (!w) { body.innerHTML = `<div class="note">Zu wenig Daten für den Walk-Forward-Test (${IVN[st.iv][1]}).</div>`; return; }
+      const cl = st.cl, tot = w.total[st.wfmeth];
+      const verdict = (x, e, p) => p == null ? '–' : p >= 0.05 ? '<span class="pos">passt</span>' : x > e ? '<span class="negv">Risiko unterschätzt</span>' : '<span style="color:var(--warn)">Risiko überschätzt</span>';
+      const sum = ['0.95', '0.99'].map(k => { const t = tot[k]; return `<tr><td>VaR ${Math.round(k * 100)} %</td><td>${t.viol}</td><td>${nf(t.expected, 1)}</td><td>${pct(t.hit, 2, false)}</td><td>${pct(1 - k, 0, false)}</td><td>${nf(t.lr, 2)}</td><td>${pv(t.p)}</td><td>${verdict(t.viol, t.expected, t.p)}</td></tr>`; }).join('');
+      const t0 = Date.parse(w.chart.d[0] + 'T00:00:00Z'), t1 = Date.parse(w.chart.d[w.chart.d.length - 1] + 'T00:00:00Z');
+      const tt = w.chart.d.map(d => Date.parse(d + 'T00:00:00Z'));
+      const mk = (k, col) => (w.chart.viol[k] || []).map(([d, r]) => ({ t: Date.parse(d + 'T00:00:00Z'), color: col, title: `${dDE(d)}: ${pct(r)} (VaR ${Math.round(k * 100)} % verletzt)` }));
+      const steps = w.steps.map(s => { const b = s.by[cl][st.wfmeth]; return `<tr><td>${dDE(s.oos_start)} – ${dDE(s.oos_end)}${s.partial ? ' <span class="dim">(Teil)</span>' : ''}</td><td>${dDE(s.is_start)} – ${dDE(s.is_end)}</td><td>${pct(s.is_mu, 3)}</td><td>${pct(s.is_sigma, 2, false)}</td><td>${pct(b.var, 2, false)}</td><td>${pct(b.es, 2, false)}</td><td>${pct(s.oos_mu, 3)}</td><td>${pct(s.oos_sigma, 2, false)}</td><td>${b.viol} / ${s.oos_n}</td><td>${pct(b.hit, 1, false)}</td><td>${pct(b.oos_es, 2, false)}</td></tr>`; }).join('');
+      body.innerHTML = `
+        <div class="filters">
+          <div class="fld"><label>Fenster</label><div class="seg" id="wfM"><button type="button" data-v="rolling">Rollierend</button><button type="button" data-v="expanding">Wachsend</button></div></div>
+          <div class="fld"><label>VaR-Methode</label><div class="seg" id="wfMe"><button type="button" data-v="hist">Historisch</button><button type="button" data-v="param">Normalverteilung</button></div></div>
+          <div class="note" style="align-self:center">In-Sample ${w.is} ${IVN[st.iv][1]} schätzen, dann ${w.oos} ${IVN[st.iv][1]} Out-of-Sample prüfen, weiterschieben. Immer über die volle Historie (${st.rt === 'log' ? 'Log' : 'einfache'} Renditen).</div>
+        </div>
+        <div class="st-tbl"><table><thead><tr><th>Niveau</th><th>Verletzungen</th><th>Erwartet</th><th>Quote</th><th>Soll</th><th>Kupiec LR</th><th>p</th><th>Ergebnis</th></tr></thead><tbody>${sum}</tbody></table></div>
+        <div class="note" style="max-width:none">Stabilität der Schätzung über ${w.steps.length} Schritte: Mittel ${pct(w.stability.mu_mean, 3)} (Spannweite ${pct(w.stability.mu_range, 3, false)}), Sigma ${pct(w.stability.sigma_mean, 2, false)} (Spannweite ${pct(w.stability.sigma_range, 2, false)}). Kupiec-Test: p &lt; 0,05 heißt, die Zahl der Verletzungen passt nicht zum Niveau.</div>
+        <div style="display:grid;gap:12px">
+          <div><div class="eyebrow">Kauf und Halten nur über die Out-of-Sample-Blöcke</div><div class="chartbox"><svg viewBox="0 0 860 240">${lineChart({ t0, t1, logY: true, yFmt: v => nf(v, v < 10 ? 1 : 0), series: [{ t: tt, y: w.chart.equity, color: C('fg') }] })}</svg></div></div>
+          <div><div class="eyebrow">Rollierende Vola (annualisiert) · Punkte = VaR-Verletzungen (gelb 95 %, rot 99 %)</div><div class="chartbox"><svg viewBox="0 0 860 240">${lineChart({ t0, t1, yFmt: v => nf(v * 100, 0) + '%', yZero: true, series: [{ t: tt, y: w.chart.roll_vol, color: C('warn') }], markers: [...mk('0.95', C('warn')), ...mk('0.99', C('bear'))] })}</svg></div></div>
+        </div>
+        <div class="eyebrow">Schritte · VaR ${Math.round(cl * 100)} % ${st.wfmeth === 'hist' ? 'historisch' : 'normal'}</div>
+        <div class="st-tbl"><table><thead><tr><th>Out-of-Sample</th><th>In-Sample</th><th>IS Mittel</th><th>IS Sigma</th><th>VaR</th><th>ES</th><th>OOS Mittel</th><th>OOS Sigma</th><th>Verletzt</th><th>Quote</th><th>OOS-ES</th></tr></thead><tbody>${steps}</tbody></table></div>`;
+      seg('#wfM', 'wfm', drawTab); seg('#wfMe', 'wfmeth', drawTab);
+      return;
+    }
+    const s = S.decodeSeries(J.series);
+    const years = { max: 0, '20y': 20, '10y': 10, '5y': 5, '1y': 1 }[st.per];
+    const tEnd = s.t[s.t.length - 1], tStart = years ? Date.UTC(new Date(tEnd).getUTCFullYear() - years, new Date(tEnd).getUTCMonth(), new Date(tEnd).getUTCDate()) : s.t[0];
+    const step = Math.max(1, Math.ceil(s.t.filter(t => t >= tStart).length / 1500));
+    const thin = s.t.map((t, i) => i).filter(i => s.t[i] >= tStart && ((i % step) === 0 || i === s.t.length - 1));
+    if (st.tab === 'px') {
+      $('#sTabNote').textContent = `${J.meta.name} · Tagesschlüsse · Zeitraum wie oben`;
+      body.innerHTML = `<div class="filters"><div class="fld"><label>Skala</label><div class="seg" id="pxS"><button type="button" data-v="true">Log</button><button type="button" data-v="false">Linear</button></div></div></div>
+        <div class="chartbox"><svg viewBox="0 0 860 300">${lineChart({ H: 300, t0: s.t[thin[0]], t1: tEnd, logY: st.pxlog === true || st.pxlog === 'true', series: [{ t: thin.map(i => s.t[i]), y: thin.map(i => s.c[i]), color: C('fg') }] })}</svg></div>`;
+      seg('#pxS', 'pxlog', drawTab);
+      return;
+    }
+    // Makro-Overlay
+    const ms = IDX.macro || {};
+    const keys = Object.keys(ms);
+    if (!keys.includes(st.ovl)) st.ovl = keys[0];
+    const M = ms[st.ovl];
+    $('#sTabNote').textContent = 'FRED-Monatswerte · gleiche Zeitachse wie der Kurs';
+    const sel = `<div class="filters"><div class="fld"><label for="ovlSel">Makroreihe</label><select id="ovlSel">${keys.map(k => `<option value="${k}"${k === st.ovl ? ' selected' : ''}>${esc(ms[k].label)}</option>`).join('')}</select></div></div>`;
+    if (!M || M.error) { body.innerHTML = sel + `<div class="note">Diese Reihe ist gerade nicht verfügbar.</div>`; }
+    else {
+      const mt = M.d.map(d => Date.parse(d + 'T00:00:00Z'));
+      const t0 = Math.max(s.t[thin[0]], mt[0]), t1 = Math.max(tEnd, mt[mt.length - 1]);
+      body.innerHTML = sel + `<div class="eyebrow">${esc(J.meta.name)} (log)</div><div class="chartbox"><svg viewBox="0 0 860 200">${lineChart({ H: 200, t0, t1, logY: true, series: [{ t: thin.map(i => s.t[i]), y: thin.map(i => s.c[i]), color: C('fg') }] })}</svg></div>
+        <div class="eyebrow">${esc(M.label)}</div><div class="chartbox"><svg viewBox="0 0 860 200">${lineChart({ H: 200, t0, t1, series: [{ t: mt, y: M.v, color: C('warn') }] })}</svg></div>`;
+    }
+    $('#ovlSel').addEventListener('change', e => { st.ovl = e.target.value; save(); drawTab(); });
+  }
+
+  $('#sCsv').addEventListener('click', () => {
+    const c = CUR; if (!c || !J) return;
+    const D = c.distribution, rows = [['Instrument', J.meta.name], ['Ticker', J.meta.ticker], ['Intervall', st.iv], ['Rendite', st.rt], ['Zeitraum', `${D.start} bis ${D.end}`], ['N', D.n]];
+    for (const k of ['mean', 'median', 'sigma', 'ann_vol', 'skew', 'kurt', 'best', 'best_date', 'worst', 'worst_date', 'up', 'down', 'zero']) rows.push([k, D[k]]);
+    for (const [q, v] of Object.entries(c.quantiles)) rows.push([`quantil_${q}_beob`, v.obs], [`quantil_${q}_normal`, v.normal]);
+    for (const [cl, v] of Object.entries(c.var_es)) for (const [k, x] of Object.entries(v)) rows.push([`${k}_${cl}`, x]);
+    for (const [k, v] of Object.entries(c.tails)) rows.push([`jenseits_${k}sigma`, v.count], [`jenseits_${k}sigma_normal_pct`, v.normal_pct]);
+    const T = c.tests; rows.push(['jarque_bera', T.jarque_bera.stat], ['jarque_bera_p', T.jarque_bera.p], ['shapiro_w', T.shapiro.w], ['shapiro_p', T.shapiro.p], ['ad_a2', T.anderson.a2], ['ad_a2_star', T.anderson.a2_star], ['ad_p', T.anderson.p], ['t', T.ttest.t], ['t_p', T.ttest.p]);
+    const h = c.hist[st.bins].chi2; rows.push(['chi2', h.chi2], ['chi2_ndf', h.ndf], ['chi2_p', h.p]);
+    const csv = rows.map(r => r.map(v => String(v ?? '').replace(/;/g, ',')).join(';')).join('\n');
+    try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `kennzahlen_${J.meta.id}_${st.iv}_${st.rt}_${st.per}.csv`; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { console.error(e); }
+  });
+
+  await draw();
+
+  // ================================================================== Strategie-Tester
+  const CT = {
+    always: { l: 'Immer (Kauf und Halten)', f: [] },
+    price_sma: { l: 'Kurs vs. gleitender Durchschnitt', f: ['op', 'n'] },
+    sma_sma: { l: 'Durchschnitt vs. Durchschnitt', f: ['op', 'a', 'b'] },
+    mom: { l: 'Momentum (Rendite über n Perioden)', f: ['n', 'op', 'thp'] },
+    ret: { l: 'Letzte Periodenrendite', f: ['op', 'thp'] },
+    z: { l: 'z-Score der Periodenrendite', f: ['n', 'op', 'th'] },
+    rsi: { l: 'RSI (Wilder)', f: ['n', 'op', 'th'] },
+    hilo: { l: 'Nähe zum n-Perioden-Hoch/-Tief', f: ['side', 'n', 'thp'] },
+    vol: { l: 'Volatilität annualisiert', f: ['n', 'op', 'thp'] },
+    calendar: { l: 'Kalender (Monat / Wochentag)', f: ['months', 'weekdays'] },
+  };
+  const MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'], WDN = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+  const defBt = { inst: 'SPY', iv: '1wk', dir: 'long', conds: [{ type: 'ret', op: 'lt', th: -3 }], exSig: false, hold: 4, sl: 0, tp: 0, tr: 0, size: 100, lev: 1, fee: 1, spread: 2, slip: 1, fin: 0, lag: '1', start: '', end: '', split: '' };
+  const bt = Object.assign({}, defBt, store.get('bt', {}));
+  if (!byId[bt.inst] && bt.inst !== '__csv') bt.inst = 'SPY';
+  let custom = null;
+
+  function condRow(c, k) {
+    const f = CT[c.type].f;
+    const num = (key, lab, stepv = 1) => `<div class="fld"><label>${lab}</label><input type="number" data-k="${key}" step="${stepv}" value="${c[key] ?? ''}"></div>`;
+    let h = `<div class="bt-cond" data-i="${k}"><div class="fld"><label>Bedingung ${k + 1}</label><select data-k="type">${Object.entries(CT).map(([v, d]) => `<option value="${v}"${v === c.type ? ' selected' : ''}>${d.l}</option>`).join('')}</select></div>`;
+    for (const x of f) {
+      if (x === 'op') h += `<div class="fld"><label>${c.type === 'price_sma' ? 'Kurs liegt' : c.type === 'sma_sma' ? 'SMA a liegt' : 'Wert ist'}</label><select data-k="op"><option value="gt"${c.op === 'gt' ? ' selected' : ''}>über / größer als</option><option value="lt"${c.op === 'lt' ? ' selected' : ''}>unter / kleiner als</option></select></div>`;
+      if (x === 'n') h += num('n', 'Länge n (Perioden)');
+      if (x === 'a') h += num('a', 'SMA a (kurz)');
+      if (x === 'b') h += num('b', 'SMA b (lang)');
+      if (x === 'thp') h += num('th', c.type === 'hilo' ? 'Abstand höchstens %' : 'Schwelle %', 0.5);
+      if (x === 'th') h += num('th', c.type === 'z' ? 'Schwelle (σ)' : 'Schwelle', 0.1);
+      if (x === 'side') h += `<div class="fld"><label>Nähe zum</label><select data-k="side"><option value="high"${c.side !== 'low' ? ' selected' : ''}>Hoch</option><option value="low"${c.side === 'low' ? ' selected' : ''}>Tief</option></select></div>`;
+      if (x === 'months') h += `<div class="fld"><label>Monate (leer = alle)</label><div class="months">${MON.map((m, i) => `<label class="chk"><input type="checkbox" data-m="${i + 1}"${(c.months || []).includes(i + 1) ? ' checked' : ''}>${m}</label>`).join('')}</div></div>`;
+      if (x === 'weekdays') h += `<div class="fld"><label>Wochentage (nur Signal-Intervall Tag)</label><div class="months">${WDN.map((m, i) => `<label class="chk"><input type="checkbox" data-w="${i + 1}"${(c.weekdays || []).includes(i + 1) ? ' checked' : ''}>${m}</label>`).join('')}</div></div>`;
+    }
+    return h + `<button type="button" class="linkbtn x" data-del="${k}" aria-label="Bedingung entfernen">entfernen</button></div>`;
+  }
+  const DEF = { always: {}, price_sma: { op: 'gt', n: 10 }, sma_sma: { op: 'gt', a: 10, b: 40 }, mom: { n: 12, op: 'gt', th: 0 }, ret: { op: 'lt', th: -3 },
+    z: { n: 52, op: 'lt', th: -2 }, rsi: { n: 14, op: 'lt', th: 30 }, hilo: { side: 'low', n: 52, th: 2 }, vol: { n: 20, op: 'lt', th: 20 }, calendar: { months: [], weekdays: [] } };
+  function drawConds() {
+    $('#btConds').innerHTML = bt.conds.map(condRow).join('') || '<div class="note">Keine Bedingung = immer investiert.</div>';
+    $('#btAdd').hidden = bt.conds.length >= 3;
+    $('#btConds').querySelectorAll('.bt-cond').forEach(row => {
+      const k = +row.dataset.i;
+      row.querySelector('select[data-k="type"]').addEventListener('change', e => { bt.conds[k] = { type: e.target.value, ...JSON.parse(JSON.stringify(DEF[e.target.value])) }; drawConds(); });
+      row.querySelectorAll('[data-k]:not([data-k="type"])').forEach(inp => inp.addEventListener('change', () => { const v = inp.tagName === 'SELECT' ? inp.value : parseFloat(inp.value); bt.conds[k][inp.dataset.k] = v; }));
+      row.querySelectorAll('[data-m]').forEach(cb => cb.addEventListener('change', () => { bt.conds[k].months = [...row.querySelectorAll('[data-m]:checked')].map(x => +x.dataset.m); }));
+      row.querySelectorAll('[data-w]').forEach(cb => cb.addEventListener('change', () => { bt.conds[k].weekdays = [...row.querySelectorAll('[data-w]:checked')].map(x => +x.dataset.w); }));
+      row.querySelector('[data-del]').addEventListener('click', () => { bt.conds.splice(k, 1); drawConds(); });
+    });
+  }
+  $('#btAdd').addEventListener('click', () => { if (bt.conds.length < 3) { bt.conds.push({ type: 'price_sma', ...DEF.price_sma }); drawConds(); } });
+
+  const fields = { btIv: 'iv', btDir: 'dir', btHold: 'hold', btSl: 'sl', btTp: 'tp', btTr: 'tr', btSize: 'size', btLev: 'lev', btFee: 'fee', btSpread: 'spread', btSlip: 'slip', btFin: 'fin', btLag: 'lag', btStart: 'start', btEnd: 'end', btSplit: 'split' };
+  function fillForm() {
+    $('#btInst').innerHTML = options(bt.inst) + (custom ? `<option value="__csv"${bt.inst === '__csv' ? ' selected' : ''}>Eigene Daten (${custom.t.length} Tage)</option>` : '');
+    for (const [id, k] of Object.entries(fields)) $('#' + id).value = bt[k] ?? '';
+    $('#btExSig').checked = !!bt.exSig;
+    drawConds();
+  }
+  function readForm() {
+    bt.inst = $('#btInst').value;
+    for (const [id, k] of Object.entries(fields)) { const el = $('#' + id); bt[k] = el.type === 'number' ? (el.value === '' ? 0 : parseFloat(el.value)) : el.value; }
+    bt.exSig = $('#btExSig').checked;
+    store.set('bt', bt);
+    const pctKeys = { mom: 1, ret: 1, hilo: 1, vol: 1 };
+    const conds = bt.conds.map(c => { const o = { ...c }; if (pctKeys[c.type]) o.th = (c.th || 0) / 100; return o; });
+    return { interval: bt.iv, dir: bt.dir, conds, exit: { signal: bt.exSig, maxHold: Math.max(0, Math.round(bt.hold || 0)), sl: bt.sl || 0, tp: bt.tp || 0, trail: bt.tr || 0 },
+      size: (bt.size || 100) / 100, lev: bt.lev || 1, cost: { fee_bp: bt.fee || 0, spread_bp: bt.spread || 0, slip_bp: bt.slip || 0, fin_pa: bt.fin || 0 },
+      lag: +bt.lag, start: bt.start || null, end: bt.end || null, split: bt.split || null };
+  }
+
+  $('#btCsvUse').addEventListener('click', () => {
+    const lines = $('#btCsv').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const rows = [];
+    for (const l of lines) {
+      const parts = l.includes(';') ? l.split(';') : l.includes('\t') ? l.split('\t') : l.split(',');
+      if (parts.length < 2) continue;
+      let d = parts[0].trim(), v = parts[parts.length - 1].trim().replace(/\s/g, '');
+      const m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (m) d = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      if (v.includes(',') && v.includes('.')) v = v.replace(/\./g, '').replace(',', '.');   // 1.234,56
+      else if (v.includes(',')) v = v.replace(',', '.');                                      // 1234,56
+      const x = Number(v); if (!(x > 0)) continue;
+      rows.push([Date.parse(d + 'T00:00:00Z'), x]);
+    }
+    const map = new Map(); for (const [t, x] of rows) map.set(t, x);
+    const srt = [...map.entries()].sort((a, b) => a[0] - b[0]);
+    if (srt.length < 60) { $('#btCsvMsg').textContent = `Nur ${srt.length} gültige Zeilen erkannt – mindestens 60 nötig.`; return; }
+    const t = srt.map(r => r[0]), today = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+    custom = { t, d: t.map(S.iso), c: srt.map(r => r[1]), ends: { '1wk': S.periodEnds(t, '1wk', today), '1mo': S.periodEnds(t, '1mo', today) }, crypto: false };
+    bt.inst = '__csv';
+    $('#btCsvMsg').textContent = `${srt.length} Tage erkannt (${dDE(S.iso(t[0]))} – ${dDE(S.iso(t[t.length - 1]))}).`;
+    fillForm();
+  });
+
+  function variants(key) {
+    let v = store.get('variants', []);
+    if (!Array.isArray(v)) v = [];
+    if (!v.includes(key)) { v.push(key); if (v.length > 5000) v = v.slice(-5000); store.set('variants', v); }
+    return v.length;
+  }
+
+  async function runBt() {
+    const btn = $('#btRun'); btn.disabled = true; $('#btMsg').textContent = 'rechnet …';
+    await new Promise(r => setTimeout(r, 20));
+    try {
+      const cfg = readForm();
+      let data, meta;
+      if (bt.inst === '__csv' && custom) { data = custom; meta = { name: 'Eigene Daten', investable: true, note: '', id: '__csv' }; }
+      else { const Jb = await inst(bt.inst); const s = S.decodeSeries(Jb.series); data = { ...s, ends: Jb.period_ends, crypto: Jb.meta.crypto }; meta = Jb.meta; }
+      const res = S.backtest(data, cfg);
+      const pl = S.placebo(data, cfg, res, 200, 42);
+      const M = variants(JSON.stringify([bt.inst, cfg.interval, cfg.dir, cfg.conds, cfg.exit, cfg.size, cfg.lev, cfg.cost, cfg.lag, cfg.start, cfg.end]));
+      renderBt(res, pl, cfg, meta, M);
+      $('#btMsg').textContent = '';
+    } catch (e) { console.error(e); $('#btMsg').innerHTML = `<span class="negv">${esc(e.message || e)}</span>`; }
+    btn.disabled = false;
+  }
+  $('#btRun').addEventListener('click', runBt);
+
+  function renderBt(res, pl, cfg, meta, M) {
+    const m = res.metrics, a = m.all, b = m.bh, ts = res.tradeStats;
+    const ems = S.expectedMaxSharpe(M, res.years);
+    $('#btVar').textContent = `${M} Variante${M === 1 ? '' : 'n'} getestet (dieser Browser)`;
+    const warn = [];
+    if (cfg.lag === 0) warn.push('<b>Ausführung am gleichen Schlusskurs</b> ist optimistisch: Den Schlusskurs kennt man erst, wenn er feststeht.');
+    if (!meta.investable) warn.push(`<b>${esc(meta.name)}</b> ist nicht direkt handelbar – Ergebnisse sind rein theoretisch.`);
+    if (meta.note && /Roll/.test(meta.note)) warn.push(`<b>Futures-Front-Monat:</b> ${esc(meta.note)}. Für Backtests besser die ETFs verwenden.`);
+    if (meta.note && /ohne Dividenden/.test(meta.note)) warn.push('<b>Kursindex ohne Dividenden:</b> Kauf und Halten ist hier zu niedrig, Short-Strategien zu gut.');
+    if (ts.n < 30) warn.push(`<b>Nur ${ts.n} Trades:</b> zu wenig für eine belastbare Aussage.`);
+    if (res.ruined) warn.push('<b>Totalverlust</b> durch den Hebel.');
+    if (M > 1 && a.sharpe != null && a.sharpe <= ems) warn.push(`<b>Data Snooping:</b> Bei ${M} getesteten Varianten erreicht die beste Zufallsstrategie über ${nf(res.years, 0)} Jahre im Schnitt schon einen Sharpe von ≈ ${nf(ems, 2)}. Dieses Ergebnis (${nf(a.sharpe, 2)}) liegt nicht darüber.`);
+    const kpi = (k, v, d, cls = '') => `<div class="tile"><div class="k">${k}</div><div class="v ${cls}">${v}</div><div class="d">${d}</div></div>`;
+    const sgn = v => (v == null ? '' : v >= 0 ? 'pos' : 'negv');
+    const plTxt = pl.na ? pl.na : `p = ${nf(pl.p, 3)}`;
+    const col = (x, f) => (x ? f(x) : '–');
+    const rowM = (l, f) => `<tr><td>${l}</td><td>${col(m.all, f)}</td><td>${col(m.is, f)}</td><td>${col(m.oos, f)}</td><td>${col(m.bh, f)}</td><td>${col(m.bh_is, f)}</td><td>${col(m.bh_oos, f)}</td></tr>`;
+    const t0 = res.series.t[0], t1 = res.series.t[res.series.t.length - 1];
+    const step = Math.max(1, Math.ceil(res.series.t.length / 1500));
+    const idx = res.series.t.map((_, i) => i).filter(i => i % step === 0 || i === res.series.t.length - 1);
+    const pick = arr => idx.map(i => arr[i]);
+    let pk = -Infinity; const dd = res.series.eq.map(v => { pk = Math.max(pk, v); return pk > 0 ? v / pk - 1 : 0; });  // nur Darstellung
+    const splitT = Date.parse(res.range.split + 'T00:00:00Z');
+    const yrs = res.yearly.map(y => `<tr><td>${y.year}</td><td class="${sgn(y.strat)}">${pct(y.strat, 1)}</td><td class="${sgn(y.bh)}">${pct(y.bh, 1)}</td><td class="${sgn(y.strat - y.bh)}">${pct(y.strat - y.bh, 1)}</td></tr>`).join('');
+    const trs = res.trades.slice(-200).reverse().map(t => `<tr><td>${dDE(t.entry)}</td><td>${dDE(t.exit)}</td><td>${t.dir > 0 ? 'Long' : 'Short'}</td><td>${nf(t.entryPx, 2)}</td><td>${nf(t.exitPx, 2)}</td><td class="${sgn(t.ret)}">${pct(t.ret, 2)}</td><td>${t.days}</td><td>${t.reason}</td></tr>`).join('');
+    $('#btOut').innerHTML = `
+      ${warn.length ? `<div class="warnbox">${warn.join('<br>')}</div>` : ''}
+      <div class="kpis">
+        ${kpi('CAGR', pct(a.cagr), `Kauf und Halten ${pct(b.cagr)}`, sgn(a.cagr))}
+        ${kpi('Sharpe', nf(a.sharpe, 2), `Kauf und Halten ${nf(b.sharpe, 2)}`)}
+        ${kpi('Max. Drawdown', pct(a.maxdd, 1), `Kauf und Halten ${pct(b.maxdd, 1)}`, 'negv')}
+        ${kpi('Out-of-Sample Sharpe', nf(m.oos && m.oos.sharpe, 2), `ab ${dDE(res.range.split)}`)}
+        ${kpi('Trades', ts.n, `Treffer ${ts.n ? pct(ts.win, 0, false) : '–'} · Ø ${ts.n ? nf(ts.avg_days, 0) : '–'} Tage`)}
+        ${kpi('Zeit im Markt', pct(res.exposure, 0, false), `Kosten gesamt ${pct(res.costs, 2, false)}`)}
+        ${kpi('Zufallsvergleich', plTxt, pl.na ? '' : `Median Zufall ${nf(pl.median, 2)} · 95 % ${nf(pl.p95, 2)}`, pl.p != null && pl.p < 0.05 ? 'pos' : '')}
+        ${kpi('Varianten getestet', M, M > 1 ? `bester Zufalls-Sharpe ≈ ${nf(ems, 2)}` : 'ab 2 Varianten: Zufalls-Vergleichswert')}
+      </div>
+      <div class="note" style="max-width:none">${esc(meta.name)} · ${dDE(res.range.start)} – ${dDE(res.range.end)} · In-Sample bis ${dDE(res.range.split)}, danach Out-of-Sample. Zufallsvergleich: 200 Strategien mit gleicher Zahl, Dauer und Richtung der Trades zu zufälligen Zeitpunkten (fester Startwert); p = Anteil, der mindestens so gut war. Kosten je Seite ${nf(((cfg.cost.fee_bp || 0) + (cfg.cost.spread_bp || 0) / 2 + (cfg.cost.slip_bp || 0)) * cfg.size * cfg.lev, 1)} Bp, ${res.sides} Seiten.</div>
+      <div class="grid2b">
+        <div><div class="eyebrow">Kapital (log) · Strategie <span style="color:var(--accent)">●</span> · Kauf und Halten <span style="color:var(--muted)">●</span></div><div class="chartbox"><svg viewBox="0 0 860 260">${lineChart({ H: 260, t0, t1, logY: true, yFmt: v => nf(v, v < 10 ? 1 : 0), vlines: [{ t: splitT, label: 'OOS', color: C('warn') }], series: [{ t: pick(res.series.t), y: pick(res.series.bh), color: C('muted'), w: 1.2 }, { t: pick(res.series.t), y: pick(res.series.eq), color: C('accent'), w: 1.8 }] })}</svg></div></div>
+        <div><div class="eyebrow">Drawdown der Strategie</div><div class="chartbox"><svg viewBox="0 0 860 260">${lineChart({ H: 260, t0, t1, yZero: true, yFmt: v => nf(v * 100, 0) + '%', series: [{ t: pick(res.series.t), y: pick(dd), color: C('bear'), w: 1.2, area: true }] })}</svg></div></div>
+      </div>
+      <div class="st-tbl"><table><thead><tr><th>Kennzahl</th><th>Gesamt</th><th>In-Sample</th><th>Out-of-Sample</th><th>Halten gesamt</th><th>Halten IS</th><th>Halten OOS</th></tr></thead><tbody>
+        ${rowM('Gesamtrendite', x => pct(x.total, 1))}${rowM('CAGR', x => pct(x.cagr))}${rowM('Volatilität', x => pct(x.vol, 1, false))}
+        ${rowM('Sharpe (rf = 0)', x => nf(x.sharpe, 2))}${rowM('Sortino', x => nf(x.sortino, 2))}${rowM('Max. Drawdown', x => pct(x.maxdd, 1))}
+        ${rowM('Längster Drawdown (Tage)', x => nf(x.dd_days, 0))}${rowM('Calmar', x => nf(x.calmar, 2))}${rowM('t-Wert Ø Tagesrendite', x => nf(x.t, 2))}${rowM('p-Wert', x => pv(x.p))}${rowM('Jahre', x => nf(x.years, 1))}
+      </tbody></table></div>
+      <div class="note" style="max-width:none">Trades: ${ts.n} · Treffer ${ts.n ? pct(ts.win, 1, false) : '–'} · Ø Gewinn ${pct(ts.avg_win)} · Ø Verlust ${pct(ts.avg_loss)} · Profit-Faktor ${nf(ts.pf, 2)} · Ø Trade ${pct(ts.avg_ret)} · Ø Haltedauer ${ts.n ? nf(ts.avg_days, 1) : '–'} Kalendertage.</div>
+      <div class="grid2b">
+        <div><div class="eyebrow">Jahre</div><div class="st-tbl"><table><thead><tr><th>Jahr</th><th>Strategie</th><th>Halten</th><th>Differenz</th></tr></thead><tbody>${yrs}</tbody></table></div></div>
+        <div><div class="eyebrow">Trades (neueste zuerst${res.trades.length > 200 ? ', letzte 200' : ''})</div><div class="st-tbl"><table><thead><tr><th>Einstieg</th><th>Ausstieg</th><th>Richtung</th><th>Kurs ein</th><th>Kurs aus</th><th>Rendite</th><th>Tage</th><th>Grund</th></tr></thead><tbody>${trs || '<tr><td colspan="8">keine Trades</td></tr>'}</tbody></table></div></div>
+      </div>`;
+  }
+
+  fillForm();
+  await runBt();
+};
+</script>
+
 <script>
 (async function () {
   const $ = s => document.querySelector(s);
   let D;
   let MODE = 'alfred';  // Standard: strengere Echtzeit-Variante
   try { MODE = localStorage.getItem('mlc_mode') || 'alfred'; } catch (e) {}
-  if (['#alfred', '#fred', '#faktoren', '#termine'].includes(location.hash)) MODE = location.hash.slice(1);
+  if (['#alfred', '#fred', '#faktoren', '#termine', '#statistik'].includes(location.hash)) MODE = location.hash.slice(1);
   document.querySelectorAll('#modeSeg button').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.m === MODE);
     b.addEventListener('click', () => { if (b.dataset.m === MODE) return; try { localStorage.setItem('mlc_mode', b.dataset.m); } catch (e) {} location.hash = b.dataset.m; location.reload(); });
@@ -804,6 +1405,13 @@ window.renderFactors = async function () {
     document.querySelector('.brand .sub').textContent = 'US-Datentermine · Zinsentscheide der 8 Notenbanken';
     try { await window.renderTermine(); }
     catch (e) { $('#termView').innerHTML = '<div class="panel err">Die Termine (termine.json) konnten nicht geladen werden. Bitte die Seite neu laden.</div>'; console.error(e); }
+    return;
+  }
+  if (MODE === 'statistik') {
+    $('#macroView').hidden = true; $('#statView').hidden = false;
+    document.querySelector('.brand .sub').textContent = 'Rendite-Statistik · Walk-Forward · Strategie-Tester';
+    try { await window.renderStatistik(); }
+    catch (e) { $('#statView').innerHTML = '<div class="panel err">Die Statistik-Daten (stats_index.json) konnten nicht geladen werden. Bitte die Seite neu laden.</div>'; console.error(e); }
     return;
   }
   if (MODE === 'faktoren') {

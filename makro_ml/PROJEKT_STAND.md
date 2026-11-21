@@ -22,13 +22,16 @@ Stand: 20.11.2026. Diese Datei ist für neue Sitzungen gedacht: zuerst lesen, da
 | `research/turning_points.py` | Wendepunkt-Analyse mit TradingView-CSV-Exporten – nur Forschung |
 | `termine.py` | Termine der Woche: US-Termine von Census, BEA, Fed (G.17) und FRED-Kalender (BLS), offizielle Uhrzeiten, ISM-PMI nach Regel, letzte Werte aus FRED; Zinsentscheide der 8 Notenbanken (Liste Stand 20.11.2026, bis Ende 2027) |
 | `pruefe_termine.py` | Unabhängige Gegenprüfung: lädt die offiziellen Seiten selbst und vergleicht jeden Notenbank- und US-Termin (Exit-Code 1 bei Abweichung); läuft täglich nach der Pipeline |
-| `pruefe_cockpit.js` | Öffnet die Seite in allen Reitern (Desktop/Handy), meldet JavaScript-Fehler; läuft täglich vor dem Veröffentlichen, bei Fehler wird nicht veröffentlicht |
+| `pruefe_cockpit.js` | Öffnet die Seite in allen fünf Reitern (Desktop/Handy), meldet JavaScript-Fehler; läuft täglich vor dem Veröffentlichen, bei Fehler wird nicht veröffentlicht |
 | `data_sources.py` | Abruf FRED, ALFRED (ohne Key), BIS, EZB, SIPRI, CFTC; Cache in `cache/` |
-| `cockpit.html` | Oberfläche; lädt `data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json` (4. Reiter „Termine“) |
+| `cockpit.html` | Oberfläche; lädt `data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json` (4. Reiter „Termine“), 5. Reiter „Statistik“ lädt `stats_index.json`, `stats/<id>.json`, `strategie.js` |
+| `returns_stats.py` | Reiter Statistik: 46 Instrumente (Aktien, Anleihen, Rohstoffe, Währungen, Krypto, VIX) über yfinance bzw. FRED; Verteilung, Tests, VaR/ES, Live-Rang, Walk-Forward-VaR mit Kupiec. Definitionen: `SPEC_STATISTIK.md` |
+| `strategie.js` / `strategie_ref.py` | Strategie-Tester im Browser (Regeln frei wählbar) und unabhängige Python-Gegenrechnung für die Tests |
 | `../tests/test_makro_ml.py` | Selbsttests (Lecks, Fristen, Euro ab 1999, Kosten, Phantom-Monat) |
 
 Neu rechnen: `cd makro_ml && python3 -W ignore pipeline.py` (ca. 10 Min., Exit-Code 1 = ein Teil ist fehlgeschlagen und zeigt den alten Stand).
 Danach `cockpit.html` veröffentlichen mit `files` = {`data_fred.json`, `data_alfred.json`, `factors.json`, `termine.json`, `research_52w.json`} jeweils aus `output/`.
+Reiter Statistik (Entwurf 21.11., noch **nicht** in der täglichen Aufgabe): `python3 returns_stats.py`, dann zusätzlich `strategie.js`, `stats_index.json`, `stats/<id>.json` veröffentlichen.
 Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pipeline-Lauf, sonst werden sie mangels Cache übersprungen („skipped“ heißt nicht bestanden).
 
 ## Ergebnisse (nach allen Korrekturen)
@@ -77,6 +80,11 @@ Tests: `python3 -m pytest tests/test_makro_ml.py -q` – erst **nach** einem Pip
   Richtung – aber seit 2015 fast null. Hochs: nichts belegt. Als Hinweis im Faktor-Reiter (`research_52w.json`, täglich).
 - **Wendepunkte:** mit keinem Signal vorhersagbar (Vorhersage 49–52 %). Gute Treffer an Wenden (CFTC, umgedrehtes Momentum) sind Rückblick-Effekte.
   Optimieren auf einen Wendepunkt: 100 % dort, 51 % anderswo → Überoptimierung.
+
+- **Reiter Statistik (Entwurf 21.11.):** SPY Weekly seit 1993 passt zum Vorbild-Screenshot (Sigma 2,36 %, Vola 17,0 %,
+  beste/schlechteste Woche 28.11.08 / 10.10.08, Schiefe −0,58, Kurtosis 6,5). Walk-Forward-VaR (156/52 Wochen, rollierend):
+  95 %-VaR 102 Verletzungen statt 80 erwartet, 99 % 38 statt 16 (Kupiec p 0,017 / < 0,001) → die Normal-/Historien-VaR
+  unterschätzt das Risiko. Unabhängige Gegenrechnung des Strategie-Testers (JS vs. Python) in 9 Regel-Kombinationen identisch.
 
 ## Grundsätze, an die wir uns halten
 
